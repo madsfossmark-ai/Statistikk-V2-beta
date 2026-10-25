@@ -1359,6 +1359,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 #v2-status { position: fixed; left: 12px; bottom: 12px; z-index: 9998; font: 600 13px/1.2 system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: #fff7e6; color: #8a5a00; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: none; }
 #v2-status.feil { background: #fde8e8; color: #9b1c1c; }
 #v2-status.ok { background: #e7f6ec; color: #17603a; }
+#v2-loggut { position: fixed; right: 12px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
 </style>
 <script>
 /* V2: Supabase-lagring med innlogging. Standard i appen er fortsatt Claude-lagringen; denne siden er et eget valg. */
@@ -1371,6 +1372,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function statuslinje(store) {
     const el = document.createElement('div'); el.id = 'v2-status'; el.setAttribute('role', 'status'); document.body.appendChild(el);
+    if (!demo) { const ut = document.createElement('a'); ut.href = '?loggut'; ut.textContent = 'Logg ut'; ut.id = 'v2-loggut'; document.body.appendChild(ut); }
     let skjul = null;
     store.påStatus((s) => {
       clearTimeout(skjul);
@@ -1387,30 +1389,31 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
     klar({ store, user, skrive });
   }
-  async function kanSkrive(client, user) {
-    try {
-      const r = await client.schema('stats').from('context_members').select('role').eq('user_id', user.id);
-      return (r.data || []).some((x) => x.role !== 'viewer');
-    } catch (e) { return false; }
+  // Etter innlogging: uten medlemskap i noe lag vises en tydelig melding (ikke en feil fra appen)
+  async function videre(client, user) {
+    let roller = [];
+    try { const r = await client.schema('stats').from('context_members').select('role').eq('user_id', user.id); roller = (r.data || []).map((x) => x.role); } catch (e) { roller = []; }
+    if (!roller.length) {
+      const vis = () => { document.body.innerHTML = '<div id="v2-login"><form><h2 style="margin:0">Ingen tilgang ennå</h2><div style="color:#666">Du er logget inn som ' + (user.email || 'ukjent') + ', men brukeren er ikke lagt til i noe lag. Be treneren/eieren legge deg til, eller logg inn med en annen bruker.</div><button type="button" id="v2-ut">Logg ut</button></form></div>';
+        document.getElementById('v2-ut').onclick = async () => { await client.auth.signOut(); location.reload(); }; };
+      if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
+      return;
+    }
+    start(client, user, roller.some((r) => r !== 'viewer'));
   }
   function innlogging(client) {
     const v = document.createElement('div'); v.id = 'v2-login';
     v.innerHTML = '<form><h2 style="margin:0">Kampstatistikk</h2><div style="color:#666;font-size:14px">Logg inn for å føre statistikk</div>'
       + '<input type="email" name="e" autocomplete="username" placeholder="E-post" required aria-label="E-post">'
       + '<input type="password" name="p" autocomplete="current-password" placeholder="Passord" aria-label="Passord">'
-      + '<button type="submit">Logg inn</button><button type="button" class="lenke" data-v="lenke">Send meg en innloggingslenke</button><div class="feil"></div></form>';
+      + '<button type="submit">Logg inn</button><div class="feil"></div></form>';
     const vis = () => document.body.appendChild(v); if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
     const f = v.querySelector('form'), feil = v.querySelector('.feil');
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault(); feil.textContent = '';
       const { data, error } = await client.auth.signInWithPassword({ email: f.e.value, password: f.p.value });
       if (error) { feil.textContent = 'Innlogging feilet: ' + error.message; return; }
-      v.remove(); start(client, data.user, await kanSkrive(client, data.user));
-    });
-    v.querySelector('[data-v="lenke"]').addEventListener('click', async () => {
-      if (!f.e.value) { feil.textContent = 'Skriv e-postadressen først.'; return; }
-      const { error } = await client.auth.signInWithOtp({ email: f.e.value, options: { emailRedirectTo: location.href } });
-      feil.textContent = error ? 'Feil: ' + error.message : 'Sjekk e-posten din for innloggingslenken.';
+      v.remove(); videre(client, data.user);
     });
   }
   if (demo) {
@@ -1422,7 +1425,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     // Bare publishable key i nettleseren. Aldri secret/service_role.
     const client = window.supabase.createClient(cfg.url, cfg.publishableKey);
     client.auth.getSession().then(async ({ data }) => {
-      if (data && data.session) start(client, data.session.user, await kanSkrive(client, data.session.user)); else innlogging(client);
+      if (q.has('loggut') && data && data.session) { await client.auth.signOut(); location.replace(location.pathname); return; }
+      if (data && data.session) videre(client, data.session.user); else innlogging(client);
     });
   }
   const downloads = {
