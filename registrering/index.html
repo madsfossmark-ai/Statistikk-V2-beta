@@ -1382,7 +1382,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     });
   }
   async function start(client, user, skrive) {
-    const store = await StatsV2.SupabaseStore({ client, deviceId, userId: user.id, mainSlug: cfg.mainSlug || 'main', pollMs: demo ? 0 : 4000 }).start();
+    const store = await StatsV2.SupabaseStore({ client, deviceId, userId: user.id, mainSlug: demo ? 'main' : (cfg.mainSlug || 'main'), pollMs: demo ? 0 : 4000 }).start();
     window.addEventListener('online', () => store.tøm());
     window.__v2 = { store, client };
     const vis = () => statuslinje(store);
