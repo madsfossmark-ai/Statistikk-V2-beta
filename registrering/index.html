@@ -498,6 +498,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   .dir-sum .panel-head { display: none; }
   .dir-page { break-after: page; } .dir-page:last-child { break-after: auto; }
 }
+#moved-banner { position: sticky; top: 0; z-index: 60; background: #1d4ed8; color: #fff; padding: 10px 16px; font-size: 15px; text-align: center; }
+#moved-banner a { color: #fff; font-weight: 700; margin-left: 6px; }
 .panel.pending { box-shadow: 0 0 0 2px var(--opp-strong); }
 .resform { display: flex; flex-direction: column; gap: 6px; }
 .res-set { display: grid; grid-template-columns: 70px 64px 16px 64px; gap: 8px; align-items: center; }
@@ -1634,8 +1636,26 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const oppLabel = (m, nr) => { const n = oppName(m, nr); return '#' + nr + (n ? ' ' + n.split(' ')[0] : ''); };
 
   // ---------- Data ----------
+  // Appen er flyttet til den nye løsningen (Supabase, beta) 25.10.2026. Denne versjonen er bare til lesing.
+  // Gjelder bare Claude-artefakten: ikke de åpne sidene (PUBLIC) og ikke V2-bygget (V2_CONFIG).
+  const MOVED_URL = 'https://madsfossmark-ai.github.io/Statistikk-V2-beta/';
+  const FROZEN = !window.PUBLIC && !window.V2_CONFIG;
+  function frozenDb(db) {
+    const nope = async () => { S.error = 'Appen er flyttet til den nye løsningen (beta). Her kan du bare se, ikke endre. Før statistikk på ' + MOVED_URL; render(); throw Object.assign(new Error('flyttet'), { code: 'flyttet' }); };
+    return {
+      doc: (path) => { const d = db.doc(path); return { onSnapshot: (...a) => d.onSnapshot(...a), get: (...a) => d.get(...a), set: nope, update: nope, delete: nope }; },
+      collection: (path) => { const c = db.collection(path); return { onSnapshot: (...a) => c.onSnapshot(...a), get: (...a) => c.get(...a), add: nope }; },
+    };
+  }
+  function movedBanner() {
+    if (!FROZEN || document.getElementById('moved-banner')) return;
+    const d = document.createElement('div'); d.id = 'moved-banner'; d.setAttribute('role', 'status');
+    d.innerHTML = '<b>Flyttet:</b> statistikken føres nå i den nye løsningen (beta). Denne versjonen er bare til lesing. <a href="' + MOVED_URL + '" target="_blank" rel="noopener">Åpne den nye appen ›</a>';
+    document.body.prepend(d);
+  }
   async function boot() {
     try { S.db = await window.claude?.use?.('db'); } catch (e) { S.db = null; }
+    if (FROZEN && S.db) { S.db = frozenDb(S.db); movedBanner(); }
     try { S.dl = await window.claude?.use?.('downloads'); } catch (e) { S.dl = null; }
     if (!window.PUBLIC) {
       try { S.user = await window.claude?.use?.('user'); } catch (e) { S.user = null; }
