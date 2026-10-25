@@ -37,7 +37,8 @@ td small { display: block; font-size: 11px; color: var(--muted); }
 </head>
 <body>
 <main>
-  <div class="topp"><h1 id="tittel">Live statistikk</h1><span class="beta">BETA – testdata</span><span id="status">Kobler til …</span></div>
+  <div class="topp"><h1 id="tittel">Live statistikk</h1><span class="beta">BETA – under arbeid</span><span id="status">Kobler til …</span></div>
+  <nav style="display:flex;gap:12px;font-size:14px"><a href="?lag=randaberg">Randaberg</a><a href="?lag=u20-nevza-2026">Norge U20 · NEVZA</a></nav>
   <div id="kamper"><div class="tom">Laster …</div></div>
   <div class="forklaring">Snitt 0–2 fra egen føring er hovedmålet: mottak (0 feil, 1 spillbart, 2 perfekt), angrep (2 poeng, 1 i spill, 0 feil/blokkert), serve (2 ess, 1 i spill, 0 feil). Tallet under er antall forsøk. Statistikk fra NVBF/CEV vises separat.</div>
 </main>
@@ -53,7 +54,10 @@ td small { display: block; font-size: 11px; color: var(--muted); }
   const status = document.getElementById('status');
   const settStatus = (s) => { status.className = s === 'live' ? 'live' : ''; status.textContent = s === 'live' ? 'Live' : s === 'feil' ? 'Får ikke kontakt – prøver igjen' : 'Kobler til …'; };
   const vis = (kamper) => {
-    document.getElementById('kamper').innerHTML = kamper.length ? kamper.map(StatsLive.kampKort).join('') : '<div class="tom">Ingen publiserte kamper.</div>';
+    // Bare kamper som pågår eller har egen føring; pågående først, så siste spilte
+    const utvalg = kamper.filter((k) => k.status === 'pågår' || (k.players || []).length)
+      .sort((a, b) => (b.status === 'pågår') - (a.status === 'pågår') || String(b.starts_at || '').localeCompare(String(a.starts_at || '')));
+    document.getElementById('kamper').innerHTML = utvalg.length ? utvalg.map(StatsLive.kampKort).join('') : '<div class="tom">Ingen kamper med live-statistikk ennå.</div>';
   };
   let client;
   if (q.has('demo') && window.StatsLiveFake) client = window.StatsLiveFake.klient();
