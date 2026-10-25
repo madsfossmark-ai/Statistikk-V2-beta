@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live statistikk (beta)</title>
+<style>
+:root { --bg: #f4f2ee; --panel: #fff; --fg: #1d2330; --muted: #667085; --line: #e6e2da; --accent: #1d4ed8; --good: #17803d; --mid: #c08a00; --bad: #c2410c; }
+@media (prefers-color-scheme: dark) { :root { --bg: #11151c; --panel: #1a202a; --fg: #e8ebf0; --muted: #98a2b3; --line: #2a3240; --accent: #7aa2ff; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.topp { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.topp h1 { margin: 0; font-size: 24px; }
+.beta { font-size: 12px; font-weight: 700; background: #fff3cd; color: #7a5a00; padding: 3px 8px; border-radius: 999px; }
+#status { margin-left: auto; font-size: 13px; color: var(--muted); }
+#status.live::before { content: "●"; color: #16a34a; margin-right: 6px; }
+.kamp { background: var(--panel); border-radius: 14px; padding: 14px; border: 1px solid var(--line); }
+.kamp header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.kamp h3 { margin: 0; font-size: 20px; } .kamp h3 b { margin: 0 6px; }
+.kamp h4 { margin: 12px 0 4px; font-size: 14px; color: var(--muted); }
+.status { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--line); }
+.s-pågår { background: #dcfce7; color: #166534; }
+.sett { display: flex; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+.naa { color: var(--fg); font-weight: 700; }
+table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td small { display: block; font-size: 11px; color: var(--muted); }
+.snitt { font-weight: 700; font-size: 16px; }
+.snitt.lo { color: var(--bad); } .snitt.mid { color: var(--mid); } .snitt.hi { color: var(--good); }
+.tom, .forklaring { color: var(--muted); font-size: 13px; }
+.ekstern { margin-top: 8px; font-size: 13px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; }
+@media (max-width: 560px) { th, td { padding: 6px 4px; } .kamp h3 { font-size: 17px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="topp"><h1 id="tittel">Live statistikk</h1><span class="beta">BETA – under arbeid</span><span id="status">Kobler til …</span></div>
+  <div id="kamper"><div class="tom">Laster …</div></div>
+  <div class="forklaring">Snitt 0–2 fra egen føring er hovedmålet: mottak (0 feil, 1 spillbart, 2 perfekt), angrep (2 poeng, 1 i spill, 0 feil/blokkert), serve (2 ess, 1 i spill, 0 feil). Tallet under er antall forsøk. Statistikk fra NVBF/CEV vises separat.</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="../../live/live.js"></script>
+<script src="../../live/fake-live.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search), cfg = window.V2_LIVE || {};
+  const slug = cfg.contextSlug;
+  document.getElementById('tittel').textContent = cfg.title || 'Live statistikk';
+  const status = document.getElementById('status');
+  const settStatus = (s) => { status.className = s === 'live' ? 'live' : ''; status.textContent = s === 'live' ? 'Live' : s === 'feil' ? 'Får ikke kontakt – prøver igjen' : 'Kobler til …'; };
+  const vis = (kamper) => {
+    // Bare kamper som pågår eller har egen føring; pågående først, så siste spilte
+    const utvalg = kamper.filter((k) => k.status === 'pågår' || (k.players || []).length)
+      .sort((a, b) => (b.status === 'pågår') - (a.status === 'pågår') || String(b.starts_at || '').localeCompare(String(a.starts_at || '')));
+    document.getElementById('kamper').innerHTML = utvalg.length ? utvalg.map(StatsLive.kampKort).join('') : '<div class="tom">Ingen kamper med live-statistikk ennå.</div>';
+  };
+  let client;
+  if (q.has('demo') && window.StatsLiveFake) client = window.StatsLiveFake.klient();
+  else if (cfg.url && cfg.key && window.supabase) client = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: false } });
+  else { document.getElementById('kamper').innerHTML = '<div class="tom">Mangler config.js.</div>'; return; }
+  window.__live = StatsLive.LiveKilde({ client, contextSlug: slug, onData: vis, onStatus: settStatus, pollMs: q.has('demo') ? 0 : 15000 });
+  window.__live.start();
+})();
+</script>
+</body>
+</html>

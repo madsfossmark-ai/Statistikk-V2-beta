@@ -1,0 +1,2 @@
+// Randaberg herrer – live (beta). Leser bare publiserte sammendrag for dette laget. Offentlig anon-nøkkel.
+window.V2_LIVE = { url: 'https://yusgawxiggfljkvtubph.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1c2dhd3hpZ2dmbGprdnR1YnBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5Mjg0MDMsImV4cCI6MjEwODUwNDQwM30.gr7dA50SS5-bunVisAJyhR8x5ijrnWJv1RdhH3B_dY0', contextSlug: 'randaberg-herrer', title: 'Randaberg herrer · live (beta)' };
