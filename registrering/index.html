@@ -1374,7 +1374,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function statuslinje(store) {
     const el = document.createElement('div'); el.id = 'v2-status'; el.setAttribute('role', 'status'); document.body.appendChild(el);
     if (demo) { const d = document.createElement('div'); d.id = 'v2-demo'; d.textContent = 'DEMO – lagres ikke, vises ikke på live-siden'; document.body.appendChild(d); }
-    if (!demo) { const ut = document.createElement('a'); ut.href = '?loggut'; ut.textContent = 'Logg ut'; ut.id = 'v2-loggut'; document.body.appendChild(ut); }
+    if (!demo && cfg.autoLogin) { const d = document.createElement('div'); d.id = 'v2-demo'; d.style.background = '#1d4ed8'; d.textContent = 'ÅPEN BETA – testdata'; document.body.appendChild(d); }
+    if (!demo && !cfg.autoLogin) { const ut = document.createElement('a'); ut.href = '?loggut'; ut.textContent = 'Logg ut'; ut.id = 'v2-loggut'; document.body.appendChild(ut); }
     let skjul = null;
     store.påStatus((s) => {
       clearTimeout(skjul);
@@ -1427,6 +1428,16 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     // Bare publishable key i nettleseren. Aldri secret/service_role.
     const client = window.supabase.createClient(cfg.url, cfg.publishableKey);
     client.auth.getSession().then(async ({ data }) => {
+      // Åpen beta (valgfritt): config.autoLogin = {email, password} logger inn en felles beta-bruker automatisk.
+      // Brukeren har bare tilgang til beta-konteksten. Fjern autoLogin fra config.js for vanlig innlogging.
+      const auto = cfg.autoLogin;
+      if (auto && auto.email) {
+        if (data && data.session && data.session.user.email === auto.email) return videre(client, data.session.user);
+        if (data && data.session) await client.auth.signOut();
+        const r = await client.auth.signInWithPassword({ email: auto.email, password: auto.password });
+        if (r.error) { innlogging(client); return; }
+        return videre(client, r.data.user);
+      }
       if (q.has('loggut') && data && data.session) { await client.auth.signOut(); location.replace(location.pathname); return; }
       if (data && data.session) videre(client, data.session.user); else innlogging(client);
     });
