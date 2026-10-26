@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Analyse</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: bane til venstre, tall og tabeller til høyre (iPad liggende); stables på smal skjerm */
+:root {
+  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --line: #D9D6CD; --fg: #16181D; --muted: #4A4F5A;
+  --accent: #1B4592; --accent-fg: #FFFFFF; --accent-soft: #DCE4F5; --accent-ink: #122F66; --warn-bg: #FBF3EC; --warn: #8A3E0F;
+  --ok: #1F7A4D; --bad: #B3261E; --heat: #B3261E;
+  --court-floor: #F0AE68; --court-free: #4F7FA8; --court-opp: #E2A35F; --court-line: #FFFFFF; --court-net: #1B2733;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif; --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121418; --surface: #1C1F25; --sunk: #262A32; --line: #343944; --fg: #ECEDEF; --muted: #A7ADB8;
+  --accent: #7AA2FF; --accent-fg: #0C1630; --accent-soft: #24345C; --accent-ink: #DCE4F5; --warn-bg: #3A2614; --warn: #F2B27A; --ok: #6FD3A0; --bad: #FF8A80; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1C1F25; --sunk: #262A32; --line: #343944; --fg: #ECEDEF; --muted: #A7ADB8;
+  --accent: #7AA2FF; --accent-fg: #0C1630; --accent-soft: #24345C; --accent-ink: #DCE4F5; --warn-bg: #3A2614; --warn: #F2B27A; --ok: #6FD3A0; --bad: #FF8A80; color-scheme: dark }
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body); }
+main { max-width: 1280px; margin: 0 auto; padding-block: 10px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
+h1 { margin: 0; font: 700 30px/1.05 var(--font-display); }
+h2 { margin: 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.topp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.topp a { color: var(--accent); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.merke { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); background: var(--warn-bg); padding: 3px 9px; border-radius: 999px; }
+.kontekst { color: var(--muted); font-size: 14px; }
+.rad { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.skyv { flex: 1 1 0; min-width: 0; }
+.etikett { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+select, button, input { font: inherit; color: var(--fg); }
+select, input[type=email], input[type=password] { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); max-width: 100%; }
+.knapp { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; cursor: pointer; }
+.knapp[aria-pressed="true"], .knapp.primar { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.knapp.fare { border-color: var(--bad); color: var(--bad); }
+.knapp.stille { background: transparent; }
+.knapp:disabled { opacity: .45; cursor: default; }
+.seg { display: inline-flex; } .seg .knapp { border-radius: 0; } .seg .knapp:first-child { border-radius: 10px 0 0 10px; } .seg .knapp:last-child { border-radius: 0 10px 10px 0; margin-left: -1px; }
+.brikke { min-height: 44px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.brikke::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; }
+.brikke[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.brikke[aria-pressed="true"]::before { background: currentColor; }
+:focus-visible { outline: 3px solid #F5B700; outline-offset: 2px; }
+[hidden] { display: none !important; }
+.felt { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.felt select { min-width: 0; }
+@media (max-width: 600px) { .felt { flex: 1 1 100%; } .felt select { flex: 1; } .felt .etikett { width: 62px; } }
+.verktoy { display: flex; flex-direction: column; gap: 8px; padding-block: 4px 8px; border-bottom: 1px solid var(--line); }
+.plan { background: var(--sunk); border-radius: 12px; padding: 8px 10px; }
+.status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--surface); color: var(--muted); }
+.status.ulagret { background: var(--warn-bg); color: var(--warn); } .status.lagret { color: var(--ok); } .status.feil { background: var(--bad); color: #FFFFFF; }
+.innhold { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 860px) { .innhold { grid-template-columns: minmax(0, 1fr); } }
+.bane { position: relative; background: var(--surface); border-radius: 14px; padding: 8px; }
+.bane svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); min-height: 320px; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 8px; }
+.panel { background: var(--surface); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fliser { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.flis { background: var(--sunk); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.flis b { font: 700 26px/1.05 var(--font-display); font-variant-numeric: tabular-nums; }
+.flis span { font-size: 12px; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+td.tall, th.tall { text-align: right; font-variant-numeric: tabular-nums; }
+tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.valgt td { font-weight: 700; }
+.prikk { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+.tom { color: var(--muted); font-size: 14px; background: var(--sunk); border-radius: 10px; padding: 10px 12px; }
+.liten { font-size: 13px; color: var(--muted); margin: 0; }
+.innlogging { max-width: 380px; margin: 40px auto; background: var(--surface); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.utskrift-tittel { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  body { background: #FFFFFF; color: #16181D; }
+  .verktoy, .topp, .ikke-utskrift { display: none !important; }
+  .utskrift-tittel { display: block; font: 700 22px var(--font-display); margin: 0 0 6px; }
+  .utskrift-tittel small { display: block; font: 400 13px var(--font-body); color: #4A4F5A; }
+  .innhold { display: block; } .panel, .bane { padding: 0; background: none; }
+  .bane svg { width: auto; height: 170mm !important; max-height: none; margin: 0 auto; }
+  .flis { background: #F2F1EC; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+<!-- app-ikon -->
+<link rel="apple-touch-icon" sizes="180x180" href="../../ikoner/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../../ikoner/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../../ikoner/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../../ikoner/icon-512.png">
+<meta name="apple-mobile-web-app-title" content="Analyse">
+<!-- /app-ikon -->
+</head>
+<body>
+<main id="app">
+  <div class="topp">
+    <h1>Analyse</h1><span class="merke">Beta</span><span class="kontekst" id="kontekst-navn"></span>
+    <select id="kontekst" hidden aria-label="Lag og sesong"></select>
+    <span class="skyv"></span>
+    <a href="../" id="tilbake">‹ Til appen</a>
+  </div>
+
+  <div class="verktoy">
+    <div class="rad" role="toolbar" aria-label="Utvalg">
+      <span class="felt"><label class="etikett" for="lag">Lag</label><select id="lag"></select></span>
+      <span class="felt"><label class="etikett" for="spiller">Spiller</label><select id="spiller"></select></span>
+      <span class="felt"><label class="etikett" for="kamp">Kamp</label><select id="kamp"><option value="">Alle kamper</option></select></span>
+      <span class="felt"><label class="etikett" for="sett">Sett</label><select id="sett"><option value="">Alle</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></span>
+      <span class="felt"><label class="etikett" for="type">Type</label><select id="type"><option value="alle">Slag og dip</option><option value="slag">Bare slag</option><option value="diagonal">Diagonal</option><option value="linje">Linje</option><option value="dip">Dip</option></select></span>
+      <span class="felt"><label class="etikett" for="utfall">Utfall</label><select id="utfall"><option value="alle">Alle</option><option value="K">Kill</option><option value="F">Feil</option><option value="B">Blokk</option><option value="D">Forsvart</option><option value="ingen">Uten utfall</option></select></span>
+    </div>
+    <div class="rad" role="toolbar" aria-label="Visning">
+      <span class="etikett">Vis</span>
+      <div class="seg" role="group" aria-label="Visning av slag"><button class="knapp" id="v-piler" aria-pressed="true">Piler</button><button class="knapp" id="v-soner" aria-pressed="false">Soner</button></div>
+      <button class="brikke" id="b-plan" aria-pressed="false">Forsvarsplan</button>
+      <span class="skyv"></span>
+      <button class="knapp stille" id="b-skriv">Skriv ut</button>
+    </div>
+    <div class="rad plan" id="plan" role="toolbar" aria-label="Forsvarsplan" hidden>
+      <span class="felt"><label class="etikett" for="rot">Rotasjon</label><select id="rot"><option>R1</option><option>R2</option><option>R3</option><option>R4</option><option>R5</option><option>R6</option></select></span>
+      <div class="seg" role="group" aria-label="Forsvarsvalg"><button class="knapp" id="p-linje" aria-pressed="true">Linje</button><button class="knapp" id="p-dia" aria-pressed="false">Dia</button></div>
+      <div class="seg" role="group" aria-label="Når du drar en spiller"><button class="knapp" id="p-flytt" aria-pressed="true">Flytt</button><button class="knapp" id="p-bev" aria-pressed="false">Tegn bevegelse</button></div>
+      <button class="brikke" id="p-rekke" aria-pressed="true">Rekkevidde</button>
+      <button class="brikke" id="p-skygge" aria-pressed="true">Blokkskygge</button>
+      <button class="knapp" id="p-las" aria-pressed="false">Lås</button>
+      <span class="skyv"></span>
+      <button class="knapp stille" id="p-null">Nullstill</button>
+      <span class="status lagret" id="p-status" role="status" aria-live="polite">Lagret</span>
+      <button class="knapp" id="p-forkast" hidden>Forkast</button>
+      <button class="knapp primar" id="p-lagre">Lagre plan</button>
+    </div>
+  </div>
+
+  <div class="innhold">
+    <div class="bane" id="bane">
+      <div class="utskrift-tittel" id="utskrift-tittel"></div>
+      <svg id="dir-svg" viewBox="0 0 900 1200" aria-label="Bane. Dra fra treffpunkt til landing. En krusedull blir dip."><defs id="dir-defs"></defs><rect x="0" y="0" width="900" height="1200" fill="var(--court-free)"></rect><rect x="0" y="0" width="900" height="210" fill="var(--court-opp)" opacity=".6"></rect><line x1="0" y1="110" x2="900" y2="110" stroke="var(--court-line)" stroke-width="4" stroke-dasharray="14 12" opacity=".8"></line><text x="12" y="98" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-line)">MOTSTANDERS SIDE</text><rect x="0" y="210" width="900" height="900" fill="var(--court-floor)"></rect><g id="dir-zones"></g><rect x="2" y="210" width="896" height="898" fill="none" stroke="var(--court-line)" stroke-width="5"></rect><line x1="0" y1="510" x2="900" y2="510" stroke="var(--court-line)" stroke-width="5"></line><line x1="0" y1="210" x2="900" y2="210" stroke="var(--court-net)" stroke-width="9"></line><line x1="3" y1="160" x2="3" y2="260" stroke="#D33A2C" stroke-width="6"></line><line x1="897" y1="160" x2="897" y2="260" stroke="#D33A2C" stroke-width="6"></line><text x="12" y="1098" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-net)" opacity=".55">VÅR BANE</text><g id="dir-layer"></g><path id="dir-live" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path></svg><div id="markorlag"></div>
+    </div>
+    <div class="panel">
+      <div class="fliser" id="fliser"></div>
+      <p class="liten" id="oppsummering"></p>
+      <div id="tom" class="tom" hidden></div>
+      <section class="ikke-utskrift-nei">
+        <h2 id="tabell-tittel">Spillere</h2>
+        <div class="tbl-wrap"><table><thead><tr><th>Spiller</th><th class="tall">Slag</th><th class="tall">Kamper</th><th class="tall" title="Diagonal / linje / dip">D/L/Dip</th><th class="tall">Kill %</th></tr></thead><tbody id="tabell"></tbody></table></div>
+      </section>
+      <section class="ikke-utskrift">
+        <h2>Kamper i utvalget</h2>
+        <div id="kampliste" class="liten"></div>
+      </section>
+      <p class="liten ikke-utskrift" id="kilde"></p>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script>
+/*
+ * Forsvarsmarkører for slagretningsmodulen (V1, isolert utviklingsmodul).
+ *
+ * Seks flyttbare markører (O, K1, K2, M, D, L) i et eget lag over banen. De påvirker ikke slagretningene:
+ * egne data, egen lagring, ingen kobling til registreringer eller statistikk.
+ *
+ * Koordinater: normalisert 0–1 på VÅR banehalvdel i slagretningsmodulens bane (viewBox 900×1200):
+ *   x = 0 venstre sidelinje (x=2) … 1 høyre sidelinje (x=898)
+ *   y = 0 ved nettet (y=210) … 1 ved baklinjen (y=1108)
+ * Motstanderens side ligger øverst i banen, akkurat som i slagretningsmodulen.
+ *
+ * Datamodell (ett dokument per lag/sesong og motstander, eller lagets standard):
+ *   { version: 1, team, opponent, updatedAt,
+ *     rotations: { 'R1-linje': { O: [x, y], ... }, 'R1-dia': {...}, ... },   plasseringer per rotasjon og forsvarsvalg
+ *     moves:     { R1: { O: [[x, y], ...], ... }, ... },       hvor spilleren kan gå i forsvar (én eller flere piler)
+ *     attacker:  { R1: [x, y], ... } }                         motstanderens angriper (y < 0 = motstanders side)
+ * En rotasjon uten egne data faller tilbake til lagets standard for samme rotasjon, ellers grunnoppsettet (5-1).
+ * Rekkevidde: en sone 1 meter rundt pilen (eller rundt spilleren uten pil). Blokkskygge: når en spiller står
+ * helt oppe ved nettet, tegnes området bak blokken sett fra angriperen (0,5 m bred ved nettet, bredere bakover, helt til baklinjen). Banen er 9 m bred, så 1 m = 896/9 enheter.
+ *
+ * Lagring via et lite grensesnitt { hent(nøkkel), lagre(nøkkel, dok) }:
+ *   - lokalLagring(prefiks): nettleserens localStorage (testsiden)
+ *   - claudeLagring(db, prefiks): Claude-appens database (doc(sti).get/set), stien <prefiks>forsvar/<motstander>
+ *   Statistikk V2 kan få sin egen adapter senere uten at modulen endres.
+ */
+(function (root) {
+  'use strict';
+
+  const MARKORER = [
+    { id: 'O', navn: 'Opplegger' }, { id: 'K1', navn: 'Kantspiller 1' }, { id: 'K2', navn: 'Kantspiller 2' },
+    { id: 'M', navn: 'Midtspiller' }, { id: 'D', navn: 'Diagonal' }, { id: 'L', navn: 'Libero' },
+  ];
+  const ROTASJONER = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+  // To forsvarsvalg per rotasjon: mot linjeslag og mot diagonalslag. Dataene ligger under nøkkelen «R1-linje», «R1-dia» osv.
+  const VARIANTER = [{ id: 'linje', navn: 'Linje' }, { id: 'dia', navn: 'Dia' }];
+  const oppsettNokkel = (rot, variant) => rot + '-' + (variant || VARIANTER[0].id);
+  const grunnrot = (k) => String(k).split('-')[0];
+  const gyldigNokkel = (k) => ROTASJONER.includes(grunnrot(k)) && (!String(k).includes('-') || VARIANTER.some((v) => k.endsWith('-' + v.id)));
+  // Grunnoppsett etter 5-1-systemet: spillerne står i sin sone for hver rotasjon (grunnposisjon, før bytte av plass).
+  // Rekkefølge i oppstillingen: O, K1, Midt 1, D, K2, Midt 2. O og D står alltid motsatt, K1 og K2 motsatt, midtene motsatt.
+  // R1 = opplegger i sone 1, og laget roterer med klokka: R2 = sone 6, R3 = 5, R4 = 4, R5 = 3, R6 = 2.
+  // Midtspilleren på bakre rekke byttes med libero, så M er alltid midten på fremre rekke og L står på bakre midts plass.
+  // Soner sett fra vår side mot nettet: 4 3 2 foran (venstre–høyre), 5 6 1 bak.
+  const SONER = { 1: [0.83, 0.72], 2: [0.83, 0.17], 3: [0.5, 0.17], 4: [0.17, 0.17], 5: [0.17, 0.72], 6: [0.5, 0.72] };
+  const OPPSTILLING = ['O', 'K1', 'M1', 'D', 'K2', 'M2'];   // sone 1–6 i R1
+  const FORAN = [2, 3, 4];
+  function sone(start, rotNr) { return ((start - 1 - (rotNr - 1)) % 6 + 6) % 6 + 1; }
+  function grunnoppsett(rot) {
+    const n = Math.max(1, ROTASJONER.indexOf(rot) + 1), pos = {}, soner = {};
+    OPPSTILLING.forEach((spiller, i) => {
+      const z = sone(i + 1, n);
+      if (spiller === 'M1' || spiller === 'M2') { const id = FORAN.includes(z) ? 'M' : 'L'; pos[id] = SONER[z].slice(); soner[id] = z; }
+      else { pos[spiller] = SONER[z].slice(); soner[spiller] = z; }
+    });
+    return { pos, soner };
+  }
+  const GRUNNOPPSETT = Object.fromEntries(ROTASJONER.map((r) => [r, grunnoppsett(r).pos]));
+  const BANE = { venstre: 2, hoyre: 898, nett: 210, bak: 1108 };
+  const STANDARD = '_standard';
+  const METER = (BANE.hoyre - BANE.venstre) / 9;          // ca. 99,6 baneenheter
+  const REKKEVIDDE_M = 1;                                    // hvor langt en spiller rekker ut fra pilen
+  const SKYGGE_BREDDE_M = 0.5;                               // blokkskyggens bredde ved nettet (blokken)
+  const NETT_GRENSE = 0.1;                                   // y ≤ 0,1 (ca. 0,9 m fra nettet) = spilleren blokkerer
+  const ANGRIPER_STANDARD = [0.85, -0.07];                   // motstanderens kant ved sin sone 4 (vår høyre side), 0,6 m fra nettet
+  const ANGRIPER_Y = [-(BANE.nett - 20) / (BANE.bak - BANE.nett), -0.02];
+  const BEVEGELSE_Y = [0, (1190 - BANE.nett) / (BANE.bak - BANE.nett)]; // forsvar kan gå bak baklinjen
+
+  const klem = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : 0));
+  const rund = (v, lo = 0, hi = 1) => Math.round(klem(v, lo, hi) * 1000) / 1000;
+  const kopi = (x) => JSON.parse(JSON.stringify(x));
+  const slug = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/å/g, 'a').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || STANDARD;
+
+  function tilBane([x, y]) { return [BANE.venstre + klem(x) * (BANE.hoyre - BANE.venstre), BANE.nett + klem(y) * (BANE.bak - BANE.nett)]; }
+  function fraBane([X, Y]) { return [rund((X - BANE.venstre) / (BANE.hoyre - BANE.venstre)), rund((Y - BANE.nett) / (BANE.bak - BANE.nett))]; }
+  // Uten klemming til vår banehalvdel (angriperen står på motstanders side, forsvar kan gå bak baklinjen)
+  const tilBaneFri = ([x, y]) => [BANE.venstre + x * (BANE.hoyre - BANE.venstre), BANE.nett + y * (BANE.bak - BANE.nett)];
+  const fraBaneFri = ([X, Y]) => [(X - BANE.venstre) / (BANE.hoyre - BANE.venstre), (Y - BANE.nett) / (BANE.bak - BANE.nett)];
+  const klemBevegelse = ([x, y]) => [rund(x), rund(y, BEVEGELSE_Y[0], BEVEGELSE_Y[1])];
+  const klemAngriper = ([x, y]) => [rund(x), rund(y, ANGRIPER_Y[0], ANGRIPER_Y[1])];
+
+  function nyttOppsett(laget, motstander) {
+    return { version: 1, team: laget || '', opponent: motstander || null, rotations: {} };
+  }
+  function gyldig(dok) {
+    return !!dok && dok.version === 1 && dok.rotations && typeof dok.rotations === 'object';
+  }
+  // Posisjoner for en rotasjon: egne, ellers lagets standard, ellers grunnoppsettet. Kilden sier hvor de kom fra.
+  function posisjoner(dok, standardDok, rot) {
+    const fra = (d) => d && d.rotations && d.rotations[rot];
+    const egne = fra(dok), std = fra(standardDok);
+    const pos = {}, kilde = egne ? 'egne' : std ? 'lagets-standard' : 'grunnoppsett';
+    MARKORER.forEach(({ id }) => {
+      const p = (egne && egne[id]) || (std && std[id]) || GRUNNOPPSETT[grunnrot(rot)][id];
+      pos[id] = [rund(p[0]), rund(p[1])];
+    });
+    return { pos, kilde };
+  }
+  // Flytt én markør i én rotasjon. Returnerer et nytt dokument; de andre rotasjonene og markørene er urørt.
+  function flytt(dok, standardDok, rot, id, x, y) {
+    if (!gyldigNokkel(rot) || !MARKORER.some((m) => m.id === id)) return dok;
+    const ny = kopi(dok);
+    if (!ny.rotations[rot]) ny.rotations[rot] = posisjoner(dok, standardDok, rot).pos;
+    ny.rotations[rot][id] = [rund(x), rund(y)];
+    return ny;
+  }
+  // Bevegelser (piler) for en rotasjon: egne, ellers lagets standard. { id: [[x, y], ...] } – flere piler per spiller.
+  // Godtar også det eldre formatet med én pil ({ id: [x, y] }).
+  const MAKS_PILER = 6;
+  function bevegelser(dok, standardDok, rot) {
+    const fra = (d) => d && d.moves && d.moves[rot];
+    const m = fra(dok) || fra(standardDok) || {};
+    const ut = {};
+    MARKORER.forEach(({ id }) => {
+      const v = m[id]; if (!Array.isArray(v) || !v.length) return;
+      const liste = typeof v[0] === 'number' ? [v] : v.filter((q) => Array.isArray(q));
+      if (liste.length) ut[id] = liste.slice(0, MAKS_PILER).map(klemBevegelse);
+    });
+    return ut;
+  }
+  function endreBevegelser(dok, standardDok, rot, id, f) {
+    if (!gyldigNokkel(rot) || !MARKORER.some((m) => m.id === id)) return dok;
+    const ny = kopi(dok);
+    ny.moves = ny.moves || {};
+    ny.moves[rot] = bevegelser(dok, standardDok, rot);
+    const liste = f(ny.moves[rot][id] || []);
+    if (liste.length) ny.moves[rot][id] = liste.slice(-MAKS_PILER); else delete ny.moves[rot][id];
+    return ny;
+  }
+  // Legg til en ny pil for spilleren (de andre pilene beholdes)
+  const leggTilBevegelse = (dok, std, rot, id, til) => endreBevegelser(dok, std, rot, id, (l) => l.concat([klemBevegelse(til)]));
+  // Fjern spillerens siste pil
+  const fjernSisteBevegelse = (dok, std, rot, id) => endreBevegelser(dok, std, rot, id, (l) => l.slice(0, -1));
+  function angriper(dok, standardDok, rot) {
+    const fra = (d) => d && d.attacker && d.attacker[rot];
+    return klemAngriper(fra(dok) || fra(standardDok) || ANGRIPER_STANDARD);
+  }
+  function settAngriper(dok, rot, pos) {
+    if (!gyldigNokkel(rot)) return dok;
+    const ny = kopi(dok);
+    ny.attacker = ny.attacker || {};
+    ny.attacker[rot] = klemAngriper(pos);
+    return ny;
+  }
+  // Nullstill bare valgt rotasjon: plasseringer, piler og angriper (faller tilbake til lagets standard eller grunnoppsettet)
+  function nullstill(dok, rot) {
+    const ny = kopi(dok);
+    delete ny.rotations[rot];
+    if (ny.moves) delete ny.moves[rot];
+    if (ny.attacker) delete ny.attacker[rot];
+    return ny;
+  }
+
+  // ---------- Geometri (baneenheter i SVG-en) ----------
+  // Rekkevidde: «stadion» (pille) med radius r rundt linjen fra plassering til mål, eller sirkel uten pil
+  function dekningSti(fra, til, radiusM) {
+    const r = (radiusM || REKKEVIDDE_M) * METER;
+    const [x1, y1] = tilBane(fra);
+    if (!til) return 'M' + (x1 - r) + ',' + y1 + ' a' + r + ',' + r + ' 0 1,0 ' + 2 * r + ',0 a' + r + ',' + r + ' 0 1,0 ' + (-2 * r) + ',0 Z';
+    const [x2, y2] = tilBaneFri(til), dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+    if (L < 1) return dekningSti(fra, null, radiusM);
+    const nx = -dy / L * r, ny = dx / L * r, f = (v) => v.toFixed(1);
+    return 'M' + f(x1 + nx) + ',' + f(y1 + ny) + ' L' + f(x2 + nx) + ',' + f(y2 + ny)
+      + ' A' + f(r) + ',' + f(r) + ' 0 0,0 ' + f(x2 - nx) + ',' + f(y2 - ny)
+      + ' L' + f(x1 - nx) + ',' + f(y1 - ny) + ' A' + f(r) + ',' + f(r) + ' 0 0,0 ' + f(x1 + nx) + ',' + f(y1 + ny) + ' Z';
+  }
+  // Blokkskygge: for hver spiller ved nettet, området bak blokken sett fra angriperen, helt til baklinjen.
+  // Blokken er 0,5 m bred ved nettet, og skyggen blir bredere bakover fordi den følger vinkelen fra angriperen.
+  function blokkskygger(pos, angr) {
+    const [ax, ay] = tilBaneFri(angr), b = SKYGGE_BREDDE_M * METER / 2, ut = [];
+    MARKORER.forEach(({ id }) => {
+      const p = pos[id]; if (!p || p[1] > NETT_GRENSE) return;
+      const bx = tilBane(p)[0], y0 = BANE.nett, t = (BANE.bak - ay) / (y0 - ay);
+      const kant = (ex) => [ax + (ex - ax) * t, BANE.bak];
+      const r = (q) => q.map((n) => Math.round(n * 10) / 10);
+      ut.push({ id, punkter: [[bx - b, y0], [bx + b, y0], kant(bx + b), kant(bx - b)].map(r) });
+    });
+    return ut;
+  }
+  // Eldre dokumenter har én variant per rotasjon («R1»). De kopieres til begge forsvarsvalgene.
+  function oppgrader(dok) {
+    if (!gyldig(dok)) return dok;
+    const ny = kopi(dok);
+    ['rotations', 'moves', 'attacker'].forEach((felt) => {
+      const m = ny[felt]; if (!m) return;
+      ROTASJONER.forEach((r) => {
+        if (m[r] === undefined) return;
+        VARIANTER.forEach((v) => { const k = oppsettNokkel(r, v.id); if (m[k] === undefined) m[k] = kopi(m[r]); });
+        delete m[r];
+      });
+    });
+    return ny;
+  }
+  const nokkel = (prefiks, motstander) => (prefiks || '') + 'forsvar/' + (motstander ? slug(motstander) : STANDARD);
+
+  // ---------- Tidligere slagretninger ----------
+  // Slag fra registreringene (type 'dir'), ett element per slag:
+  //   { kamp, dato, lag (motstanderens lag), spiller: { id, nr, navn }, x1, y1, x2, y2, k, c }
+  // Spilleren kjennes igjen på id (NIF-personId) når den finnes, så slagene følger spilleren selv om draktnummeret
+  // endres eller hun bytter lag. Uten id brukes lag + draktnummer.
+  const SPILLERFARGER = ['#6B2C91', '#0E7C86', '#B5651D', '#2F6B3A', '#7A1A14', '#1F2A44', '#C2185B', '#44505F'];
+  const spillerNokkel = (sl) => (sl.spiller && sl.spiller.id) ? 'id:' + sl.spiller.id : 'nr:' + sl.lag + '#' + (sl.spiller && sl.spiller.nr);
+  function spillereIHistorikk(slag, lag) {
+    const m = new Map();
+    slag.filter((sl) => !lag || sl.lag === lag || (sl.spiller && sl.spiller.id && slag.some((x) => x.lag === lag && x.spiller && x.spiller.id === sl.spiller.id))).forEach((sl) => {
+      const k = spillerNokkel(sl);
+      const e = m.get(k) || { nokkel: k, id: sl.spiller && sl.spiller.id || null, navn: sl.spiller && sl.spiller.navn || '', nr: new Set(), kamper: new Set(), antall: 0, sist: '' };
+      e.nr.add(String(sl.spiller && sl.spiller.nr)); e.kamper.add(sl.kamp); e.antall++;
+      if (String(sl.dato) > e.sist) { e.sist = String(sl.dato); if (sl.spiller && sl.spiller.navn) e.navn = sl.spiller.navn; }
+      m.set(k, e);
+    });
+    return [...m.values()].map((e, i) => ({ nokkel: e.nokkel, id: e.id, navn: e.navn, nr: [...e.nr], kamper: e.kamper.size, antall: e.antall, farge: SPILLERFARGER[i % SPILLERFARGER.length] }))
+      .sort((a, b) => b.antall - a.antall);
+  }
+  // Slagene som skal tegnes: én spiller (nøkkel) eller hele laget (nøkkel = null), med spillerens farge
+  function historikkFor(slag, lag, nokkel) {
+    const spillere = spillereIHistorikk(slag, lag), farge = Object.fromEntries(spillere.map((p) => [p.nokkel, p.farge]));
+    return slag.filter((sl) => farge[spillerNokkel(sl)] && (!nokkel || spillerNokkel(sl) === nokkel))
+      .map((sl) => ({ x1: sl.x1, y1: sl.y1, x2: sl.x2, y2: sl.y2, k: sl.k, c: sl.c, farge: farge[spillerNokkel(sl)], kamp: sl.kamp }));
+  }
+
+  // ---------- Lagring ----------
+  function lokalLagring(navnerom) {
+    const k = (n) => 'rv-forsvar:' + (navnerom || '') + ':' + n;
+    return {
+      async hent(n) { const t = root.localStorage.getItem(k(n)); return t ? JSON.parse(t) : null; },
+      async lagre(n, dok) { root.localStorage.setItem(k(n), JSON.stringify(dok)); },
+    };
+  }
+  // Statistikk V2 (Supabase): tabellen stats.forsvar_planer, én rad per lag/sesong (context_id) og motstander.
+  // Nøkkelen fra nokkel() er '<prefiks>forsvar/<motstander-slug>'; prefikset brukes ikke her, konteksten kommer fra contextId.
+  function supabaseLagring(client, contextId, brukerId) {
+    const db = client.schema('stats'), mot = (n) => String(n).split('forsvar/').pop();
+    const kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
+    return {
+      async hent(n) { const r = kast(await db.from('forsvar_planer').select('data').eq('context_id', contextId).eq('motstander', mot(n))); return r.length ? r[0].data : null; },
+      async lagre(n, dok) { kast(await db.from('forsvar_planer').upsert({ context_id: contextId, motstander: mot(n), data: dok, updated_at: new Date().toISOString(), updated_by: brukerId || null }, { onConflict: 'context_id,motstander' })); },
+    };
+  }
+  function claudeLagring(db) {
+    return {
+      async hent(n) { const s = await db.doc(n).get(); return s && s.exists ? s.data() : null; },
+      async lagre(n, dok) { await db.doc(n).set(dok); },
+    };
+  }
+
+  // ---------- Visning og flytting ----------
+  /*
+   * monter({ svg, lag, laget, motstander, prefiks, lagring, erTegning, onEndring })
+   *   svg       banens <svg> (viewBox 900×1200)
+   *   lag       element som ligger oppå banen (position: relative på forelderen). Markørene legges her.
+   *   erTegning () => true mens en slagretning tegnes; da kan markørene ikke tas tak i.
+   * Returnerer et kontrollobjekt (se nederst). Selve verktøylinjen lager siden selv, så modulen kan
+   * bygges inn i slagretningsmodulen uten å endre dens knapper.
+   */
+  function monter(opt) {
+    const svg = opt.svg, lag = opt.lag, lagring = opt.lagring;
+    const S = { rot: 'R1', vis: true, last: false, dok: nyttOppsett(opt.laget, opt.motstander), std: null,
+      prefiks: opt.prefiks || '', motstander: opt.motstander || null, laget: opt.laget || '', ulagret: false, valgt: null, drar: null,
+      modus: 'flytt', rekkevidde: true, skygge: true, pil: null, angr: null, variant: VARIANTER[0].id, historikk: [], visHistorikk: true };
+    const K = () => oppsettNokkel(S.rot, S.variant);
+    const knapper = {};
+    lag.classList.add('fv-lag');
+
+    // SVG-lag: skygge og rekkevidde under slagretningene, piler over. Egen gruppe, rører ikke slagretningens lag.
+    const NS = 'http://www.w3.org/2000/svg', el = (t, a) => { const n = root.document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+    const gUnder = el('g', { class: 'fv-svg-under', 'pointer-events': 'none' }), gOver = el('g', { class: 'fv-svg-over', 'pointer-events': 'none' });
+    const defs = el('defs', {});
+    const klipp = el('clipPath', { id: 'fv-klipp' }); klipp.appendChild(el('rect', { x: BANE.venstre, y: BANE.nett, width: BANE.hoyre - BANE.venstre, height: BANE.bak - BANE.nett }));
+    const pilhode = el('marker', { id: 'fv-pilhode', viewBox: '0 0 10 10', refX: '7', refY: '5', markerWidth: '3.2', markerHeight: '3.2', orient: 'auto-start-reverse' });
+    pilhode.appendChild(el('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#0B2A66' }));
+    defs.appendChild(klipp); defs.appendChild(pilhode); gUnder.appendChild(defs);
+    const gSkygge = el('g', { class: 'fv-skygge', 'clip-path': 'url(#fv-klipp)', opacity: '.42' }), gDekning = el('g', { class: 'fv-dekning' });
+    gUnder.appendChild(gSkygge); gUnder.appendChild(gDekning);
+    const slagLag = svg.querySelector('#dir-layer');
+    if (slagLag) svg.insertBefore(gUnder, slagLag); else svg.appendChild(gUnder);
+    const gHist = el('g', { class: 'fv-historikk', 'pointer-events': 'none' });
+    svg.appendChild(gHist);
+    svg.appendChild(gOver);
+
+    MARKORER.forEach(({ id, navn }) => {
+      const b = root.document.createElement('button');
+      b.type = 'button'; b.className = 'fv-markor'; b.textContent = id; b.dataset.id = id;
+      b.setAttribute('aria-label', navn + ' (' + id + '). Dra for å flytte, eller bruk piltastene.');
+      b.addEventListener('pointerdown', (ev) => ned(ev, id));
+      b.addEventListener('pointermove', bevegelse);
+      b.addEventListener('pointerup', slipp);
+      b.addEventListener('pointercancel', slipp);
+      b.addEventListener('lostpointercapture', slipp);
+      b.addEventListener('keydown', (ev) => tast(ev, id));
+      b.addEventListener('focus', () => { S.valgt = id; tegn(); });
+      lag.appendChild(b); knapper[id] = b;
+    });
+    // Motstanderens angriper: bestemmer retningen på blokkskyggen. Vises når blokkskyggen er på.
+    const angrKnapp = root.document.createElement('button');
+    angrKnapp.type = 'button'; angrKnapp.className = 'fv-markor fv-angriper'; angrKnapp.textContent = 'A'; angrKnapp.dataset.id = 'A';
+    angrKnapp.setAttribute('aria-label', 'Motstanderens angriper. Dra for å flytte. Blokkskyggen tegnes ut fra denne.');
+    angrKnapp.addEventListener('pointerdown', (ev) => nedAngriper(ev));
+    ['pointermove'].forEach((t) => angrKnapp.addEventListener(t, bevegelse));
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => angrKnapp.addEventListener(t, slipp));
+    lag.appendChild(angrKnapp);
+
+    const vis = () => posisjoner(S.dok, S.std, K());
+    function skjermpunkt([X, Y]) {
+      const m = svg.getScreenCTM(); if (!m) return null;
+      const p = svg.createSVGPoint(); p.x = X; p.y = Y; const s = p.matrixTransform(m);
+      const r = lag.getBoundingClientRect();
+      return [s.x - r.left, s.y - r.top];
+    }
+    function banepunkt(ev) {
+      const m = svg.getScreenCTM(); if (!m) return null;
+      const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; const s = p.matrixTransform(m.inverse());
+      return [s.x, s.y];
+    }
+    // Plasseringer, piler og angriper slik de vises nå (med det som dras akkurat nå)
+    function gjeldende() {
+      const pos = Object.assign({}, vis().pos), mv = bevegelser(S.dok, S.std, K());
+      if (S.drar) pos[S.drar.id] = S.drar.pos;
+      if (S.pil && S.pil.flyttet) mv[S.pil.id] = (mv[S.pil.id] || []).concat([S.pil.til]);
+      const a = S.angr ? S.angr.pos : angriper(S.dok, S.std, K());
+      return { pos, mv, a };
+    }
+    function tegn() {
+      const { pos, mv, a } = gjeldende();
+      lag.hidden = !S.vis;
+      lag.classList.toggle('fv-last', S.last);
+      lag.classList.toggle('fv-bevegelse', S.modus === 'bevegelse');
+      MARKORER.forEach(({ id }) => {
+        const b = knapper[id], p = skjermpunkt(tilBane(pos[id]));
+        if (p) { b.style.left = p[0] + 'px'; b.style.top = p[1] + 'px'; }
+        b.classList.toggle('fv-drar', (!!S.drar && S.drar.id === id) || (!!S.pil && S.pil.id === id));
+        b.classList.toggle('fv-valgt', S.valgt === id);
+        b.disabled = S.last;
+        b.tabIndex = S.last || !S.vis ? -1 : 0;
+      });
+      const ap = skjermpunkt(tilBaneFri(a));
+      if (ap) { angrKnapp.style.left = ap[0] + 'px'; angrKnapp.style.top = ap[1] + 'px'; }
+      angrKnapp.hidden = !S.skygge;
+      angrKnapp.disabled = S.last;
+      angrKnapp.classList.toggle('fv-drar', !!S.angr);
+      // SVG: skygge, rekkevidde og piler
+      gUnder.style.display = gOver.style.display = S.vis ? '' : 'none';
+      gSkygge.replaceChildren(...(S.skygge ? blokkskygger(pos, a).map((s) => el('polygon', { points: s.punkter.map((q) => q.join(',')).join(' '), fill: '#0B1F44', 'data-id': s.id })) : []));
+      // Tidligere slag fra registreringene (motstanderens spiller)
+      gHist.replaceChildren(...(S.visHistorikk ? S.historikk.map((h) => {
+        const g = el('g', {}), d = h.k === 'dip' ? 'M' + h.x1 + ',' + h.y1 + ' Q' + ((h.x1 + h.x2) / 2 + 60) + ',' + ((h.y1 + h.y2) / 2) + ' ' + h.x2 + ',' + h.y2 : 'M' + h.x1 + ',' + h.y1 + ' L' + h.x2 + ',' + h.y2;
+        g.appendChild(el('path', { d, fill: 'none', stroke: '#FFFFFF', 'stroke-width': '10', 'stroke-linecap': 'round', opacity: '.5' }));
+        g.appendChild(el('path', { d, fill: 'none', stroke: h.farge || '#6B2C91', 'stroke-width': '5', 'stroke-linecap': 'round', 'stroke-dasharray': h.k === 'dip' ? '2 10' : 'none', opacity: '.9' }));
+        g.appendChild(el('circle', { cx: h.x2, cy: h.y2, r: '9', fill: h.farge || '#6B2C91', stroke: '#FFFFFF', 'stroke-width': '2.5' }));
+        return g;
+      }) : []));
+      // Rekkevidde: bevegelsespilene og én sone per pil (eller sirkel rundt spilleren uten pil), slås av og på samlet
+      const soner = S.rekkevidde ? MARKORER.flatMap(({ id }) => (mv[id] || [null]).map((til) => [id, til])) : [];
+      gDekning.replaceChildren(...soner.map(([id, til]) => el('path', { d: dekningSti(pos[id], til), fill: '#1B4592', 'fill-opacity': '.13', stroke: '#1B4592', 'stroke-opacity': '.55', 'stroke-width': '3', 'stroke-dasharray': '10 8', 'data-id': id })));
+      const piler = (S.rekkevidde || S.pil) ? Object.keys(mv).flatMap((id) => mv[id].map((til) => [id, til])) : [];
+      gOver.replaceChildren(...piler.map(([id, til]) => {
+        const [x1, y1] = tilBane(pos[id]), [x2, y2] = tilBaneFri(til);
+        const g = el('g', { 'data-id': id });
+        g.appendChild(el('line', { x1, y1, x2, y2, stroke: '#FFFFFF', 'stroke-width': '14', 'stroke-linecap': 'round', opacity: '.7' }));
+        g.appendChild(el('line', { x1, y1, x2, y2, stroke: '#0B2A66', 'stroke-width': '8', 'stroke-linecap': 'round', 'marker-end': 'url(#fv-pilhode)' }));
+        return g;
+      }));
+    }
+    function meld() { if (opt.onEndring) opt.onEndring(tilstand()); }
+
+    function ned(ev, id) {
+      if (S.last || !S.vis || (opt.erTegning && opt.erTegning())) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      ev.preventDefault(); ev.stopPropagation();
+      try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* eldre nettleser */ }
+      S.valgt = id;
+      // Bevegelse: dra en pil ut fra spilleren. Flytt: dra selve spilleren.
+      if (S.modus === 'bevegelse') { const p = vis().pos[id]; S.pil = { id, pid: ev.pointerId, til: p, flyttet: false, start: p }; S.rekkevidde = true; }
+      else S.drar = { id, pid: ev.pointerId, pos: vis().pos[id] };
+      tegn();
+    }
+    function nedAngriper(ev) {
+      if (S.last || !S.vis || !S.skygge || (opt.erTegning && opt.erTegning())) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      ev.preventDefault(); ev.stopPropagation();
+      try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* eldre nettleser */ }
+      S.angr = { pid: ev.pointerId, pos: angriper(S.dok, S.std, K()) };
+      tegn();
+    }
+    function bevegelse(ev) {
+      const aktiv = S.drar || S.pil || S.angr;
+      if (!aktiv || ev.pointerId !== aktiv.pid) return;
+      ev.preventDefault(); ev.stopPropagation();
+      const b = banepunkt(ev); if (!b) return;
+      if (S.drar) S.drar.pos = fraBane(b);
+      else if (S.pil) { S.pil.til = klemBevegelse(fraBaneFri(b)); if (Math.hypot(S.pil.til[0] - S.pil.start[0], S.pil.til[1] - S.pil.start[1]) > 0.03) S.pil.flyttet = true; }
+      else S.angr.pos = klemAngriper(fraBaneFri(b));
+      tegn();
+    }
+    function slipp(ev) {
+      const aktiv = S.drar || S.pil || S.angr;
+      if (!aktiv || (ev && ev.pointerId !== aktiv.pid)) return;
+      if (S.drar) {
+        const { id, pos } = S.drar; S.drar = null;
+        const før = vis().pos[id];
+        if (før[0] !== pos[0] || før[1] !== pos[1]) { S.dok = flytt(S.dok, S.std, K(), id, pos[0], pos[1]); S.ulagret = true; }
+      } else if (S.pil) {
+        const { id, til, flyttet } = S.pil; S.pil = null;
+        const har = !!bevegelser(S.dok, S.std, K())[id];
+        // Dra: ny pil i tillegg til de andre. Trykk uten å dra: fjern spillerens siste pil.
+        if (flyttet) { S.dok = leggTilBevegelse(S.dok, S.std, K(), id, til); S.ulagret = true; }
+        else if (har) { S.dok = fjernSisteBevegelse(S.dok, S.std, K(), id); S.ulagret = true; }
+      } else {
+        const { pos } = S.angr; S.angr = null;
+        const før = angriper(S.dok, S.std, K());
+        if (før[0] !== pos[0] || før[1] !== pos[1]) { S.dok = settAngriper(S.dok, K(), pos); S.ulagret = true; }
+      }
+      tegn(); meld();
+    }
+    function tast(ev, id) {
+      const steg = ev.shiftKey ? 0.05 : 0.01, d = { ArrowLeft: [-steg, 0], ArrowRight: [steg, 0], ArrowUp: [0, -steg], ArrowDown: [0, steg] }[ev.key];
+      if (!d || S.last) return;
+      ev.preventDefault();
+      const p = vis().pos[id];
+      S.dok = flytt(S.dok, S.std, K(), id, p[0] + d[0], p[1] + d[1]); S.ulagret = true;
+      tegn(); meld();
+    }
+
+    const ro = root.ResizeObserver ? new root.ResizeObserver(() => tegn()) : null;
+    if (ro) { ro.observe(svg); ro.observe(lag); }
+    const vent = () => tegn();
+    root.addEventListener('resize', vent);
+    root.addEventListener('orientationchange', vent);
+
+    function tilstand() {
+      const v = vis();
+      return { rotasjon: S.rot, variant: S.variant, nokkel: K(), vis: S.vis, last: S.last, ulagret: S.ulagret, kilde: v.kilde, posisjoner: v.pos, valgt: S.valgt,
+        modus: S.modus, rekkevidde: S.rekkevidde, skygge: S.skygge, bevegelser: bevegelser(S.dok, S.std, K()), angriper: angriper(S.dok, S.std, K()),
+        blokkere: blokkskygger(v.pos, angriper(S.dok, S.std, K())).map((b) => b.id),
+        laget: S.laget, motstander: S.motstander, dokument: kopi(S.dok) };
+    }
+    async function last(prefiks, motstander, laget) {
+      S.prefiks = prefiks || ''; S.motstander = motstander || null; if (laget !== undefined) S.laget = laget;
+      const [dok, std] = await Promise.all([
+        lagring.hent(nokkel(S.prefiks, S.motstander)),
+        S.motstander ? lagring.hent(nokkel(S.prefiks, null)) : Promise.resolve(null)]);
+      S.dok = gyldig(dok) ? oppgrader(dok) : nyttOppsett(S.laget, S.motstander);
+      S.std = gyldig(std) ? oppgrader(std) : null;
+      S.ulagret = false; S.drar = null; S.pil = null; S.angr = null;
+      tegn(); meld();
+      return tilstand();
+    }
+
+    tegn();
+    return {
+      tilstand,
+      last,
+      settRotasjon(rot) { if (ROTASJONER.includes(rot)) { S.rot = rot; S.drar = S.pil = S.angr = null; tegn(); meld(); } },
+      settVariant(v) { if (VARIANTER.some((x) => x.id === v)) { S.variant = v; S.drar = S.pil = S.angr = null; tegn(); meld(); } },
+      // Tidligere slag (fra registreringene) vises i eget lag. Liste med { x1, y1, x2, y2, k, c, farge } i banekoordinater.
+      settHistorikk(liste) { S.historikk = Array.isArray(liste) ? liste : []; tegn(); meld(); },
+      settVisHistorikk(v) { S.visHistorikk = !!v; tegn(); meld(); },
+      settVis(v) { S.vis = !!v; S.drar = S.pil = S.angr = null; tegn(); meld(); },
+      settLast(v) { S.last = !!v; S.drar = S.pil = S.angr = null; tegn(); meld(); },
+      settModus(m) { S.modus = m === 'bevegelse' ? 'bevegelse' : 'flytt'; if (S.modus === 'bevegelse') S.rekkevidde = true; S.drar = S.pil = null; tegn(); meld(); },
+      settRekkevidde(v) { S.rekkevidde = !!v; tegn(); meld(); },
+      settSkygge(v) { S.skygge = !!v; S.angr = null; tegn(); meld(); },
+      fjernPiler() { const mv = bevegelser(S.dok, S.std, K()); if (!Object.keys(mv).length) return; S.dok = kopi(S.dok); S.dok.moves = S.dok.moves || {}; S.dok.moves[K()] = {}; S.ulagret = true; tegn(); meld(); },
+      nullstill() { S.dok = nullstill(S.dok, K()); S.ulagret = true; tegn(); meld(); },
+      async lagre() {
+        const dok = Object.assign(kopi(S.dok), { team: S.laget, opponent: S.motstander, updatedAt: new Date().toISOString() });
+        await lagring.lagre(nokkel(S.prefiks, S.motstander), dok);
+        S.dok = dok; S.ulagret = false; tegn(); meld();
+        return tilstand();
+      },
+      forkast() { return last(S.prefiks, S.motstander); },
+      oppdater: tegn,
+      fjern() { if (ro) ro.disconnect(); root.removeEventListener('resize', vent); root.removeEventListener('orientationchange', vent); Object.values(knapper).forEach((b) => b.remove()); angrKnapp.remove(); gUnder.remove(); gHist.remove(); gOver.remove(); },
+    };
+  }
+
+  // Stiler for markørlaget. Fast størrelse (48 px) uansett hvor stor banen er.
+  const CSS = '.fv-lag{position:absolute;inset:0;pointer-events:none;z-index:2}'
+    + '.fv-markor{position:absolute;width:48px;height:48px;margin:0;padding:0;transform:translate(-50%,-50%);border-radius:50%;border:3px solid #fff;'
+    + 'background:#1B4592;color:#fff;font:700 17px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;'
+    + 'box-shadow:0 2px 6px rgba(0,0,0,.35);pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab;transition:transform .08s ease,box-shadow .08s ease}'
+    + '.fv-markor:focus-visible{outline:3px solid #F5B700;outline-offset:2px}'
+    + '.fv-markor.fv-valgt{box-shadow:0 0 0 4px rgba(245,183,0,.85),0 2px 6px rgba(0,0,0,.35)}'
+    + '.fv-markor.fv-drar{transform:translate(-50%,-50%) scale(1.18);cursor:grabbing;box-shadow:0 0 0 5px rgba(245,183,0,.9),0 8px 18px rgba(0,0,0,.4);z-index:3}'
+    + '.fv-lag.fv-last .fv-markor{pointer-events:none;cursor:default;opacity:.92;background:#122F66}'
+    + '.fv-lag.fv-bevegelse .fv-markor:not(.fv-angriper){cursor:crosshair;border-style:dashed}'
+    + '.fv-markor.fv-angriper{width:44px;height:44px;background:#C85E1C;font-size:16px}'
+    + '.fv-markor[hidden]{display:none}'
+    + '@media (prefers-reduced-motion:reduce){.fv-markor{transition:none}}';
+
+  const eksport = { MARKORER, ROTASJONER, VARIANTER, oppsettNokkel, oppgrader, spillerNokkel, spillereIHistorikk, historikkFor, SPILLERFARGER, GRUNNOPPSETT, SONER, grunnoppsett, BANE, STANDARD, METER, REKKEVIDDE_M, SKYGGE_BREDDE_M, NETT_GRENSE, ANGRIPER_STANDARD,
+    klem, tilBane, fraBane, tilBaneFri, fraBaneFri, nyttOppsett, gyldig, posisjoner, flytt, nullstill, nokkel, slug,
+    bevegelser, leggTilBevegelse, fjernSisteBevegelse, MAKS_PILER, angriper, settAngriper, dekningSti, blokkskygger,
+    lokalLagring, claudeLagring, supabaseLagring, monter, CSS };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Forsvar = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
+ * Analyse av motstanderens slagretninger (ren logikk, ingen DOM). Brukes av Analyse-siden.
+ *
+ * Et slag (fra stats.slaghistorikk) ser slik ut:
+ *   { kamp, dato, kontekst, lag, nr, pid, navn, sett, x1, y1, x2, y2, k: 'line' | 'dip', c: 'K' | 'F' | 'B' | 'D' | null }
+ * Koordinatene er slagretningsmodulens bane (viewBox 900×1200, nettet på y=210, vår baklinje på y=1108).
+ * Klassifisering (diagonal/linje/dip og sone) er den samme som i slagretningen i appen.
+ */
+(function (root) {
+  'use strict';
+
+  const FARGER = ['#2F6FE0', '#2FAE52', '#D9473E', '#E8891C', '#8B4FD6', '#18A3B2', '#D64F9A', '#5C6270'];
+  const UTFALL = { K: 'Kill', F: 'Feil', B: 'Blokk', D: 'Forsvart' };
+
+  function slagType(s) {
+    if (s.k === 'dip') return 'dip';
+    const dx = s.x2 - s.x1, dy = Math.max(1, s.y2 - Math.max(s.y1, 210));
+    return Math.abs(dx) / dy < 0.3 ? 'linje' : 'diagonal';
+  }
+  // Sone på vår banehalvdel: 4 3 2 foran (venstre–høyre), 5 6 1 bak. Utenfor/før nettet = null.
+  function sone(s) {
+    if (s.y2 < 210) return null;
+    const col = Math.min(2, Math.max(0, Math.floor(s.x2 / 300)));
+    return s.y2 < 510 ? [4, 3, 2][col] : [5, 6, 1][col];
+  }
+  const spillerNokkel = (s) => (s.pid ? 'id:' + s.pid : 'nr:' + s.lag + '#' + s.nr);
+
+  // Spillerne i et utvalg, med flest slag først. Draktnumre samles når spiller-ID er lik.
+  function spillere(slag) {
+    const m = new Map();
+    slag.forEach((s) => {
+      const k = spillerNokkel(s);
+      const e = m.get(k) || { nokkel: k, pid: s.pid || null, navn: '', nr: new Set(), kamper: new Set(), antall: 0, sist: '' };
+      e.nr.add(String(s.nr)); e.kamper.add(s.kamp); e.antall++;
+      if (String(s.dato || '') >= e.sist) { e.sist = String(s.dato || ''); if (s.navn) e.navn = s.navn; }
+      m.set(k, e);
+    });
+    return [...m.values()].sort((a, b) => b.antall - a.antall || String(a.nokkel).localeCompare(String(b.nokkel)))
+      .map((e, i) => ({ nokkel: e.nokkel, pid: e.pid, navn: e.navn, nr: [...e.nr].sort((a, b) => (+a || 99) - (+b || 99)), kamper: e.kamper.size, antall: e.antall, farge: FARGER[i % FARGER.length] }));
+  }
+
+  // Filter: { spiller: nøkkel|null, kamp: id|null, sett: n|null, type: 'alle'|'slag'|'dip'|'diagonal'|'linje', utfall: 'alle'|'K'|'F'|'B'|'D'|'ingen' }
+  function filtrer(slag, f) {
+    f = f || {};
+    return slag.filter((s) => (!f.spiller || spillerNokkel(s) === f.spiller)
+      && (!f.kamp || s.kamp === f.kamp)
+      && (!f.sett || Number(s.sett) === Number(f.sett))
+      && (!f.type || f.type === 'alle' || (f.type === 'slag' ? s.k !== 'dip' : slagType(s) === f.type))
+      && (!f.utfall || f.utfall === 'alle' || (f.utfall === 'ingen' ? !s.c : s.c === f.utfall)));
+  }
+
+  const pst = (a, b) => (b ? Math.round((100 * a) / b) : null);
+  function oppsummer(slag) {
+    const type = { diagonal: 0, linje: 0, dip: 0 }, utfall = { K: 0, F: 0, B: 0, D: 0, ukjent: 0 }, soner = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+    let ute = 0;
+    slag.forEach((s) => {
+      type[slagType(s)]++;
+      if (s.c && utfall[s.c] !== undefined) utfall[s.c]++; else utfall.ukjent++;
+      const z = sone(s); if (z) soner[z]++; else ute++;
+    });
+    const n = slag.length, medUtfall = n - utfall.ukjent;
+    return { antall: n, kamper: new Set(slag.map((s) => s.kamp)).size, type, utfall, soner, ute,
+      andel: { diagonal: pst(type.diagonal, n), linje: pst(type.linje, n), dip: pst(type.dip, n) },
+      killPst: pst(utfall.K, medUtfall), medUtfall };
+  }
+  // Mest brukte sone (for en kort oppsummering)
+  function favorittsone(sum) {
+    let best = null;
+    Object.entries(sum.soner).forEach(([z, n]) => { if (n && (!best || n > best[1])) best = [Number(z), n]; });
+    return best ? { sone: best[0], antall: best[1], andel: pst(best[1], sum.antall) } : null;
+  }
+  // Kampene i et utvalg, nyeste først
+  function kamper(slag) {
+    const m = new Map();
+    slag.forEach((s) => { const e = m.get(s.kamp) || { kamp: s.kamp, dato: s.dato, lag: s.lag, kontekst: s.kontekst, antall: 0 }; e.antall++; m.set(s.kamp, e); });
+    return [...m.values()].sort((a, b) => String(b.dato || '').localeCompare(String(a.dato || '')));
+  }
+  // Rad fra stats.slaghistorikk -> slag
+  const fraRad = (r) => ({ kamp: r.match_id, dato: r.dato, kontekst: r.kontekst, lag: r.lag, nr: r.jersey, pid: r.person_id || null, navn: r.navn || '',
+    sett: r.set_no, x1: Number(r.x1), y1: Number(r.y1), x2: Number(r.x2), y2: Number(r.y2), k: r.k || 'line', c: r.utfall || null });
+
+  const eksport = { FARGER, UTFALL, slagType, sone, spillerNokkel, spillere, filtrer, oppsummer, favorittsone, kamper, fraRad };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Analyse = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
+ * Analyse-siden: motstanderens slagretninger på tvers av kamper, per lag eller spiller, og forsvarsplanen mot laget.
+ * Leser bare data (slaghistorikk, motstandere, tropper). Skriver bare forsvarsplaner (stats.forsvar_planer).
+ * Registreringen og kampdataene røres ikke.
+ * ?demo=1 bruker oppdiktede data uten nett.
+ */
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const q = new URLSearchParams(location.search), demo = q.has('demo');
+  const cfg = window.V2_CONFIG || {};
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const st = document.createElement('style'); st.textContent = Forsvar.CSS; document.head.appendChild(st);
+  const svg = $('dir-svg'), layer = $('dir-layer'), zones = $('dir-zones'), defs = $('dir-defs');
+  svg.setAttribute('aria-label', 'Bane med motstanderens slagretninger');
+
+  const S = { kontekster: [], ktx: null, motstandere: [], tropp: {}, slag: [], ekstra: [], visning: 'piler', plan: false, fv: null, lagring: null, feil: '' };
+  const dato = (d) => { if (!d) return ''; const t = new Date(d); return isNaN(t) ? String(d).slice(0, 10) : t.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: '2-digit' }); };
+
+  // ---------- Datakilde ----------
+  function demoKilde() {
+    const kontekster = [{ id: 'demo-ctx', slug: 'demo', name: 'Randaberg (demo)', our_team: 'Randaberg' }];
+    const lagene = {
+      'Oslo Volley': { kamper: [['o1', '2026-09-26T14:00:00Z'], ['o2', '2026-10-17T14:00:00Z'], ['o3', '2026-11-07T15:30:00Z']],
+        spillere: [['d501', ['4', '4', '14'], 'Oslo-kant A', 'kryss'], ['d502', ['9', '9', '9'], 'Oslo-diagonal B', 'linje'], ['d503', ['12', '12', '12'], 'Oslo-midt C', 'kort'], ['d504', ['3', '3', '3'], 'Oslo-kant D', 'kryss']] },
+      'BSI': { kamper: [['b1', '2026-10-03T13:00:00Z'], ['b2', '2026-10-17T16:30:00Z']],
+        spillere: [['d601', ['10', '10'], 'BSI-kant E', 'linje'], ['d602', ['7', '7'], 'BSI-diagonal F', 'kryss'], ['d603', ['15', '15'], 'BSI-midt G', 'kort']] },
+      'Koll IL': { kamper: [], spillere: [['d701', ['5'], 'Koll-kant H', 'kryss']] },
+    };
+    let frø = 11; const tilf = () => { frø = (frø * 9301 + 49297) % 233280; return frø / 233280; };
+    const slag = [];
+    Object.entries(lagene).forEach(([lag, L]) => L.kamper.forEach(([kamp, d], ki) => L.spillere.forEach(([pid, nr, navn, stil]) => {
+      const n = 3 + Math.floor(tilf() * 4), fraX = stil === 'linje' ? 160 : stil === 'kryss' ? 720 : 450;
+      for (let i = 0; i < n; i++) {
+        const x2 = stil === 'linje' ? 90 + tilf() * 220 : stil === 'kryss' ? 120 + tilf() * 380 : 300 + tilf() * 300;
+        slag.push({ kamp, dato: d, kontekst: 'demo', lag, nr: nr[ki], pid, navn, sett: 1 + Math.floor(tilf() * 4),
+          x1: Math.round(fraX + (tilf() - 0.5) * 120), y1: Math.round(140 + tilf() * 40), x2: Math.round(x2), y2: Math.round(stil === 'kort' ? 300 + tilf() * 300 : 520 + tilf() * 560),
+          k: tilf() < 0.15 ? 'dip' : 'line', c: ['K', 'K', 'F', 'B', 'D', 'D', null][Math.floor(tilf() * 7)] });
+      }
+    })));
+    const motstandere = Object.keys(lagene).sort((a, b) => a.localeCompare(b, 'nb')).map((n, i) => ({ id: 'o' + i, slug: n.toLowerCase().replace(/[^a-z]+/g, '-'), name: n }));
+    const tropp = {}; Object.entries(lagene).forEach(([lag, L]) => { tropp[lag] = L.spillere.map(([pid, nr, navn]) => ({ jersey: nr[nr.length - 1], name: navn, person_id: pid })); });
+    return {
+      async kontekster() { return kontekster; },
+      async motstandere() { return motstandere; },
+      async tropp() { return tropp; },
+      async slag(ktx, lag) { return slag.filter((s) => s.lag === lag); },
+      async slagForPerson() { return []; },
+      lagring() { return Forsvar.lokalLagring('analyse-demo'); },
+    };
+  }
+  function supabaseKilde(client, bruker) {
+    const db = client.schema('stats');
+    const kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
+    return {
+      async kontekster() { return kast(await db.from('contexts').select('id,slug,name,our_team').order('name')); },
+      async motstandere(ktx) {
+        const o = kast(await db.from('opponents').select('id,slug,name').eq('context_id', ktx.id).order('name'));
+        // Lag som finnes i kampene, men ikke som motstander med tropp, tas også med
+        const m = kast(await db.from('matches').select('home,away').eq('context_id', ktx.id));
+        const navn = new Set(o.map((x) => x.name));
+        m.forEach((k) => [k.home, k.away].forEach((t) => { if (t && t !== ktx.our_team && !navn.has(t) && !/^\d\. plass$/.test(t)) { navn.add(t); o.push({ id: null, slug: t, name: t }); } }));
+        return o.sort((a, b) => a.name.localeCompare(b.name, 'nb'));
+      },
+      async tropp(ktx, motstandere) {
+        const ids = motstandere.filter((x) => x.id).map((x) => x.id); if (!ids.length) return {};
+        const pl = kast(await db.from('opponent_players').select('opponent_id,jersey,name,position,person_id').in('opponent_id', ids));
+        const ut = {}; motstandere.forEach((o) => { ut[o.name] = pl.filter((p) => p.opponent_id === o.id); });
+        return ut;
+      },
+      async slag(ktx, lag) { return kast(await db.rpc('slaghistorikk', { p_lag: lag, p_person: null })).filter((r) => r.kontekst === ktx.slug).map(Analyse.fraRad); },
+      async slagForPerson(pid) { return kast(await db.rpc('slaghistorikk', { p_lag: null, p_person: pid })).map(Analyse.fraRad); },
+      lagring(ktx) { return Forsvar.supabaseLagring(client, ktx.id, bruker && bruker.id); },
+    };
+  }
+
+  // ---------- Innlogging (samme bruker og økt som appen på samme lenke) ----------
+  async function start() {
+    if (demo || !window.supabase || !cfg.url) {
+      if (!demo && !cfg.url) { $('kilde').textContent = 'Mangler config.js – viser demodata.'; }
+      return kjør(demoKilde(), true);
+    }
+    const client = window.supabase.createClient(cfg.url, cfg.publishableKey, cfg.queue ? { auth: { storageKey: 'sb-rv-' + cfg.queue } } : undefined);
+    let { data } = await client.auth.getSession();
+    let bruker = data && data.session && data.session.user;
+    const auto = cfg.autoLogin;
+    if (auto && auto.email && (!bruker || bruker.email !== auto.email)) {
+      if (bruker) await client.auth.signOut();
+      const r = await client.auth.signInWithPassword({ email: auto.email, password: auto.password });
+      if (r.error) return visFeil('Kunne ikke logge inn: ' + r.error.message);
+      bruker = r.data.user;
+    }
+    if (!bruker) return innlogging(client);
+    return kjør(supabaseKilde(client, bruker), false);
+  }
+  function innlogging(client) {
+    $('app').innerHTML = '<form class="innlogging"><h1>Analyse</h1><p class="liten">Logg inn med samme e-post og passord som i appen.</p>'
+      + '<label class="etikett" for="li-e">E-post</label><input id="li-e" type="email" autocomplete="username" required>'
+      + '<label class="etikett" for="li-p">Passord</label><input id="li-p" type="password" autocomplete="current-password" required>'
+      + '<button class="knapp primar" type="submit">Logg inn</button><p class="liten" id="li-feil" role="alert"></p></form>';
+    $('app').querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const r = await client.auth.signInWithPassword({ email: $('li-e').value, password: $('li-p').value });
+      if (r.error) { $('li-feil').textContent = 'Innlogging feilet: ' + r.error.message; return; }
+      location.reload();
+    });
+  }
+  function visFeil(t) { $('tom').hidden = false; $('tom').textContent = t; }
+
+  // ---------- Hovedflyt ----------
+  let kilde;
+  async function kjør(k, erDemo) {
+    kilde = k;
+    try {
+      S.kontekster = await kilde.kontekster();
+      const ønsket = cfg.locked ? cfg.mainSlug : (q.get('lag') || cfg.mainSlug);
+      S.ktx = S.kontekster.find((c) => c.slug === ønsket) || S.kontekster[0];
+      if (!S.ktx) return visFeil('Du har ikke tilgang til noe lag ennå.');
+      if (!cfg.locked && S.kontekster.length > 1) {
+        const v = $('kontekst'); v.hidden = false;
+        v.innerHTML = S.kontekster.map((c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>').join('');
+        v.value = S.ktx.slug;
+        v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); });
+      } else $('kontekst-navn').textContent = S.ktx.name + (erDemo ? ' · oppdiktede data' : '');
+      await lastKontekst();
+    } catch (e) { visFeil('Kunne ikke hente data: ' + e.message); }
+  }
+  async function lastKontekst() {
+    S.motstandere = await kilde.motstandere(S.ktx);
+    S.tropp = await kilde.tropp(S.ktx, S.motstandere);
+    $('lag').innerHTML = S.motstandere.map((o) => '<option>' + esc(o.name) + '</option>').join('');
+    const fraUrl = q.get('motstander');
+    if (fraUrl && S.motstandere.some((o) => o.name === fraUrl)) $('lag').value = fraUrl;
+    S.lagring = kilde.lagring(S.ktx);
+    if (S.fv) S.fv.fjern();
+    S.fv = Forsvar.monter({ svg, lag: $('markorlag'), laget: S.ktx.name, lagring: S.lagring, prefiks: '', motstander: $('lag').value, onEndring: visPlan });
+    S.fv.settVis(S.plan); S.fv.settLast(false);
+    await lastLag();
+  }
+  async function lastLag() {
+    const lag = $('lag').value;
+    S.slag = lag ? await kilde.slag(S.ktx, lag) : [];
+    S.ekstra = [];
+    oppdaterSpillervalg();
+    $('kamp').innerHTML = '<option value="">Alle kamper</option>' + Analyse.kamper(S.slag).map((k) => '<option value="' + esc(k.kamp) + '">' + esc(dato(k.dato)) + ' · ' + k.antall + ' slag</option>').join('');
+    if (S.fv) { try { await S.fv.last('', lag || null, S.ktx.name); S.feil = ''; } catch (e) { S.feil = 'Kunne ikke hente forsvarsplanen: ' + e.message; visPlan(S.fv.tilstand()); } }
+    tegn();
+  }
+  // Spillere: fra troppen (med ID) og fra slagene, samlet på spiller-ID
+  function oppdaterSpillervalg() {
+    const lag = $('lag').value, fraSlag = Analyse.spillere(S.slag), sett = new Set(fraSlag.map((p) => p.nokkel));
+    const tropp = (S.tropp[lag] || []).map((p) => ({ nokkel: p.person_id ? 'id:' + p.person_id : 'nr:' + lag + '#' + p.jersey, navn: p.name || '', nr: [String(p.jersey)], antall: 0, pid: p.person_id || null }))
+      .filter((p) => !sett.has(p.nokkel)).sort((a, b) => (+a.nr[0] || 99) - (+b.nr[0] || 99));
+    const forrige = $('spiller').value;
+    $('spiller').innerHTML = '<option value="">Hele laget</option>'
+      + fraSlag.map((p) => '<option value="' + esc(p.nokkel) + '">#' + esc(p.nr.join('/')) + ' ' + esc(p.navn) + ' · ' + p.antall + ' slag</option>').join('')
+      + (tropp.length ? '<optgroup label="Uten registrerte slag">' + tropp.map((p) => '<option value="' + esc(p.nokkel) + '">#' + esc(p.nr[0]) + ' ' + esc(p.navn) + '</option>').join('') + '</optgroup>' : '');
+    if ([...$('spiller').options].some((o) => o.value === forrige)) $('spiller').value = forrige;
+  }
+  // En valgt spiller med ID: ta også med slagene hennes fra andre lag/sesonger du har tilgang til
+  async function hentEkstra() {
+    S.ekstra = [];
+    const nk = $('spiller').value;
+    if (nk.startsWith('id:')) {
+      const alle = await kilde.slagForPerson(nk.slice(3));
+      const har = new Set(S.slag.map((s) => s.kamp + '|' + s.x1 + '|' + s.y1 + '|' + s.x2 + '|' + s.y2));
+      S.ekstra = alle.filter((s) => !har.has(s.kamp + '|' + s.x1 + '|' + s.y1 + '|' + s.x2 + '|' + s.y2));
+    }
+  }
+
+  function filter() {
+    return { spiller: $('spiller').value || null, kamp: $('kamp').value || null, sett: $('sett').value || null, type: $('type').value, utfall: $('utfall').value };
+  }
+
+  // ---------- Tegning ----------
+  const svgEl = (t, a) => { const n = document.createElementNS('http://www.w3.org/2000/svg', t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+  function tegn() {
+    const alle = S.slag.concat(S.ekstra), f = filter(), utvalg = Analyse.filtrer(alle, f);
+    const farge = Object.fromEntries(Analyse.spillere(alle).map((p) => [p.nokkel, p.farge]));
+    layer.innerHTML = ''; zones.innerHTML = '';
+    [...defs.querySelectorAll('marker.an')].forEach((m) => m.remove());
+    const brukt = [...new Set(utvalg.map((s) => farge[Analyse.spillerNokkel(s)]))];
+    brukt.forEach((c, i) => { const mk = svgEl('marker', { id: 'an-' + i, class: 'an', viewBox: '0 0 10 10', refX: '6', refY: '5', markerWidth: '4', markerHeight: '4', orient: 'auto-start-reverse' }); mk.appendChild(svgEl('path', { d: 'M0,0 L10,5 L0,10 z', fill: c })); defs.appendChild(mk); });
+    if (S.visning === 'soner') {
+      const sum = Analyse.oppsummer(utvalg), pos = { 4: [0, 210], 3: [300, 210], 2: [600, 210], 5: [0, 510], 6: [300, 510], 1: [600, 510] };
+      Object.entries(pos).forEach(([z, [x, y]]) => {
+        const h = y === 210 ? 300 : 600, n = sum.soner[z], andel = sum.antall ? n / sum.antall : 0;
+        zones.appendChild(svgEl('rect', { x, y, width: 300, height: h, fill: '#B3261E', 'fill-opacity': (andel * 0.85).toFixed(2) }));
+        zones.appendChild(svgEl('line', { x1: x, y1: y, x2: x, y2: y + h, stroke: 'var(--court-line)', 'stroke-width': 2, 'stroke-dasharray': '8 10', opacity: '.6' }));
+        const t1 = svgEl('text', { x: x + 150, y: y + h / 2, 'text-anchor': 'middle', 'font-family': 'Barlow Condensed, Arial Narrow, sans-serif', 'font-size': 64, 'font-weight': 700, fill: 'var(--court-net)' });
+        t1.textContent = sum.antall ? Math.round(andel * 100) + ' %' : '–'; zones.appendChild(t1);
+        const t2 = svgEl('text', { x: x + 150, y: y + h / 2 + 38, 'text-anchor': 'middle', 'font-family': 'Barlow Condensed, Arial Narrow, sans-serif', 'font-size': 26, fill: 'var(--court-net)', opacity: '.7' });
+        t2.textContent = 'Sone ' + z + ' · ' + n; zones.appendChild(t2);
+      });
+      utvalg.forEach((s) => layer.appendChild(s.k === 'dip'
+        ? svgEl('rect', { x: s.x2 - 12, y: s.y2 - 12, width: 24, height: 24, transform: 'rotate(45 ' + s.x2 + ' ' + s.y2 + ')', fill: '#FFFFFF', stroke: farge[Analyse.spillerNokkel(s)], 'stroke-width': 6 })
+        : svgEl('circle', { cx: s.x2, cy: s.y2, r: 13, fill: farge[Analyse.spillerNokkel(s)], stroke: '#FFFFFF', 'stroke-width': 3 })));
+    } else {
+      utvalg.forEach((s) => {
+        const c = farge[Analyse.spillerNokkel(s)], dip = s.k === 'dip';
+        const d = dip ? 'M' + s.x1 + ',' + s.y1 + ' Q' + ((s.x1 + s.x2) / 2 + 60) + ',' + ((s.y1 + s.y2) / 2) + ' ' + s.x2 + ',' + s.y2 : 'M' + s.x1 + ',' + s.y1 + ' L' + s.x2 + ',' + s.y2;
+        const g = svgEl('g', {});
+        g.appendChild(svgEl('path', { d, fill: 'none', stroke: '#FFFFFF', 'stroke-width': 11, 'stroke-linecap': 'round', opacity: '.5' }));
+        const p = { d, fill: 'none', stroke: c, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': dip ? '2 12' : (s.c === 'F' ? '16 10' : 'none'), opacity: s.c === 'D' ? '.6' : '1' };
+        if (!dip) p['marker-end'] = 'url(#an-' + brukt.indexOf(c) + ')';
+        g.appendChild(svgEl('path', p));
+        if (dip) g.appendChild(svgEl('circle', { cx: s.x2, cy: s.y2, r: 9, fill: '#FFFFFF', stroke: c, 'stroke-width': 4 }));
+        if (s.c === 'K' || s.c === 'B') { const t = svgEl('text', { x: s.x2 + 14, y: s.y2 - 10, 'font-family': 'Barlow Condensed, Arial Narrow, sans-serif', 'font-size': 26, 'font-weight': 700, fill: s.c === 'K' ? '#0F5A2F' : '#7A1A14' }); t.textContent = s.c; g.appendChild(t); }
+        layer.appendChild(g);
+      });
+    }
+    panel(alle, utvalg, farge);
+  }
+
+  function panel(alle, utvalg, farge) {
+    const sum = Analyse.oppsummer(utvalg), fav = Analyse.favorittsone(sum), lag = $('lag').value, nk = $('spiller').value;
+    const sp = Analyse.spillere(alle).find((p) => p.nokkel === nk);
+    const navn = nk ? (sp ? '#' + sp.nr.join('/') + ' ' + sp.navn : $('spiller').selectedOptions[0].textContent) : 'Hele laget';
+    const fl = (tall, tekst) => '<div class="flis"><b>' + tall + '</b><span>' + tekst + '</span></div>';
+    $('fliser').innerHTML = fl(sum.antall, sum.kamper === 1 ? 'slag i 1 kamp' : 'slag i ' + sum.kamper + ' kamper')
+      + fl(sum.andel.diagonal == null ? '–' : sum.andel.diagonal + ' %', 'diagonal')
+      + fl(sum.andel.linje == null ? '–' : sum.andel.linje + ' %', 'linje')
+      + fl(sum.andel.dip == null ? '–' : sum.andel.dip + ' %', 'dip')
+      + fl(sum.killPst == null ? '–' : sum.killPst + ' %', 'kill (av ' + sum.medUtfall + ' med utfall)');
+    $('oppsummering').textContent = sum.antall ? (navn + ': ' + (fav ? 'oftest i sone ' + fav.sone + ' (' + fav.andel + ' %). ' : '') + sum.utfall.K + ' kill, ' + sum.utfall.F + ' feil, ' + sum.utfall.B + ' blokk, ' + sum.utfall.D + ' forsvart.') : '';
+    const tom = $('tom');
+    tom.hidden = !!sum.antall;
+    tom.textContent = alle.length ? 'Ingen slag i dette utvalget. Endre filtrene.' : 'Ingen slagretninger registrert mot ' + lag + ' ennå. Slagene dukker opp her når dere registrerer slagretning i kamp. Forsvarsplanen kan lages likevel.';
+    // Spillertabell (filtrert på kamp/sett/type/utfall, men ikke på spiller)
+    const uten = Object.assign(filter(), { spiller: null }), base = Analyse.filtrer(alle, uten);
+    const rader = Analyse.spillere(base);
+    $('tabell-tittel').textContent = 'Spillere hos ' + lag;
+    $('tabell').innerHTML = rader.length ? rader.map((p) => {
+      const o = Analyse.oppsummer(Analyse.filtrer(base, { spiller: p.nokkel }));
+      return '<tr class="klikk' + (p.nokkel === nk ? ' valgt' : '') + '" data-nokkel="' + esc(p.nokkel) + '" tabindex="0"><td><span class="prikk" style="background:' + farge[p.nokkel] + '"></span>#' + esc(p.nr.join('/')) + ' ' + esc(p.navn) + '</td><td class="tall">' + o.antall + '</td><td class="tall">' + o.kamper + '</td><td class="tall">' + o.type.diagonal + '/' + o.type.linje + '/' + o.type.dip + '</td><td class="tall">' + (o.killPst == null ? '–' : o.killPst + ' %') + '</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="liten">Ingen slag.</td></tr>';
+    $('kampliste').innerHTML = Analyse.kamper(utvalg).map((k) => esc(dato(k.dato)) + ' · ' + k.antall + ' slag' + (k.kontekst && S.ktx && k.kontekst !== S.ktx.slug ? ' (annen sesong/lag)' : '')).join('<br>') || '–';
+    $('kilde').textContent = S.ekstra.length ? 'Inkluderer ' + S.ekstra.length + ' slag fra andre lag eller sesonger (samme spiller-ID).' : '';
+    const fl2 = filter(), deler = [fl2.kamp ? 'én kamp' : 'alle kamper', fl2.sett ? 'sett ' + fl2.sett : null, fl2.type !== 'alle' ? $('type').selectedOptions[0].textContent.toLowerCase() : null, fl2.utfall !== 'alle' ? $('utfall').selectedOptions[0].textContent.toLowerCase() : null, S.visning === 'soner' ? 'soner' : 'piler'].filter(Boolean);
+    $('utskrift-tittel').innerHTML = 'Slagretninger · ' + esc(lag) + ' · ' + esc(navn) + '<small>' + esc(S.ktx ? S.ktx.name : '') + ' · ' + esc(deler.join(' · ')) + ' · ' + sum.antall + ' slag</small>';
+  }
+
+  // ---------- Forsvarsplan ----------
+  let nullTimer = null;
+  function visPlan(t) {
+    $('rot').value = t.rotasjon;
+    $('p-linje').setAttribute('aria-pressed', String(t.variant === 'linje')); $('p-dia').setAttribute('aria-pressed', String(t.variant === 'dia'));
+    $('p-flytt').setAttribute('aria-pressed', String(t.modus === 'flytt')); $('p-bev').setAttribute('aria-pressed', String(t.modus === 'bevegelse'));
+    $('p-rekke').setAttribute('aria-pressed', String(t.rekkevidde)); $('p-skygge').setAttribute('aria-pressed', String(t.skygge));
+    $('p-las').setAttribute('aria-pressed', String(t.last)); $('p-las').textContent = t.last ? 'Låst' : 'Lås';
+    const s = $('p-status');
+    s.className = 'status' + (S.feil ? ' feil' : t.ulagret ? ' ulagret' : ' lagret');
+    s.textContent = S.feil || (t.ulagret ? 'Ulagrede endringer' : 'Lagret');
+    $('p-forkast').hidden = !t.ulagret;
+    $('lag').disabled = !!t.ulagret; $('kontekst').disabled = !!t.ulagret;
+    $('lag').title = t.ulagret ? 'Lagre eller forkast forsvarsplanen først' : '';
+    if (!nullTimer) $('p-null').textContent = 'Nullstill';
+  }
+  $('b-plan').addEventListener('click', () => {
+    S.plan = !S.plan; $('b-plan').setAttribute('aria-pressed', String(S.plan)); $('plan').hidden = !S.plan;
+    if (S.fv) S.fv.settVis(S.plan);
+  });
+  $('rot').addEventListener('change', (e) => S.fv.settRotasjon(e.target.value));
+  $('p-linje').addEventListener('click', () => S.fv.settVariant('linje'));
+  $('p-dia').addEventListener('click', () => S.fv.settVariant('dia'));
+  $('p-flytt').addEventListener('click', () => S.fv.settModus('flytt'));
+  $('p-bev').addEventListener('click', () => S.fv.settModus('bevegelse'));
+  $('p-rekke').addEventListener('click', () => S.fv.settRekkevidde(!S.fv.tilstand().rekkevidde));
+  $('p-skygge').addEventListener('click', () => S.fv.settSkygge(!S.fv.tilstand().skygge));
+  $('p-las').addEventListener('click', () => S.fv.settLast(!S.fv.tilstand().last));
+  $('p-null').addEventListener('click', () => {
+    const b = $('p-null'), t = S.fv.tilstand();
+    if (!nullTimer) { b.textContent = 'Nullstill ' + t.rotasjon + ' ' + (t.variant === 'dia' ? 'Dia' : 'Linje') + '?'; b.classList.add('fare'); nullTimer = setTimeout(() => { nullTimer = null; b.textContent = 'Nullstill'; b.classList.remove('fare'); }, 4000); return; }
+    clearTimeout(nullTimer); nullTimer = null; b.textContent = 'Nullstill'; b.classList.remove('fare'); S.fv.nullstill();
+  });
+  $('p-lagre').addEventListener('click', async () => {
+    try { S.feil = ''; await S.fv.lagre(); }
+    catch (e) { S.feil = 'Ikke lagret: ' + e.message + '. Endringene er beholdt.'; visPlan(S.fv.tilstand()); }
+  });
+  $('p-forkast').addEventListener('click', () => S.fv.forkast());
+
+  // ---------- Utvalg og visning ----------
+  $('lag').addEventListener('change', () => { $('spiller').value = ''; lastLag(); });
+  $('spiller').addEventListener('change', async () => { await hentEkstra(); tegn(); });
+  ['kamp', 'sett', 'type', 'utfall'].forEach((id) => $(id).addEventListener('change', tegn));
+  $('v-piler').addEventListener('click', () => { S.visning = 'piler'; $('v-piler').setAttribute('aria-pressed', 'true'); $('v-soner').setAttribute('aria-pressed', 'false'); tegn(); });
+  $('v-soner').addEventListener('click', () => { S.visning = 'soner'; $('v-soner').setAttribute('aria-pressed', 'true'); $('v-piler').setAttribute('aria-pressed', 'false'); tegn(); });
+  $('tabell').addEventListener('click', async (ev) => {
+    const r = ev.target.closest('tr[data-nokkel]'); if (!r) return;
+    $('spiller').value = $('spiller').value === r.dataset.nokkel ? '' : r.dataset.nokkel; await hentEkstra(); tegn();
+  });
+  $('tabell').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('tr[data-nokkel]')) ev.target.click(); });
+  $('b-skriv').addEventListener('click', () => window.print());
+  $('tilbake').href = demo ? '../?demo=1' : '../';
+
+  window.__analyse = { S, tegn, get fv() { return S.fv; } };
+  start().catch((e) => visFeil('Noe gikk galt: ' + e.message));
+})();
+
+</script>
+</body>
+</html>
