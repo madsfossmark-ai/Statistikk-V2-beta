@@ -912,7 +912,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       squad_player_id: egen ? (k.spillerUuid(ev.p) || null) : null, opp_jersey: egen ? null : String(ev.p == null ? '?' : ev.p),
       name_at_time: ev.n || null, origin: 'app' };
     if (type === 'dir') {
-      const g = {}; for (const [x, v] of Object.entries(ev)) if (!['id', 't', 'set', 'type', 'p', 'c', 'n'].includes(x)) g[x] = v;
+      const g = {}; for (const [x, v] of Object.entries(ev)) if (!['id', 't', 'set', 'type', 'p', 'c', 'n', 'pid'].includes(x)) g[x] = v;
       rad.geom = g;
     }
     if (ev.id && !erUuid(ev.id)) rad.legacy_id = String(ev.id);
@@ -922,6 +922,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const ev = { id: r.legacy_id || r.id, t: Date.parse(r.recorded_at), set: r.set_no, type: r.type,
       p: r.squad_player_id ? (spillerLegacy(r.squad_player_id) || r.squad_player_id) : r.opp_jersey, c: r.code };
     if (r.name_at_time) ev.n = r.name_at_time;
+    if (r.opp_person_id) ev.pid = r.opp_person_id;   // motstanderens spiller-ID (NIF), fylles inn av databasen
     if (r.geom) Object.assign(ev, r.geom);
     return ev;
   }
@@ -1158,7 +1159,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           if (String(sti) === 'config/contexts') {
             return lytt('ctx', [['contexts']], async () => {
               const rader = await hentKontekster();
-              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined })) };
+              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined, gender: c.gender || undefined })) };
             }, (d) => cb(dokSnap(d)), feil);
           }
           if (String(sti) === 'config/access') { setTimeout(() => cb(dokSnap(null)), 0); return () => {}; }
@@ -1200,7 +1201,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           }
           if (deler[0] === 'opponents' && deler[1]) {
             const r = kast(await db.from('opponents').upsert({ context_id: c.id, slug: deler[1], name: data.name }, { onConflict: 'context_id,slug' }).select('id'));
-            const oid = r[0].id, pl = (data.players || []).filter((x) => x.nr != null).map((x) => ({ opponent_id: oid, jersey: String(x.nr), name: x.name || null, position: x.pos || null }));
+            const oid = r[0].id, pl = (data.players || []).filter((x) => x.nr != null).map((x) => Object.assign({ opponent_id: oid, jersey: String(x.nr), name: x.name || null, position: x.pos || null }, x.id ? { person_id: String(x.id) } : {}));
             if (pl.length) kast(await db.from('opponent_players').upsert(pl, { onConflict: 'opponent_id,jersey' }));
             return;
           }
@@ -1243,7 +1244,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
               av = lytt('motst', [['opponents', 'context_id=eq.' + c.id], ['opponent_players']], async () => {
                 const o = kast(await db.from('opponents').select('*').eq('context_id', c.id));
                 const pl = o.length ? kast(await db.from('opponent_players').select('*').in('opponent_id', o.map((x) => x.id))) : [];
-                return o.map((x) => [x.slug, { name: x.name, players: pl.filter((p) => p.opponent_id === x.id).map((p) => ({ nr: p.jersey, name: p.name || undefined, pos: p.position || undefined })) }]);
+                return o.map((x) => [x.slug, { name: x.name, players: pl.filter((p) => p.opponent_id === x.id).map((p) => ({ nr: p.jersey, name: p.name || undefined, pos: p.position || undefined, id: p.person_id || undefined })) }]);
               }, (x) => cb(samSnap(x)), feil);
             else setTimeout(() => cb(samSnap([])), 0);
           }).catch((e) => feil && feil(e));
