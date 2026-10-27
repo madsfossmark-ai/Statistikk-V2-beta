@@ -184,7 +184,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   .menu-btn span { display: none; } .menu-btn { padding: 0 12px; }
   .list-controls .tabs { order: 1; } .list-controls .menu-wrap { order: 2; }
   .lc-break { display: block; order: 3; flex-basis: 100%; height: 0; }
-  .list-controls > button { order: 4; }
+  .list-controls > button, .list-controls > a.secondary { order: 4; }
 }
 .listhead h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1; }
 .tabs { display: inline-flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: 10px; }
@@ -2673,7 +2673,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     let h = '<div class="listhead"><div class="lh-ctx">' + ctxPicker() + '</div><div class="lh-id">' + crest(OUR, 'md') + '<h1>Kamper</h1></div>' + '</div>'
       + '<div class="list-controls"><div class="tabs" role="group" aria-label="Filter">'
       + [['alle', 'Alle'], ['vare', OUR]].map(([k, l]) => '<button data-a="filter" data-v="' + k + '" aria-pressed="' + (S.filter === k) + '">' + esc(l) + '</button>').join('')
-      + '</div><button class="secondary" data-a="table">Tabell</button><button class="primary" data-a="season">Dashboard</button><span class="lc-break"></span>' + menuHtml() + '</div>';
+      + '</div><button class="secondary" data-a="table">Tabell</button><button class="primary" data-a="season">Dashboard</button>' + ((!(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? '<a class="secondary" href="analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') + '" style="display:inline-flex;align-items:center;box-sizing:border-box;text-decoration:none">Analyse</a>' : '') + '<span class="lc-break"></span>' + menuHtml() + '</div>';
     if (S.showNewCtx) h += newCtxForm();
     if (S.showNew) h += newMatchForm();
     if (S.showShare && siteUrl()) h += sharePanel();
@@ -2692,7 +2692,6 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + (hasSite() ? '<button class="menu-item" role="menuitem" data-a="publish">Publiser åpen side</button>' : '')
       + (siteUrl() ? '<button class="menu-item" role="menuitem" data-a="share">Del lenke til åpen side</button>' : '')
       + (!S.dash && !window.PUBLIC ? '<button class="menu-item" role="menuitem" data-a="logos">Lagmerker</button>' : '')
-      + ((!(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? '<a class="menu-item" role="menuitem" href="analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') + '">Analyse</a>' : '')
       + '<button class="menu-item" role="menuitem" data-a="legend">Fargeforklaring</button>'
       + (fsOk() ? fsBtn('menu-item') : '');
     if (window.PUBLIC && !fsOk()) return '';
