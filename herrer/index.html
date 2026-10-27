@@ -885,6 +885,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       else if (k === 'current') { if (v) { rad.current_set = v.set || 1; rad.current_home = v.home || 0; rad.current_away = v.away || 0; } }
       else if (k === 'setScores') sett = (v || []).map((s, i) => { const a = Array.isArray(s) ? s : [s.home, s.away]; return { set_no: i + 1, home: +a[0] || 0, away: +a[1] || 0 }; });
       else if (k === 'publish') rad.publish = !!v;
+      // Oppstilling per sett (issue #20): slås sammen per sett, så to enheter som bekrefter hvert sitt sett ikke overskriver hverandre.
+      // Ved versjonskonflikt hentes ny legacy, og sammenslåingen gjøres på nytt mot den.
+      else if (k === 'lineups' && v && v.sets) {
+        const g = legacy.lineups || {}, uten = v.uten !== undefined ? v.uten : g.uten;
+        legacy.lineups = Object.assign({ v: v.v || 1, sets: Object.assign({}, g.sets || {}, v.sets) }, uten !== undefined ? { uten } : {});
+      }
       else legacy[k] = v;  // oppsett, receivers, onCourt, oppNumbers, short … beholdes uendret
     }
     if (patch.round !== undefined) rad.is_test = String(patch.round || '').toLowerCase() === 'test';
@@ -1959,7 +1965,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + '<button type="button" data-fk="null" data-fk-del="red" class="secondary">Nullstill</button></div>'
       + '<div class="fk-rad"><span class="label">Tidligere kamper</span><div class="seg" role="group" aria-label="Tidligere kamper">'
       + [['av', 'Av'], ['valgt', 'Valgt spiller'], ['alle', 'Alle i kampen']].map(([v, l]) => '<button type="button" data-fk="hist" data-v="' + v + '" aria-pressed="false">' + l + '</button>').join('') + '</div></div>'
-      + '<div class="fk-info" id="fk-info"></div>'
+      + '<div class="fk-info" id="fk-info"></div><div class="fk-info" id="fk-kobling"></div>'
       + '<div class="fk-info"><a id="fk-analyse" href="#">Åpne laget i Analyse ›</a></div>';
     const sum = side.querySelector('.dir-sum');
     side.insertBefore(panel, sum || null);
@@ -2079,7 +2085,17 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     // Nytt nummer kan ha fått spiller-ID i troppen etter at vi hentet: hent på nytt ved neste visning
     if (st.app.nums.join(',') !== før.split('|')[0] && st.hist && st.app.nums.some((n) => !st.hist.some((h) => h.nr === n))) { st.hist = null; st.histFeil = ''; }
     if (mem.hist !== 'av') oppdaterHistorikk();
+    visKobling();
     st.fv.oppdater();
+  }
+  // Oppstillingen (issue #20) kobler markørene til faktiske spillere: M = midt foran nå, L = libero inne (ellers midt bak).
+  // Bare visning; markørdataene og planen endres ikke.
+  function visKobling() {
+    if (!st) return; const boks = st.panel.querySelector('#fk-kobling'), O = window.Oppstilling;
+    const opp = O && st.o.oppstilling ? st.o.oppstilling() : null;
+    if (!opp) { boks.textContent = ''; return; }
+    const k = O.forsvarKobling(opp), sp = st.o.spillere ? st.o.spillere() : [], nr = (id) => { const p = sp.find((x) => String(x.id) === String(id)); return p ? '#' + (p.nr || '?') : '?'; };
+    boks.textContent = 'På banen nå: ' + ['O', 'K1', 'M', 'D', 'K2', 'L'].filter((r) => k[r]).map((r) => r + ' ' + nr(k[r])).join(' · ');
   }
   function lukk() {
     if (!st) return; const s = st; st = null;
@@ -2091,6 +2107,580 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   window.ForsvarKamp = { apne, oppdater, lukk, get tilstand() { return st ? Object.assign(st.fv.tilstand(), { redigerer: st.red, status: st.status, historikk: st.hist ? st.hist.length : null }) : null; } };
 })();
+</script>
+<script>/*
+ * Oppstillingsvelger V1 (issue #20): startsekser, rotasjon R1–R6, første serve, libero og mottaksformasjon per sett.
+ *
+ * Felles komponent for alle lag og sesonger. Den kjenner bare spillerlisten den får (id, nr, navn, posisjon), ikke laget.
+ * Rene funksjoner (testes i node) + en stor, iPad-tilpasset velger (monter).
+ *
+ * Begreper
+ *   Plass 1–6: formell rotasjonsplass sett fra vår side med nettet øverst:  4 3 2 (foran) / 5 6 1 (bak).
+ *   R1–R6:     oppleggerens plass. R1 = opplegger på plass 1, nederst til høyre.
+ *   Rotasjon:  når laget roterer, går spilleren på plass 2 til 1, 3 til 2 … og 1 til 6 (R1 → R6 → R5 …).
+ *   Libero:    er ikke en sjuende plass. De seks grunnspillerne beholder plassene sine; liberoen erstatter én bakspiller.
+ *
+ * Datamodell (kampens legacy-felt «lineups», én post per sett, versjonert):
+ *   lineups = { v: 1, sets: { "1": Sett, "2": Sett, … } }
+ *   Sett = { v, confirmed, confirmedAt, confirmedBy, updatedAt,
+ *            start:  Oppsett   // bekreftet startoppstilling; endres aldri etter første registrering i settet
+ *            naa:    Oppsett   // det som er på banen nå (bytter, libero inn/ut, manuell rotasjon)
+ *            receptionPositions: { R1: { spillerId: [x, y] }, … }   // normalisert 0–1 på vår halvdel (y 0 = nett)
+ *            endringer: [{ t, type, … }] }
+ *   Oppsett = { rotation: 'R1'…'R6', firstServe: 'oss'|'motstander', positions: { '1': id, … '6': id },
+ *               roles: { id: 'O'|'K1'|'K2'|'M1'|'M2'|'D'|… }, libero: { spillere: [id], aktiv: id|null, inne: bool, erstatter: id|null },
+ *               receivers: [id] }
+ * Appens «onCourt» og «receivers» regnes ut fra Oppsett (onCourtOgMottak) og lagres i samme oppdatering.
+ */
+(function (root) {
+  'use strict';
+  const PLASSER = [1, 2, 3, 4, 5, 6];
+  const FORAN = [4, 3, 2], BAK = [5, 6, 1];
+  const ROTASJONER = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+  // 5-1: rekkefølgen rundt banen fra oppleggerens plass (1 → 2 → … → 6)
+  const REKKEFOLGE_51 = ['O', 'K1', 'M1', 'D', 'K2', 'M2'];
+  const ROLLER = ['O', 'K1', 'K2', 'M1', 'M2', 'D'];
+  const ROLLENAVN = { O: 'Opplegger', K1: 'Kant 1', K2: 'Kant 2', M1: 'Midt 1', M2: 'Midt 2', D: 'Diagonal', L: 'Libero' };
+  // Formelle plasser på vår halvdel (samme som forsvarsmarkørene): x 0–1 venstre–høyre, y 0 = nett, 1 = baklinje
+  const PLASS_XY = { 1: [0.83, 0.72], 2: [0.83, 0.17], 3: [0.5, 0.17], 4: [0.17, 0.17], 5: [0.17, 0.72], 6: [0.5, 0.72] };
+
+  const kopi = (x) => JSON.parse(JSON.stringify(x));
+  const erBak = (p) => BAK.includes(Number(p));
+  const rNr = (R) => Number(String(R || '').replace(/\D/g, '')) || null;
+  const klem = (v) => Math.max(0, Math.min(1, v));
+  const rund = (v) => Math.round(v * 1000) / 1000;
+
+  function plassAv(pos, id) { for (const p of PLASSER) if (pos && String(pos[p]) === String(id)) return p; return null; }
+  function ider(pos) { return PLASSER.map((p) => pos && pos[p]).filter((x) => x != null && x !== ''); }
+  // Spillerne i rotasjonsrekkefølge fra plass «fra» (1 → 2 → … → 6 → 1)
+  function rekkefolge(pos, fra) { return PLASSER.map((_, i) => pos[((fra - 1 + i) % 6) + 1]); }
+  // Plasser fra R og en rekkefølge (rekke[0] er oppleggeren)
+  function fraRotasjon(R, rekke) { const k = rNr(R) || 1, pos = {}; rekke.forEach((id, i) => { pos[((k - 1 + i) % 6) + 1] = id; }); return pos; }
+  // Én rotasjon (laget vinner serven): spilleren på 2 går til 1, …, 1 til 6. steg kan være negativt (tilbake).
+  function roter(pos, steg) {
+    let ut = Object.assign({}, pos); const n = ((steg == null ? 1 : steg) % 6 + 6) % 6;
+    for (let i = 0; i < n; i++) { const f = ut; ut = {}; PLASSER.forEach((p) => { ut[p] = f[(p % 6) + 1]; }); }
+    return ut;
+  }
+  // Hovedoppleggeren: første spiller med rolle O i plassrekkefølge
+  function opplegger(pos, roller) { for (const p of PLASSER) { const id = pos[p]; if (id != null && roller && roller[id] === 'O') return id; } return null; }
+  function rotasjonAv(pos, roller) { const o = opplegger(pos, roller); const p = o == null ? null : plassAv(pos, o); return p ? 'R' + p : null; }
+  // Ny R: samme rekkefølge rundt banen, oppleggeren flyttes til plass R
+  function settRotasjon(pos, roller, R) {
+    const o = opplegger(pos, roller); if (o == null || !rNr(R)) return Object.assign({}, pos);
+    return fraRotasjon(R, rekkefolge(pos, plassAv(pos, o)));
+  }
+  // Alle seks rotasjoner fra startoppstillingen: { R1: plasser, … } (nøkkel = oppleggerens plass)
+  function alleRotasjoner(pos, roller) {
+    const ut = {}; for (let s = 0; s < 6; s++) { const p = roter(pos, s); const R = rotasjonAv(p, roller); if (R) ut[R] = p; }
+    return ut;
+  }
+
+  // 5-1-systemet: rotasjonen R gir fast rolle på hver plass (R1: 1 O, 2 K1, 3 M1, 4 D, 5 K2, 6 M2).
+  // Spilleren som settes på en plass får plassens rolle.
+  function rolleForPlass(R, p) { const k = rNr(R) || 1; return REKKEFOLGE_51[((Number(p) - k) % 6 + 6) % 6]; }
+  function rollerFraSystem(pos, R) { const r = {}; PLASSER.forEach((p) => { const id = pos && pos[p]; if (id != null && id !== '') r[id] = rolleForPlass(R, p); }); return r; }
+  // Ny rotasjon: hver spiller beholder rollen og flyttes til plassen som har den rollen i den nye rotasjonen
+  function flyttTilRotasjon(pos, fra, til) {
+    const ut = {}; PLASSER.forEach((p) => { const id = pos[p]; if (id == null || id === '') return; const r = rolleForPlass(fra, p); ut[PLASSER.find((q) => rolleForPlass(til, q) === r)] = id; });
+    return ut;
+  }
+  // R etter manuell rotasjon (steg 1 = laget vinner serven: oppleggeren går fra plass k til k − 1, 1 → 6)
+  function rotasjonEtter(R, steg) { const k = rNr(R) || 1; return 'R' + ((((k - 1 - (steg || 0)) % 6) + 6) % 6 + 1); }
+  // Plasserer en spiller på plass p. Settes en opplegger på en plass som ikke er O mens O-plassen er tom,
+  // blir rotasjonen R = p, og spillerne som allerede står der beholder rollene sine.
+  function plasserSpiller(pos, R, id, p, erOpplegger) {
+    p = Number(p); let ut = Object.assign({}, pos), nyR = R;
+    const der = plassAv(ut, id); if (der) delete ut[der];
+    const oPlass = PLASSER.find((q) => rolleForPlass(R, q) === 'O');
+    if (erOpplegger && rolleForPlass(R, p) !== 'O' && (ut[oPlass] == null || ut[oPlass] === '')) {
+      nyR = 'R' + p; ut = flyttTilRotasjon(ut, R, nyR);
+      const fortrengt = ut[p]; ut[p] = id;
+      if (fortrengt != null) { const ledig = PLASSER.find((q) => ut[q] == null); if (ledig) ut[ledig] = fortrengt; }
+      return { positions: ut, rotation: nyR };
+    }
+    const fortrengt = ut[p]; ut[p] = id;
+    if (fortrengt != null && der) ut[der] = fortrengt;   // bytter plass
+    return { positions: ut, rotation: nyR };
+  }
+
+  // Rolle fra spillerregisterets posisjon (Opplegger, Kant, Midt, Diagonal, Libero)
+  function rolleForslag(spillere) {
+    const roller = {}, tell = { K: 0, M: 0 };
+    spillere.forEach((p) => {
+      const pos = String(p.pos || '').toLowerCase();
+      if (pos.startsWith('oppl')) roller[p.id] = roller[p.id] || 'O';
+      else if (pos.startsWith('diag')) roller[p.id] = 'D';
+      else if (pos.startsWith('kant')) roller[p.id] = ++tell.K <= 2 ? 'K' + tell.K : 'K' + tell.K;
+      else if (pos.startsWith('midt')) roller[p.id] = ++tell.M <= 2 ? 'M' + tell.M : 'M' + tell.M;
+    });
+    return roller;
+  }
+  // Forslag til startsekser i 5-1-rekkefølge fra spillerregisteret (bare når det er entydig nok; ellers tomme plasser)
+  function forslagFraRegister(roster) {
+    const aktive = roster.filter((p) => !p.archived);
+    const ikkeLibero = aktive.filter((p) => !/^libero/i.test(p.pos || ''));
+    const roller = rolleForslag(ikkeLibero), valgt = {};
+    REKKEFOLGE_51.forEach((r) => { const p = ikkeLibero.find((x) => roller[x.id] === r && !Object.values(valgt).includes(x.id)); if (p) valgt[r] = p.id; });
+    const pos = {}; REKKEFOLGE_51.forEach((r, i) => { if (valgt[r]) pos[i + 1] = valgt[r]; });
+    const rl = {}; Object.values(pos).forEach((id) => { rl[id] = roller[id]; });
+    const libero = aktive.filter((p) => /^libero/i.test(p.pos || '')).map((p) => p.id);
+    return { positions: pos, roles: rl, liberoer: libero };
+  }
+
+  // Liberoen står alltid for midtspilleren (M1 eller M2) som er på bakerste rekke, og bytter når midten roterer frem.
+  function liberoErstatter(pos, roller) {
+    for (const p of BAK) { const id = pos[p]; if (id != null && /^M/.test((roller || {})[id] || '')) return id; }
+    return null;
+  }
+  // De seks som fysisk er på banen: grunnspillerne, med liberoen inne for den hun erstatter (aldri begge)
+  function paBanen(o) {
+    if (!o || !o.positions) return [];
+    const L = o.libero || {}, inne = !!(L.inne && L.aktiv && L.erstatter && erBak(plassAv(o.positions, L.erstatter)));
+    return PLASSER.map((p) => o.positions[p]).filter((id) => id != null && id !== '').map((id) => (inne && String(id) === String(L.erstatter) ? L.aktiv : id));
+  }
+  function liberoInne(o) { const L = (o && o.libero) || {}; return !!(L.inne && L.aktiv && L.erstatter && erBak(plassAv(o.positions || {}, L.erstatter))); }
+  // Standard mottakere: K1, K2 og libero (når hun er inne) – bare spillere som er på banen
+  function standardMottakere(o) {
+    const pb = paBanen(o), r = o.roles || {}, ut = [];
+    pb.forEach((id) => { if (r[id] === 'K1' || r[id] === 'K2') ut.push(id); });
+    if (liberoInne(o)) ut.push(o.libero.aktiv);
+    return ut;
+  }
+  // Appens kompatible lister fra samme oppsett: onCourt = seks på banen, receivers = mottakere som er på banen
+  function onCourtOgMottak(o) {
+    const pb = paBanen(o), mottak = (o.receivers || []).filter((id) => pb.map(String).includes(String(id)));
+    return { onCourt: pb, receivers: mottak };
+  }
+
+  // Gyldighet: nøyaktig seks ulike, kjente og aktive spillere; libero ikke i grunnseksern; erstatter må stå bak
+  function valider(o, roster) {
+    const feil = [], aktiv = new Set(roster.filter((p) => !p.archived).map((p) => String(p.id)));
+    const id6 = PLASSER.map((p) => o.positions && o.positions[p]);
+    const mangler = PLASSER.filter((p, i) => id6[i] == null || id6[i] === '');
+    if (mangler.length) feil.push('Velg spiller på plass ' + mangler.join(', ') + '.');
+    const fylt = id6.filter((x) => x != null && x !== '').map(String);
+    if (new Set(fylt).size !== fylt.length) feil.push('Samme spiller står på to plasser.');
+    const ukjent = fylt.filter((x) => !aktiv.has(x));
+    if (ukjent.length) feil.push('Ukjent eller arkivert spiller i oppstillingen.');
+    if (!opplegger(o.positions || {}, o.roles)) feil.push('Velg hvem som er opplegger (rolle O).');
+    const L = o.libero || {};
+    (L.spillere || []).forEach((id) => { if (fylt.includes(String(id))) feil.push('Liberoen kan ikke også stå i startsekseren.'); if (!aktiv.has(String(id))) feil.push('Liberoen finnes ikke i troppen.'); });
+    if (L.inne && L.aktiv && (!L.erstatter || !erBak(plassAv(o.positions || {}, L.erstatter)) || !/^M/.test((o.roles || {})[L.erstatter] || ''))) feil.push('Liberoen kan bare stå for midtspilleren (M1/M2) på bakerste rekke.');
+    const pb = paBanen(o).map(String);
+    if ((o.receivers || []).some((id) => !pb.includes(String(id)))) feil.push('En mottaker er ikke på banen.');
+    if (!['oss', 'motstander'].includes(o.firstServe)) feil.push('Velg hvem som server først.');
+    return [...new Set(feil)];
+  }
+
+  // Standard mottaksformasjon for én rotasjon: mottakerne på en linje bak, de andre ved sine formelle plasser
+  // Standard 5-1 mottaksformasjon med tre mottakere (K1, K2 og libero) per rotasjon (nøkkel = oppleggerens plass).
+  // Roller: O, K1, K2, D, MF = midt foran, MB = midt bak (liberoen står her når hun er inne).
+  // Oppfyller overlappregelen: hver frontspiller foran bakspilleren i samme kolonne, og rekkefølgen venstre–høyre i hver rekke.
+  // x 0–1 venstre–høyre sett fra vår side, y 0 = nett, 1 = baklinje. Utgangspunkt som treneren kan justere.
+  const FORMASJON_51 = {
+    R1: { D: [0.12, 0.06], MF: [0.5, 0.06], K1: [0.8, 0.55], K2: [0.2, 0.58], MB: [0.5, 0.62], O: [0.92, 0.75] },
+    R6: { K2: [0.18, 0.52], D: [0.5, 0.12], MF: [0.85, 0.06], MB: [0.42, 0.62], O: [0.6, 0.3], K1: [0.8, 0.62] },
+    R5: { MF: [0.1, 0.06], K2: [0.25, 0.5], D: [0.9, 0.1], O: [0.12, 0.3], K1: [0.5, 0.62], MB: [0.8, 0.62] },
+    R4: { O: [0.3, 0.06], MF: [0.55, 0.06], K2: [0.8, 0.52], K1: [0.2, 0.62], MB: [0.5, 0.62], D: [0.92, 0.8] },
+    R3: { K1: [0.15, 0.5], O: [0.55, 0.06], MF: [0.85, 0.06], MB: [0.38, 0.62], D: [0.55, 0.85], K2: [0.78, 0.62] },
+    R2: { MF: [0.1, 0.06], K1: [0.3, 0.5], O: [0.88, 0.06], D: [0.1, 0.8], K2: [0.55, 0.62], MB: [0.82, 0.62] },
+  };
+  function formasjonsrolle(pos, roller, id) { const r = (roller || {})[id] || '', p = plassAv(pos, id); return /^M/.test(r) ? (erBak(p) ? 'MB' : 'MF') : r; }
+  function standardMottaksformasjon(pos, roller, mottakere, libero) {
+    const o = { positions: pos, roles: roller, libero: Object.assign({}, libero, { erstatter: liberoErstatter(pos, roller) }) };
+    // 5-1-mal når laget står i 5-1 og mottakerne er standard (K1, K2 og libero/midt bak)
+    const R = rotasjonAv(pos, roller), mal = R && FORMASJON_51[R], ids = PLASSER.map((q) => pos[q]);
+    const grunnroller = ids.map((id) => formasjonsrolle(pos, roller, id)).sort().join(',');
+    if (mal && grunnroller === 'D,K1,K2,MB,MF,O') {
+      const inne = liberoInne(o), std = ids.filter((id) => /^K[12]$/.test(roller[id])).concat(inne ? [o.libero.aktiv] : []).map(String).sort();
+      if (JSON.stringify((mottakere || []).map(String).sort()) === JSON.stringify(std)) {
+        const xy = {};
+        ids.forEach((id) => { const fr = formasjonsrolle(pos, roller, id), ut = fr === 'MB' && inne ? o.libero.aktiv : id; xy[ut] = mal[fr].slice(); });
+        return xy;
+      }
+    }
+    const pb = paBanen(o), mot = pb.filter((id) => (mottakere || []).map(String).includes(String(id)) || (libero && libero.inne && String(id) === String(libero.aktiv) && (mottakere || []).map(String).includes(String(libero.aktiv))));
+    const xy = {};
+    pb.forEach((id) => { const grunn = libero && libero.inne && String(id) === String(libero.aktiv) ? o.libero.erstatter : id; const p = plassAv(pos, grunn); if (p) xy[id] = PLASS_XY[p].slice(); });
+    const sortert = mot.slice().sort((a, b) => xy[a][0] - xy[b][0]);
+    const linje = { 1: [0.5], 2: [0.3, 0.7], 3: [0.18, 0.5, 0.82], 4: [0.14, 0.38, 0.62, 0.86], 5: [0.1, 0.3, 0.5, 0.7, 0.9] }[sortert.length] || [];
+    sortert.forEach((id, i) => { xy[id] = [linje[i], 0.66]; });
+    pb.filter((id) => !mot.includes(id)).forEach((id) => { const [x, y] = xy[id]; xy[id] = [x, y > 0.5 ? 0.4 : 0.1]; });
+    Object.keys(xy).forEach((k) => { xy[k] = [rund(xy[k][0]), rund(xy[k][1])]; });
+    return xy;
+  }
+  function mottaksformasjoner(o, lagret) {
+    const ut = {}, rot = alleRotasjoner(o.positions, o.roles);
+    ROTASJONER.forEach((R) => { if (!rot[R]) return; const std = standardMottaksformasjon(rot[R], o.roles, o.receivers, o.libero);
+      const l = (lagret || {})[R] || {}; ut[R] = {}; Object.keys(std).forEach((id) => { ut[R][id] = l[id] ? l[id].slice() : std[id]; }); });
+    return ut;
+  }
+
+  // Forsvarsmarkørene (O/K1/K2/M/D/L) koblet til faktiske spillere der det er entydig.
+  // M = midt som står foran nå; L = liberoen når hun er inne, ellers midt som står bak.
+  function forsvarKobling(o) {
+    if (!o || !o.positions) return {};
+    const r = o.roles || {}, ut = {}, pb = paBanen(o).map(String);
+    Object.entries(r).forEach(([id, rolle]) => { if (['O', 'K1', 'K2', 'D'].includes(rolle) && pb.includes(String(id))) ut[rolle] = id; });
+    FORAN.forEach((p) => { const id = o.positions[p]; if (id != null && /^M/.test(r[id] || '')) ut.M = id; });
+    if (liberoInne(o)) ut.L = o.libero.aktiv; else BAK.forEach((p) => { const id = o.positions[p]; if (id != null && /^M/.test(r[id] || '')) ut.L = id; });
+    return ut;
+  }
+
+  // ---------- Sett: bekreftelse, endringer under settet, synk fra «På banen»/«I mottak» ----------
+  function bekreft(utkast, meta, tidligere, harHendelser) {
+    const t = (meta && meta.t) || new Date().toISOString();
+    const o = kopi(utkast); o.receivers = onCourtOgMottak(o).receivers;
+    // Før første registrering i settet: ny eller korrigert startoppstilling. Etterpå: bare «naa» endres.
+    if (tidligere && tidligere.confirmed && harHendelser) return endreUnderSett(tidligere, o, meta);
+    return { v: 1, confirmed: true, confirmedAt: t, confirmedBy: (meta && meta.enhet) || null, updatedAt: t,
+      start: o, naa: kopi(o), receptionPositions: kopi(utkast.receptionPositions || (tidligere && tidligere.receptionPositions) || {}),
+      endringer: (tidligere && tidligere.endringer ? tidligere.endringer.slice() : []).concat(tidligere && tidligere.confirmed ? [{ t, type: 'korrigert_start', enhet: (meta && meta.enhet) || null }] : []) };
+  }
+  function endreUnderSett(sett, nytt, meta) {
+    const t = (meta && meta.t) || new Date().toISOString(), før = sett.naa || sett.start, s = kopi(sett);
+    const n = kopi(nytt); delete n.receptionPositions; n.firstServe = sett.start.firstServe; n.receivers = onCourtOgMottak(n).receivers;
+    const e = { t, enhet: (meta && meta.enhet) || null, type: 'endring' };
+    const a = paBanen(før).map(String), b = paBanen(n).map(String);
+    const ut = a.filter((x) => !b.includes(x)), inn = b.filter((x) => !a.includes(x));
+    // Rotasjon (manuell): liberoen kan gå ut/inn som følge av den; det logges som del av rotasjonen
+    if (rotasjonAv(før.positions, før.roles) !== rotasjonAv(n.positions, n.roles)) { e.type = 'rotasjon'; if (ut.length || inn.length) { e.ut = ut; e.inn = inn; } }
+    else if (ut.length || inn.length) { e.type = (n.libero && (inn.includes(String(n.libero.aktiv)) || ut.includes(String(n.libero.aktiv)))) ? 'libero' : 'bytte'; e.ut = ut; e.inn = inn; }
+    e.rotasjon = rotasjonAv(n.positions, n.roles);
+    s.naa = n; s.updatedAt = t; s.endringer = (s.endringer || []).concat([e]);
+    if (nytt.receptionPositions) s.receptionPositions = kopi(nytt.receptionPositions);
+    return s;
+  }
+  // Dagens «På banen»/«I mottak»-knapper: én ut og én inn = bytte på samme plass (eller libero ut/inn).
+  // Ufullstendige mellomtilstander (5 eller 7 på banen) beholdes i naa.venter til de går opp.
+  function fraToggles(sett, onCourt, receivers, meta) {
+    if (!sett || !sett.confirmed) return sett;
+    const t = (meta && meta.t) || new Date().toISOString(), s = kopi(sett), o = kopi(s.naa || s.start);
+    const før = paBanen(o).map(String), nå = (onCourt || []).map(String);
+    const ut = før.filter((x) => !nå.includes(x)), inn = nå.filter((x) => !før.includes(x));
+    const venter = [...new Set((o.venter || []).map(String).concat(ut))].filter((x) => !nå.includes(x));
+    const L = o.libero || {};
+    let endret = false;
+    while (venter.length && inn.length) {
+      const u = venter.shift(), i = inn.shift();
+      if (L.aktiv && String(u) === String(L.aktiv)) { L.inne = false; if (String(i) !== String(L.erstatter)) { const p = plassAv(o.positions, L.erstatter); if (p) o.positions[p] = i; } }
+      else if (L.aktiv && String(i) === String(L.aktiv) && erBak(plassAv(o.positions, u)) && /^M/.test((o.roles || {})[u] || '')) { L.inne = true; L.erstatter = u; }
+      else { const p = plassAv(o.positions, u); if (p) o.positions[p] = i; }
+      s.endringer = (s.endringer || []).concat([{ t, type: L.aktiv && (String(u) === String(L.aktiv) || String(i) === String(L.aktiv)) ? 'libero' : 'bytte', ut: [u], inn: [i], kilde: 'tropp', enhet: (meta && meta.enhet) || null }]);
+      endret = true;
+    }
+    o.libero = L;
+    o.venter = venter.length ? venter : undefined; if (!o.venter) delete o.venter;
+    const pb = paBanen(o).map(String);
+    o.receivers = (receivers || []).filter((x) => pb.includes(String(x)) || nå.includes(String(x)));
+    s.naa = o; s.updatedAt = t;
+    if (!endret && JSON.stringify((sett.naa || sett.start).receivers) !== JSON.stringify(o.receivers)) s.endringer = (s.endringer || []).concat([{ t, type: 'mottak', kilde: 'tropp' }]);
+    return s;
+  }
+  function aktuelt(sett) { return sett && sett.confirmed ? (sett.naa || sett.start) : null; }
+  function settFor(m, nr) { return m && m.lineups && m.lineups.sets ? m.lineups.sets[String(nr)] || null : null; }
+  // Utkast: forrige sett i kampen, ellers siste bekreftede oppstilling i en annen kamp i samme kontekst, ellers registeret.
+  // Utkastet er aldri bekreftet.
+  function utkastFor(m, nr, roster, andreKamper) {
+    const aktiv = new Set(roster.filter((p) => !p.archived).map((p) => String(p.id)));
+    const brukbar = (o) => o && o.positions && PLASSER.every((p) => aktiv.has(String(o.positions[p])));
+    for (let s = nr - 1; s >= 1; s--) { const st = settFor(m, s); if (st && st.confirmed && brukbar(st.start)) return { oppsett: Object.assign(kopi(st.start), { receptionPositions: kopi(st.receptionPositions || {}) }), kilde: 'sett ' + s }; }
+    const kandidater = (andreKamper || []).filter((k) => k && k.id !== (m && m.id) && k.lineups && k.lineups.sets)
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    for (const k of kandidater) { const st = k.lineups.sets['1']; if (st && st.confirmed && brukbar(st.start)) return { oppsett: Object.assign(kopi(st.start), { receptionPositions: kopi(st.receptionPositions || {}) }), kilde: 'forrige kamp' }; }
+    const f = forslagFraRegister(roster), pos = f.positions;
+    const o = { rotation: 'R1', firstServe: 'oss', positions: pos, roles: f.roles,
+      libero: { spillere: f.liberoer, aktiv: f.liberoer[0] || null, inne: !!f.liberoer.length, erstatter: null }, receivers: [] };
+    o.libero.erstatter = o.libero.aktiv ? liberoErstatter(pos, f.roles) : null;
+    if (!o.libero.erstatter) o.libero.inne = false;
+    o.receivers = standardMottakere(o);
+    return { oppsett: o, kilde: 'spillerregisteret' };
+  }
+  // Sammenslåing per sett (brukes av lagringen, så to enheter som bekrefter hvert sitt sett ikke overskriver hverandre)
+  function slaSammen(gammel, ny) {
+    const g = gammel && gammel.sets ? gammel : { v: 1, sets: {} };
+    const ut = { v: 1, sets: Object.assign({}, g.sets, (ny && ny.sets) || {}) };
+    // «Før uten oppstilling» gjelder hele kampen (ingen automatisk velger); beholdes ved sammenslåing
+    const uten = ny && ny.uten !== undefined ? ny.uten : g.uten; if (uten !== undefined) ut.uten = uten;
+    return ut;
+  }
+
+  // ---------- Velgeren (UI) ----------
+  const CSS = ''
+    + '.ops-ov{position:fixed;inset:0;z-index:60;background:var(--bg,#F2F1EC);overflow:auto;-webkit-overflow-scrolling:touch;padding:max(12px,env(safe-area-inset-top)) 16px 16px;display:flex;flex-direction:column;gap:12px;color:var(--fg,#16181D)}'
+    + '.ops-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}'
+    + '.ops-head h2{margin:0;font:700 26px/1.1 var(--font-display,"Barlow Condensed",sans-serif)}'
+    + '.ops-sub{color:var(--muted,#555);font-size:14px}'
+    + '.ops-sp{flex:1}'
+    + '.ops-ov button{font:inherit;color:inherit}'
+    + '.ops-btn{min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);font-weight:600;cursor:pointer}'
+    + '.ops-btn.prim{background:var(--accent,#1B4592);border-color:var(--accent,#1B4592);color:var(--accent-fg,#fff)}'
+    + '.ops-btn:disabled{opacity:.45;cursor:default}'
+    + '.ops-body{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}'
+    + '@media (max-width:900px){.ops-body{grid-template-columns:minmax(0,1fr)}}'
+    + '.ops-panel{background:var(--surface,#fff);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}'
+    + '.ops-panel h3{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#555)}'
+    + '.ops-bane{position:relative;background:var(--court-floor,#F0AE68);border-radius:12px;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border:3px solid #fff}'
+    + '.ops-nett{grid-column:1/-1;height:10px;background:var(--court-net,#1B2733);border-radius:3px;position:relative}'
+    + '.ops-nett span{position:absolute;right:6px;top:-18px;font-size:11px;color:var(--muted,#555);letter-spacing:.1em}'
+    + '.ops-linje{grid-column:1/-1;height:0;border-top:3px dashed #fff;opacity:.8}'
+    + '.ops-slot{min-height:104px;border-radius:12px;border:2px solid rgba(255,255,255,.9);background:rgba(255,255,255,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;cursor:pointer;text-align:center;position:relative}'
+    + '.ops-slot[aria-pressed="true"]{outline:4px solid #F5B700;outline-offset:1px}'
+    + '.ops-slot .pl{position:absolute;left:8px;top:6px;font:700 13px/1 var(--font-display,"Barlow Condensed",sans-serif);color:var(--muted,#555)}'
+    + '.ops-slot .nr{font:700 30px/1 var(--font-display,"Barlow Condensed",sans-serif)}'
+    + '.ops-slot .nm{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.ops-slot .rl{font-size:12px;font-weight:700;color:#fff;background:var(--accent,#1B4592);border-radius:999px;padding:1px 8px}'
+    + '.ops-slot .rl.tom{background:#9AA0A6}'
+    + '.ops-slot.libero{background:#FFF4D6}'
+    + '.ops-slot .lib{font-size:11px;font-weight:700;color:#8A5A00}'
+    + '.ops-seg{display:flex;flex-wrap:wrap;gap:6px}'
+    + '.ops-seg button{min-height:44px;min-width:52px;padding:0 12px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);font-weight:600;cursor:pointer}'
+    + '.ops-seg button[aria-pressed="true"]{background:var(--fg,#16181D);border-color:var(--fg,#16181D);color:var(--bg,#fff)}'
+    + '.ops-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}'
+    + '.ops-liste button{min-height:52px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);text-align:left;padding:4px 10px;display:flex;gap:8px;align-items:center;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}'
+    + '.ops-liste button.brukt{opacity:.6}'
+    + '.ops-slot[data-drag]{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}'
+    + '.ops-slot.tom{border-style:dashed;background:rgba(255,255,255,.55)}'
+    + '.ops-slot.mål{outline:5px solid #F5B700;outline-offset:1px;transform:scale(1.03)}'
+    + '.ops-ghost{position:fixed;z-index:70;transform:translate(-50%,-120%);pointer-events:none;background:var(--accent,#1B4592);color:#fff;border-radius:999px;padding:8px 14px;font-size:15px;box-shadow:0 8px 20px rgba(0,0,0,.3);white-space:nowrap}'
+    + '.ops-ov.ops-drar{cursor:grabbing}'
+    + '.ops-liste button .nr{font:700 20px/1 var(--font-display,"Barlow Condensed",sans-serif);min-width:26px}'
+    + '.ops-liste button[aria-pressed="true"]{border-color:var(--accent,#1B4592);background:var(--accent-soft,#DCE4F5)}'
+    + '.ops-liste button small{display:block;color:var(--muted,#555)}'
+    + '.ops-feil{background:#FDECEA;color:#8C1D18;border-radius:10px;padding:8px 12px;font-size:14px}'
+    + '.ops-info{background:#FBF3EC;color:#8A3E0F;border-radius:10px;padding:8px 12px;font-size:14px}'
+    + '.ops-rad{display:flex;flex-wrap:wrap;gap:8px;align-items:center}'
+    + '.ops-rad label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#555)}'
+    + '.ops-rad select{min-height:44px;border-radius:10px;border:1px solid var(--line,#ccc);padding:0 8px;font:inherit;background:var(--surface,#fff);color:inherit}'
+    + '.ops-mf{position:relative;max-width:560px;width:100%;margin:0 auto}'
+    + '.ops-mf svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:8px}'
+    + '.ops-mk{position:absolute;width:52px;height:52px;margin:0;padding:0;transform:translate(-50%,-50%);border-radius:50%;border:3px solid #fff;background:#44505F;color:#fff;'
+    + 'font:700 18px/1 "Barlow Condensed","Arial Narrow",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.35);touch-action:none;cursor:grab}'
+    + '.ops-mk small{font-size:10px;font-weight:600;opacity:.9}'
+    + '.ops-mk.mot{background:var(--accent,#1B4592)} .ops-mk.lib{background:#C27C0E} .ops-mk.drar{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 0 5px rgba(245,183,0,.9)}'
+    + '.ops-fot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:sticky;bottom:0;background:var(--bg,#F2F1EC);padding:8px 0 max(8px,env(safe-area-inset-bottom))}'
+    + '@media (prefers-color-scheme:dark){.ops-slot{background:rgba(28,31,37,.92)}.ops-slot.libero{background:#3A2E14}.ops-feil{background:#3A1614;color:#FFB4AB}.ops-info{background:#3A2614;color:#F2B27A}}';
+
+  function monter(opt) {
+    const doc = root.document, esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    if (!doc.getElementById('ops-css')) { const st = doc.createElement('style'); st.id = 'ops-css'; st.textContent = CSS; doc.head.appendChild(st); }
+    const roster = (opt.roster || []).filter((p) => !p.archived);
+    const P = (id) => roster.find((p) => String(p.id) === String(id)) || null;
+    const underSett = !!opt.underSett;
+    const S = { o: kopi(opt.utkast || { positions: {}, roles: {}, libero: { spillere: [], aktiv: null, inne: false, erstatter: null }, receivers: [], firstServe: 'oss' }),
+      valgt: null, steg: 'oppstilling', mfR: null, mf: {}, feil: '', lagrer: false, R: null, etterDrag: 0 };
+    S.R = rNr(S.o.rotation) ? S.o.rotation : (rotasjonAv(S.o.positions || {}, S.o.roles) || 'R1');
+    // Mottakerne følger standard (K1, K2, L) til de endres for hånd
+    S.mottakManuell = JSON.stringify((S.o.receivers || []).map(String).sort()) !== JSON.stringify(standardMottakere(Object.assign({}, S.o, { roles: rollerFraSystem(S.o.positions || {}, S.R) })).map(String).sort());
+    S.o.libero = Object.assign({ spillere: [], aktiv: null, inne: false, erstatter: null }, S.o.libero || {});
+    S.o.firstServe = S.o.firstServe || 'oss';
+    S.mf = mottaksformasjoner(S.o, S.o.receptionPositions || {});
+    const el = doc.createElement('div'); el.className = 'ops-ov'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Oppstilling sett ' + opt.setNr);
+    doc.body.appendChild(el);
+
+    const rolle = (id) => (S.o.roles || {})[id] || '';
+    function oppdaterAvledet() {
+      const L = S.o.libero;
+      if (L.aktiv && !(L.spillere || []).map(String).includes(String(L.aktiv))) L.spillere = (L.spillere || []).concat([L.aktiv]);
+      S.o.roles = rollerFraSystem(S.o.positions, S.R);
+      if (L.inne && L.aktiv) L.erstatter = liberoErstatter(S.o.positions, S.o.roles);
+      if (!L.erstatter) L.inne = false;
+      S.o.roles = rollerFraSystem(S.o.positions, S.R); S.o.rotation = S.R;
+      const pb = paBanen(S.o).map(String);
+      S.o.receivers = S.mottakManuell ? (S.o.receivers || []).filter((id) => pb.includes(String(id))) : standardMottakere(S.o);
+      S.mf = mottaksformasjoner(S.o, S.mf);
+    }
+    function slot(p) {
+      const id = S.o.positions[p], sp = id != null ? P(id) : null, L = S.o.libero, libInne = liberoInne(S.o) && String(L.erstatter) === String(id);
+      const vis = sp, lib = libInne ? P(L.aktiv) : null, fast = rolleForPlass(S.R, p), r = fast;
+      return '<button type="button" class="ops-slot' + (libInne ? ' libero' : '') + (vis ? '' : ' tom') + '" data-o="slot" data-p="' + p + '"' + (sp ? ' data-drag="' + esc(id) + '"' : '') + ' aria-pressed="' + (S.valgt === p) + '" aria-label="Plass ' + p + ' · ' + fast + (vis ? ': #' + esc(vis.nr) + ' ' + esc(vis.name) : ': tom') + (lib ? ' (libero #' + esc(lib.nr) + ' inne)' : '') + '">'
+        + '<span class="pl">' + p + '</span>' + (vis ? '<span class="nr">' + esc(vis.nr || '–') + '</span><span class="nm">' + esc(vis.name) + '</span>' : '<span class="nr">+</span><span class="nm">Dra hit</span>')
+        + '<span class="rl">' + esc(r) + '</span>' + (lib ? '<span class="lib">L #' + esc(lib.nr) + ' ' + esc(String(lib.name || '').split(' ')[0]) + ' inne</span>' : '') + '</button>';
+    }
+    function erLiberoSpiller(id) { return /^libero/i.test((P(id) || {}).pos || '') || String(id) === String(S.o.libero.aktiv); }
+    function spillerKnapp(p) {
+      const på = plassAv(S.o.positions, p.id), L = S.o.libero, lib = String(p.id) === String(L.aktiv);
+      const status = på ? 'plass ' + på + ' · ' + rolleForPlass(S.R, på) : lib ? (liberoInne(S.o) ? 'libero, inne' : 'libero, ute') : (p.pos || '');
+      return '<button type="button" class="ops-sp-k' + (på || lib ? ' brukt' : '') + '" data-o="spiller" data-id="' + esc(p.id) + '" data-drag="' + esc(p.id) + '" aria-pressed="' + (S.valgt && String(S.o.positions[S.valgt]) === String(p.id)) + '">'
+        + '<span class="nr">' + esc(p.nr || '–') + '</span><span>' + esc(p.name) + '<small>' + esc(status) + '</small></span></button>';
+    }
+    function tegnOppstilling() {
+      const feil = valider(S.o, roster), R = S.R, L = S.o.libero;
+      const bakspillere = BAK.map((p) => S.o.positions[p]).filter((id) => id != null);
+      const pb = paBanen(S.o);
+      let h = '<div class="ops-body"><div class="ops-panel"><h3>Startsekser · ' + esc(R) + ' · 5-1</h3>'
+        + '<div class="ops-bane" id="ops-bane"><div class="ops-nett"><span>NETT</span></div>' + FORAN.map(slot).join('') + '<div class="ops-linje"></div>' + BAK.map(slot).join('') + '</div>'
+        + '<div class="ops-sub">Dra en spiller fra listen til en plass, eller trykk en plass og så en spiller. Rollen følger plassen i ' + esc(R) + '. Setter du oppleggeren på en plass, blir det rotasjonen. Liberoen står alltid for midten (M1/M2) på bakerste rekke.</div>'
+        + (S.valgt ? '<div class="ops-rad"><b>Plass ' + S.valgt + ' (' + rolleForPlass(R, S.valgt) + ') valgt</b><button type="button" class="ops-btn" data-o="tom">Tøm plassen</button><button type="button" class="ops-btn" data-o="ferdigplass">Ferdig</button></div>' : '')
+        + '<h3>Spillere</h3><div class="ops-liste" id="ops-liste" role="group" aria-label="Spillere">' + roster.map(spillerKnapp).join('') + '</div></div>';
+      h += '<div class="ops-panel">'
+        + '<h3>Rotasjon (oppleggerens plass)</h3><div class="ops-seg" role="group" aria-label="Rotasjon">' + ROTASJONER.map((r) => '<button type="button" data-o="rot" data-v="' + r + '" aria-pressed="' + (R === r) + '">' + r + '</button>').join('') + '</div>'
+        + '<div class="ops-sub">' + PLASSER.map((p) => p + ' ' + rolleForPlass(R, p)).join(' · ') + '</div>'
+        + (underSett ? '<div class="ops-rad"><button type="button" class="ops-btn" data-o="roter" data-v="1">Roter én (vi vant serven)</button><button type="button" class="ops-btn" data-o="roter" data-v="-1">Roter tilbake</button></div>' : '')
+        + (underSett ? '' : '<h3>Første serve</h3><div class="ops-seg" role="group" aria-label="Første serve"><button type="button" data-o="serve" data-v="oss" aria-pressed="' + (S.o.firstServe === 'oss') + '">' + esc(opt.lagNavn || 'Vi') + ' server</button><button type="button" data-o="serve" data-v="motstander" aria-pressed="' + (S.o.firstServe === 'motstander') + '">' + esc(opt.motstander || 'Motstanderen') + ' server</button></div>')
+        + '<h3>Libero</h3><div class="ops-rad"><label for="ops-lib">Libero</label><select id="ops-lib" data-o="libero"><option value="">Ingen</option>' + roster.filter((p) => !Object.values(S.o.positions).map(String).includes(String(p.id))).map((p) => '<option value="' + esc(p.id) + '"' + (String(p.id) === String(L.aktiv) ? ' selected' : '') + '>#' + esc(p.nr) + ' ' + esc(p.name) + (/^libero/i.test(p.pos || '') ? ' (L)' : '') + '</option>').join('') + '</select>'
+        + (L.aktiv ? '<div class="ops-seg" role="group" aria-label="Libero inne"><button type="button" data-o="libinne" data-v="1" aria-pressed="' + !!L.inne + '">Inne</button><button type="button" data-o="libinne" data-v="0" aria-pressed="' + !L.inne + '">Ute</button></div>' : '') + '</div>'
+        + (L.aktiv && L.inne && L.erstatter ? '<div class="ops-sub">Liberoen står for #' + esc((P(L.erstatter) || {}).nr) + ' ' + esc(rolle(L.erstatter)) + ' (midt bak) og bytter automatisk når midten roterer frem.</div>' : '')
+        + '<h3>I mottak</h3><div class="ops-seg" role="group" aria-label="I mottak">' + pb.map((id) => '<button type="button" data-o="mottak" data-id="' + esc(id) + '" aria-pressed="' + (S.o.receivers || []).map(String).includes(String(id)) + '">#' + esc((P(id) || {}).nr) + ' ' + esc(String(id) === String(L.aktiv) && liberoInne(S.o) ? 'L' : rolle(id) || (P(id) || {}).name || '') + '</button>').join('') + '</div>'
+        + '<div class="ops-rad"><button type="button" class="ops-btn" data-o="standardmottak">Standard (K1, K2, L)</button><button type="button" class="ops-btn" data-o="mf"' + (feil.length ? ' disabled' : '') + '>Mottaksformasjon ›</button></div>'
+        + '</div></div>';
+      return { h, feil };
+    }
+    function tegnMottak() {
+      const Rs = ROTASJONER.filter((R) => S.mf[R]); if (!S.mfR || !S.mf[S.mfR]) S.mfR = rotasjonAv(S.o.positions, S.o.roles) || Rs[0];
+      return '<div class="ops-panel"><h3>Mottaksformasjon · dra markørene</h3><div class="ops-seg" role="group" aria-label="Rotasjon">' + Rs.map((r) => '<button type="button" data-o="mfr" data-v="' + r + '" aria-pressed="' + (S.mfR === r) + '">' + r + '</button>').join('') + '</div>'
+        + '<div class="ops-mf" id="ops-mf"><svg viewBox="0 0 900 1000" aria-label="Vår banehalvdel, nettet øverst"><rect x="0" y="0" width="900" height="1000" fill="var(--court-free,#4F7FA8)"/><rect x="2" y="40" width="896" height="900" fill="var(--court-floor,#F0AE68)" stroke="#fff" stroke-width="5"/>'
+        + '<line x1="0" y1="40" x2="900" y2="40" stroke="var(--court-net,#1B2733)" stroke-width="10"/><line x1="2" y1="340" x2="898" y2="340" stroke="#fff" stroke-width="4" stroke-dasharray="14 12"/></svg></div>'
+        + '<div class="ops-sub">Hver rotasjon lagres for seg. Blå = mottaker, gul = libero. Formell rotasjonsplass endres ikke av plasseringen her.</div>'
+        + '<div class="ops-rad"><button type="button" class="ops-btn" data-o="mfstd">Tilbakestill ' + esc(S.mfR) + '</button><button type="button" class="ops-btn" data-o="tilbake">‹ Tilbake til oppstillingen</button></div></div>';
+    }
+    function markorer() {
+      const boks = el.querySelector('#ops-mf'); if (!boks) return;
+      boks.querySelectorAll('.ops-mk').forEach((b) => b.remove());
+      const svg = boks.querySelector('svg'), xy = S.mf[S.mfR] || {}, L = S.o.libero;
+      Object.entries(xy).forEach(([id, [x, y]]) => {
+        const sp = P(id) || {}, b = doc.createElement('button'); b.type = 'button'; b.className = 'ops-mk' + ((S.o.receivers || []).map(String).includes(String(id)) ? ' mot' : '') + (String(id) === String(L.aktiv) ? ' lib' : '');
+        b.dataset.id = id; b.innerHTML = esc(sp.nr || '?') + '<small>' + esc(String(id) === String(L.aktiv) ? 'L' : rolle(id)) + '</small>';
+        b.setAttribute('aria-label', '#' + (sp.nr || '') + ' ' + (sp.name || '') + '. Dra for å flytte.');
+        const plasser = () => { const r = svg.getBoundingClientRect(), br = boks.getBoundingClientRect(), [X, Y] = S.mf[S.mfR][id];
+          b.style.left = (r.left - br.left + (2 + X * 896) / 900 * r.width) + 'px'; b.style.top = (r.top - br.top + (40 + Y * 900) / 1000 * r.height) + 'px'; };
+        let drar = null;
+        b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); drar = ev.pointerId; try { b.setPointerCapture(ev.pointerId); } catch (e) { /* eldre */ } b.classList.add('drar'); });
+        b.addEventListener('pointermove', (ev) => { if (drar !== ev.pointerId) return; const r = svg.getBoundingClientRect();
+          const X = klem(((ev.clientX - r.left) / r.width * 900 - 2) / 896), Y = klem(((ev.clientY - r.top) / r.height * 1000 - 40) / 900);
+          S.mf[S.mfR][id] = [rund(X), rund(Y)]; plasser(); });
+        const slipp = (ev) => { if (drar !== ev.pointerId) return; drar = null; b.classList.remove('drar'); };
+        b.addEventListener('pointerup', slipp); b.addEventListener('pointercancel', slipp);
+        b.addEventListener('keydown', (ev) => { const d = { ArrowLeft: [-0.02, 0], ArrowRight: [0.02, 0], ArrowUp: [0, -0.02], ArrowDown: [0, 0.02] }[ev.key]; if (!d) return; ev.preventDefault();
+          const [X, Y] = S.mf[S.mfR][id]; S.mf[S.mfR][id] = [rund(klem(X + d[0])), rund(klem(Y + d[1]))]; plasser(); });
+        boks.appendChild(b); plasser(); b._plasser = plasser;
+      });
+    }
+    function tegn() {
+      const tittel = (underSett ? 'Endre oppstilling · sett ' : 'Oppstilling · sett ') + opt.setNr;
+      const fokus = doc.activeElement && el.contains(doc.activeElement) ? { o: doc.activeElement.dataset.o, v: doc.activeElement.dataset.v || doc.activeElement.dataset.id || doc.activeElement.dataset.p } : null;
+      let h = '<div class="ops-head"><h2>' + esc(tittel) + '</h2><span class="ops-sub">' + esc(opt.lagNavn || '') + (opt.motstander ? ' mot ' + esc(opt.motstander) : '') + '</span><span class="ops-sp"></span>' + (!underSett && opt.onUten ? '<button type="button" class="ops-btn" data-o="uten" title="Velg På banen og I mottak manuelt, som før">Før uten oppstilling</button>' : '') + '<button type="button" class="ops-btn" data-o="lukk">' + (underSett ? 'Avbryt' : 'Senere') + '</button></div>';
+      if (opt.utkastKilde && !underSett) h += '<div class="ops-info">Utkast fra ' + esc(opt.utkastKilde) + '. Sjekk og bekreft – ingenting er lagret ennå.</div>';
+      if (underSett) h += '<div class="ops-info">Settet er i gang. Endringer gjelder det som er på banen nå; startoppstillingen og tidligere registreringer endres ikke.</div>';
+      let feil = [];
+      if (S.steg === 'mottak') h += tegnMottak();
+      else { const r = tegnOppstilling(); h += r.h; feil = r.feil; }
+      if (S.steg !== 'mottak' && feil.length) h += '<div class="ops-feil" role="alert">' + feil.map(esc).join('<br>') + '</div>';
+      if (S.feil) h += '<div class="ops-feil" role="alert">' + esc(S.feil) + '</div>';
+      h += '<div class="ops-fot"><button type="button" class="ops-btn prim" data-o="bekreft"' + (feil.length || S.lagrer ? ' disabled' : '') + '>' + (S.lagrer ? 'Lagrer …' : underSett ? 'Lagre endringen' : 'Bekreft og start registrering') + '</button>'
+        + '<span class="ops-sub">' + paBanen(S.o).length + ' på banen · ' + (S.o.receivers || []).length + ' i mottak</span></div>';
+      el.innerHTML = h;
+      if (S.steg === 'mottak') markorer();
+      if (fokus) { const f = el.querySelector('[data-o="' + fokus.o + '"]' + (fokus.v ? '[data-v="' + fokus.v + '"],[data-o="' + fokus.o + '"][data-id="' + fokus.v + '"],[data-o="' + fokus.o + '"][data-p="' + fokus.v + '"]' : '')); if (f) try { f.focus({ preventScroll: true }); } catch (e) { /* */ } }
+    }
+    // Setter spiller id på plass p (fra listen eller ved trykk). Libero til en bakspiller: liberoen settes inn for henne.
+    function plasser(id, p) {
+      p = Number(p); const L = S.o.libero;
+      if (/^libero/i.test((P(id) || {}).pos || '') && plassAv(S.o.positions, id) == null) {
+        const der = S.o.positions[p];
+        if (!erBak(p) || der == null || !/^M/.test(rolleForPlass(S.R, p))) { S.feil = 'Liberoen kan bare stå for midtspilleren (M1/M2) på bakerste rekke.'; return; }
+        L.aktiv = id; L.inne = true; L.erstatter = der; if (!(L.spillere || []).map(String).includes(String(id))) L.spillere = (L.spillere || []).concat([id]);
+        oppdaterAvledet(); return;
+      }
+      if (String(id) === String(L.aktiv)) { L.aktiv = null; L.inne = false; L.erstatter = null; L.spillere = (L.spillere || []).filter((x) => String(x) !== String(id)); }
+      const erOpp = /^oppl/i.test((P(id) || {}).pos || '');
+      const r = plasserSpiller(S.o.positions, S.R, id, p, erOpp);
+      S.o.positions = r.positions; S.R = r.rotation;
+      oppdaterAvledet();
+    }
+    function velgSpiller(id) { if (S.valgt) { plasser(id, S.valgt); if (!S.feil) S.valgt = null; } }
+    // Dra og slipp med pekerhendelser (fungerer med finger på iPad og med mus)
+    let drag = null;
+    el.addEventListener('pointerdown', (ev) => {
+      const k = ev.target.closest('[data-drag]'); if (!k || S.steg !== 'oppstilling' || S.lagrer) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      drag = { id: k.dataset.drag, fra: k.dataset.p ? Number(k.dataset.p) : null, x: ev.clientX, y: ev.clientY, pid: ev.pointerId, aktiv: false, ghost: null, mål: null };
+    });
+    function målUnder(x, y) { const e = doc.elementFromPoint(x, y); return e && e.closest ? e.closest('.ops-slot') : null; }
+    el.addEventListener('pointermove', (ev) => {
+      if (!drag || ev.pointerId !== drag.pid) return;
+      if (!drag.aktiv) {
+        if (Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) < 8) return;
+        drag.aktiv = true; const sp = P(drag.id) || {};
+        const g = doc.createElement('div'); g.className = 'ops-ghost'; g.innerHTML = '<b>' + esc(sp.nr || '') + '</b> ' + esc(sp.name || ''); doc.body.appendChild(g); drag.ghost = g;
+        el.classList.add('ops-drar');
+      }
+      ev.preventDefault();
+      drag.ghost.style.left = ev.clientX + 'px'; drag.ghost.style.top = ev.clientY + 'px';
+      // Ruller når fingeren er nær kanten (liten skjerm: listen ligger under banen)
+      const h = root.innerHeight || 800; if (ev.clientY < 70) el.scrollTop -= 14; else if (ev.clientY > h - 70) el.scrollTop += 14;
+      const m = målUnder(ev.clientX, ev.clientY);
+      if (m !== drag.mål) { if (drag.mål) drag.mål.classList.remove('mål'); if (m) m.classList.add('mål'); drag.mål = m; }
+    });
+    function slippDrag(ev, avbrutt) {
+      if (!drag || ev.pointerId !== drag.pid) return;
+      const d = drag; drag = null;
+      if (!d.aktiv) return;
+      if (d.ghost) d.ghost.remove(); el.classList.remove('ops-drar'); if (d.mål) d.mål.classList.remove('mål');
+      S.etterDrag = Date.now(); S.feil = '';
+      if (avbrutt) { tegn(); return; }
+      const m = målUnder(ev.clientX, ev.clientY), til = m ? Number(m.dataset.p) : null;
+      if (d.fra) {
+        // Fra en plass: til en annen plass = bytt; utenfor banen = ta av banen
+        if (til && til !== d.fra) { const a = S.o.positions[d.fra], b = S.o.positions[til]; S.o.positions[til] = a; if (b != null) S.o.positions[d.fra] = b; else delete S.o.positions[d.fra]; oppdaterAvledet(); }
+        else if (!til && !(ev.target.closest && ev.target.closest('#ops-bane'))) { delete S.o.positions[d.fra]; oppdaterAvledet(); }
+      } else if (til) plasser(d.id, til);
+      S.valgt = null; tegn();
+    }
+    el.addEventListener('pointerup', (ev) => slippDrag(ev, false));
+    el.addEventListener('pointercancel', (ev) => slippDrag(ev, true));
+    el.addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-o]'); if (!b || b.disabled || b.tagName === 'SELECT') return;
+      if (Date.now() - S.etterDrag < 400) return;   // klikket som følger etter et slipp
+      const a = b.dataset.o; S.feil = '';
+      if (a === 'lukk') { lukk(); if (opt.onLukk) opt.onLukk(); return; }
+      if (a === 'uten') { try { await opt.onUten(); lukk(); } catch (e) { S.feil = 'Ikke lagret: ' + (e && e.message ? e.message : e) + '.'; tegn(); } return; }
+      if (a === 'slot') S.valgt = S.valgt === Number(b.dataset.p) ? null : Number(b.dataset.p);
+      else if (a === 'spiller') velgSpiller(b.dataset.id);
+      else if (a === 'tom') { delete S.o.positions[S.valgt]; oppdaterAvledet(); }
+      else if (a === 'ferdigplass') S.valgt = null;
+      else if (a === 'rot') { S.o.positions = flyttTilRotasjon(S.o.positions, S.R, b.dataset.v); S.R = b.dataset.v; oppdaterAvledet(); }
+      else if (a === 'roter') { S.o.positions = roter(S.o.positions, Number(b.dataset.v)); S.R = rotasjonEtter(S.R, Number(b.dataset.v)); oppdaterAvledet(); }
+      else if (a === 'serve') S.o.firstServe = b.dataset.v;
+      else if (a === 'libinne') { S.o.libero.inne = b.dataset.v === '1'; if (S.o.libero.inne) S.o.libero.erstatter = liberoErstatter(S.o.positions, S.o.roles); oppdaterAvledet();
+        if (S.o.libero.inne && !S.o.libero.erstatter) S.feil = 'Sett inn midtspillerne først. Liberoen står for midten på bakerste rekke.'; }
+      else if (a === 'mottak') { S.mottakManuell = true; const id = b.dataset.id, r = (S.o.receivers || []).map(String); S.o.receivers = r.includes(String(id)) ? S.o.receivers.filter((x) => String(x) !== String(id)) : (S.o.receivers || []).concat([id]); oppdaterAvledet(); }
+      else if (a === 'standardmottak') { S.mottakManuell = false; oppdaterAvledet(); }
+      else if (a === 'mf') { S.steg = 'mottak'; S.mfR = S.R; }
+      else if (a === 'mfr') S.mfR = b.dataset.v;
+      else if (a === 'mfstd') { const rot = alleRotasjoner(S.o.positions, S.o.roles); S.mf[S.mfR] = standardMottaksformasjon(rot[S.mfR], S.o.roles, S.o.receivers, S.o.libero); }
+      else if (a === 'tilbake') S.steg = 'oppstilling';
+      else if (a === 'bekreft') {
+        oppdaterAvledet(); const feil = valider(S.o, roster); if (feil.length) { tegn(); return; }
+        const ut = Object.assign(kopi(S.o), { receptionPositions: kopi(S.mf) });
+        S.lagrer = true; tegn();
+        try { await opt.onBekreft(ut); lukk(); return; }
+        catch (e) { S.lagrer = false; S.feil = 'Ikke lagret: ' + (e && e.message ? e.message : e) + '. Oppstillingen er beholdt her – prøv igjen.'; }
+      }
+      tegn();
+    });
+    el.addEventListener('change', (ev) => {
+      if (ev.target.dataset.o === 'libero') { const v = ev.target.value || null; if (v) S.o.libero.spillere = [...new Set((S.o.libero.spillere || []).map(String).concat([String(v)]))]; S.o.libero.aktiv = v; S.o.libero.inne = !!v; if (v) S.o.libero.erstatter = liberoErstatter(S.o.positions, S.o.roles); oppdaterAvledet(); tegn(); }
+    });
+    const vent = () => { if (S.steg === 'mottak') el.querySelectorAll('.ops-mk').forEach((b) => b._plasser && b._plasser()); };
+    root.addEventListener('resize', vent);
+    const tast = (ev) => { if (ev.key === 'Escape') { lukk(); if (opt.onLukk) opt.onLukk(); } };
+    doc.addEventListener('keydown', tast);
+    function lukk() { root.removeEventListener('resize', vent); doc.removeEventListener('keydown', tast); el.remove(); }
+    oppdaterAvledet(); tegn();
+    const første = el.querySelector('.ops-slot'); if (første) try { første.focus({ preventScroll: true }); } catch (e) { /* */ }
+    return { lukk, el, get tilstand() { return kopi(Object.assign({}, S.o, { receptionPositions: S.mf })); } };
+  }
+
+  const eksport = { PLASSER, FORAN, BAK, ROTASJONER, REKKEFOLGE_51, ROLLER, ROLLENAVN, PLASS_XY,
+    plassAv, ider, rekkefolge, fraRotasjon, roter, opplegger, rotasjonAv, settRotasjon, alleRotasjoner,
+    rolleForslag, forslagFraRegister, liberoErstatter, paBanen, liberoInne, standardMottakere, onCourtOgMottak, valider,
+    rolleForPlass, rollerFraSystem, flyttTilRotasjon, rotasjonEtter, plasserSpiller,
+    FORMASJON_51, formasjonsrolle, standardMottaksformasjon, mottaksformasjoner, forsvarKobling, bekreft, endreUnderSett, fraToggles, aktuelt, settFor, utkastFor, slaSammen,
+    CSS, monter };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Oppstilling = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <style>
 #v2-login { position: fixed; inset: 0; z-index: 9999; background: var(--bg, #f4f2ee); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -2454,13 +3044,13 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function openLogs(id) {
     if (S.logUnsub) { S.logUnsub(); S.logUnsub = null; }
-    S.logs = {};
+    S.logs = {}; S.logsFor = null;
     if (!S.db || !id) return;
     S.logUnsub = S.db.collection(PFX + 'matches/' + id + '/log').onSnapshot((snap) => {
       const logs = {};
       snap.docs.forEach((d) => { logs[d.id] = (d.data().events || []).slice(); });
       Object.keys(OPPHINT).forEach((k) => delete OPPHINT[k]); Object.values(logs).forEach((evs) => learnNames(evs, OPPHINT));
-      S.logs = logs; render();
+      S.logs = logs; S.logsFor = id; render();
     }, (e) => { S.error = 'Registreringene kunne ikke lastes (' + e.code + ').'; render(); });
   }
 
@@ -2521,6 +3111,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   // ---------- Visninger ----------
   function render() {
+    if (window.Oppstilling) setTimeout(opsAuto, 0);
     if (S.view === 'live' && !S.offline && cur()) {
       const root = document.getElementById('live-root');
       if (root && root.dataset.sig === liveSig(cur())) { updateLive(); return; }
@@ -2741,7 +3332,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           + '<button class="barbtn win" type="submit">Lagre og start sett ' + (c.set + 1) + '</button><button class="barbtn" type="button" data-a="setcancel">Avbryt</button></form>'
         : '<button class="barbtn primary-bar" data-a="endset">Avslutt sett ' + c.set + '</button>'
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
-          + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="squad">Tropp</button><button class="barbtn" data-a="sheet">Kampark</button>' + fsBtn('barbtn')
+          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="squad">Tropp</button><button class="barbtn" data-a="sheet">Kampark</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
       + '</div></header>';
   }
@@ -2778,12 +3369,13 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const evs = allEvents();
 
     let h = '<div id="live-root" data-sig="' + esc(liveSig(m)) + '" style="display:flex;flex-direction:column;gap:12px">' + scoreBar(m);
+    if (opsOk() && !opsBekreftet(m) && !(m.lineups && m.lineups.uten) && m.status !== 'ferdig' && opsHarHendelser(m, (m.current && m.current.set) || 1)) h += '<div class="notice">Oppstillingen for sett ' + ((m.current && m.current.set) || 1) + ' er ikke bekreftet. <button class="textbtn" data-a="lineup">Sett opp oppstilling</button></div>';
     h += '<div class="lastbar"><span class="label">Siste</span><div class="chips" id="last-chips">' + lastChips(evs, oppName) + '</div><button class="undo" id="undo-btn" data-a="undo"' + (ownCount() ? '' : ' disabled') + '>Angre siste</button></div>';
 
     const noCourt = '<div class="empty">Ingen på banen. Åpne Tropp og velg seks spillere.</div>';
     const courtBtn = '<button class="textbtn" data-a="squad">' + onCourt.length + ' på banen · endre</button>';
     h += '<div class="live-grid">'
-      + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
+      + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
       + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng</div>' : noCourt) + '</section>'
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
@@ -2794,7 +3386,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   }
 
   function liveSig(m) {
-    return JSON.stringify([oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -3029,7 +3621,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function focusSquadView(m) {
     const ros = teamRoster(m), rec = new Set(m.receivers || []), court = new Set(m.onCourt || []);
     let h = '<header class="bar"><button class="link" data-a="to-live">‹ Tilbake til kampen</button><div class="title"><span class="display">Tropp</span><span class="sub">Fører for ' + esc(m.focus) + ' · ' + esc(m.home) + ' – ' + esc(m.away) + ' · ' + court.size + ' på banen · ' + rec.size + ' i mottak</span></div><span class="spacer"></span></header>';
-    h += '<section class="panel"><div class="panel-head"><h2>' + esc(m.focus) + ' i denne kampen</h2><span class="status">Velg hvem som er på banen og i mottak. Nummer og navn endrer du i listen under.</span></div>'
+    h += '<section class="panel"><div class="panel-head"><h2>' + esc(m.focus) + ' i denne kampen</h2><span class="status">Velg hvem som er på banen og i mottak. Nummer og navn endrer du i listen under.</span></div>' + (opsBekreftet(m) ? '<div class="notice">Oppstillingen for sett ' + ((m.current && m.current.set) || 1) + ' er bekreftet. Endringer her registreres som bytte i settet. <button class="textbtn" data-a="lineup">Endre oppstilling</button></div>' : '')
       + (ros.length ? '<div class="tbl-wrap"><table class="squad"><thead><tr><th>Nr</th><th>Navn</th><th>Posisjon</th><th class="c">På banen</th><th class="c">I mottak</th></tr></thead><tbody>'
         + ros.map((p) => '<tr><td class="key">' + esc(p.nr) + '</td><td>' + esc(p.name) + '</td><td>' + esc(p.pos || '–') + '</td>'
           + '<td class="c"><button class="tog" data-a="court" data-id="' + esc(p.id) + '" aria-pressed="' + court.has(p.id) + '" aria-label="På banen ' + esc(p.name) + '">' + (court.has(p.id) ? '✓' : '') + '</button></td>'
@@ -3169,7 +3761,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const rec = new Set(m.receivers || []), court = new Set(m.onCourt || []);
     let h = '<header class="bar"><button class="link" data-a="to-live">‹ Tilbake til kampen</button><div class="title"><span class="display">Tropp</span><span class="sub">' + esc(m.home) + ' – ' + esc(m.away) + ' · ' + court.size + ' på banen · ' + rec.size + ' i mottak</span></div><span class="spacer"></span></header>';
     h += '<section class="panel"><div class="panel-head"><h2>Spillere</h2><span class="status">Draktnummer, navn og posisjon gjelder alle kamper. «På banen» og «I mottak» gjelder denne kampen.</span></div>'
-      + (rec.size && (rec.size < 4 || rec.size > 6) ? '<div class="notice">Velg 4–6 spillere i mottak (nå ' + rec.size + ').</div>' : '')
+      + (rec.size && (rec.size < 4 || rec.size > 6) && !opsBekreftet(m) ? '<div class="notice">Velg 4–6 spillere i mottak (nå ' + rec.size + ').</div>' : '')
+      + (opsBekreftet(m) ? '<div class="notice">Oppstillingen for sett ' + ((m.current && m.current.set) || 1) + ' er bekreftet. Endringer her registreres som bytte i settet. <button class="textbtn" data-a="lineup">Endre oppstilling</button></div>' : '')
       + (court.size > 6 ? '<div class="notice">Det er valgt ' + court.size + ' spillere på banen. Maks 6, libero føres i mottak.</div>' : '')
       + '<div class="tbl-wrap"><table class="squad"><thead><tr><th>Nr</th><th>Navn</th><th>Posisjon</th><th class="c">På banen</th><th class="c">I mottak</th><th class="hide-sm"></th></tr></thead><tbody>'
       + S.roster.filter((p) => !p.archived).map((p, i) => '<tr><td><input class="nrin" type="text" inputmode="numeric" maxlength="3" id="nr-' + esc(p.id) + '" data-a="nr" data-id="' + esc(p.id) + '" value="' + esc(p.nr || '') + '" placeholder="Nr" aria-label="Draktnummer ' + esc(p.name) + '"></td>'
@@ -3705,6 +4298,50 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // Lagres som vanlige registreringer med type 'dir' i samme logg: x1,y1 treffpunkt, x2,y2 landing, k = 'line' | 'dip', c = K/F/B/D
   const DCOL = ['#2F6FE0', '#2FAE52', '#D9473E', '#E8891C', '#8B4FD6', '#18A3B2', '#D64F9A', '#5C6270'];
   const DRES = { K: 'Kill', F: 'Feil', B: 'Blokk', D: 'Forsvart' };
+  // ---------- Oppstilling (issue #20) ----------
+  // Velgeren åpnes automatisk én gang per ubekreftet sett (start av sett 1 og hvert nye sett), ikke for et bekreftet sett.
+  // Én bekreftelse lagrer oppstillingen (lineups) og oppdaterer onCourt og receivers i samme kampoppdatering.
+  // Registreringene (0–2) røres ikke. Modulen (moduler/oppstilling) bygges inn i V2-sidene; uten den er appen som før.
+  const OPS = { el: null, avvist: {} };
+  function opsOk() { return !!window.Oppstilling && !window.PUBLIC && !S.dash; }
+  function opsBekreftet(m) { const st = window.Oppstilling && m ? Oppstilling.settFor(m, (m.current && m.current.set) || 1) : null; return !!(st && st.confirmed); }
+  function opsKnapp(m) { const O = window.Oppstilling, st = O && m ? O.settFor(m, (m.current && m.current.set) || 1) : null, o = st && st.confirmed ? O.aktuelt(st) : null;
+    return o ? 'Oppstilling ' + (O.rotasjonAv(o.positions, o.roles) || '') : 'Oppstilling'; }
+  function opsHarHendelser(m, nr) { return allEvents().some((e) => Number(e.set) === Number(nr)); }
+  function opsAapne(m) {
+    if (!opsOk() || !m || OPS.el) return;
+    const nr = (m.current && m.current.set) || 1, roster = teamRoster(m), st = Oppstilling.settFor(m, nr);
+    const under = !!(st && st.confirmed && opsHarHendelser(m, nr));
+    let utkast, kilde = null;
+    if (st && st.confirmed) utkast = Object.assign(JSON.parse(JSON.stringify(Oppstilling.aktuelt(st))), { receptionPositions: st.receptionPositions || {} });
+    else { const u = Oppstilling.utkastFor(m, nr, roster, S.matches.filter((x) => canLive(x))); utkast = u.oppsett; kilde = u.kilde; }
+    OPS.el = Oppstilling.monter({ roster, setNr: nr, lagNavn: usName(m), motstander: m.home === usName(m) ? m.away : m.home, utkast, utkastKilde: kilde, underSett: under,
+      onBekreft: (o) => opsLagre(m, nr, o),
+      // Uten oppstilling: hele kampen føres som før (På banen og I mottak manuelt), ingen automatisk velger
+      onUten: async () => { if (!S.db) throw new Error('ikke tilkoblet'); const lu = { v: 1, sets: {}, uten: true };
+        await S.db.doc(PFX + 'matches/' + m.id).update({ lineups: lu }); m.lineups = Oppstilling.slaSammen(m.lineups, lu); OPS.el = null; S.view = 'squad'; render(); toTop(); },
+      onLukk: () => { OPS.el = null; if (!opsBekreftet(m)) OPS.avvist[m.id + '|' + nr] = true; render(); } });
+  }
+  async function opsLagre(m, nr, o) {
+    if (!S.db) throw new Error('ikke tilkoblet');
+    const ny = Oppstilling.bekreft(o, { t: new Date().toISOString(), enhet: deviceId }, Oppstilling.settFor(m, nr), opsHarHendelser(m, nr));
+    const { onCourt, receivers } = Oppstilling.onCourtOgMottak(ny.naa);
+    const lu = { v: 1, sets: { [nr]: ny } };
+    // Én oppdatering: lineups + onCourt + receivers. Feiler den, endres ingenting lokalt og velgeren blir stående.
+    await S.db.doc(PFX + 'matches/' + m.id).update({ lineups: lu, onCourt, receivers });
+    m.lineups = Oppstilling.slaSammen(m.lineups, lu); m.onCourt = onCourt; m.receivers = receivers;
+    OPS.el = null; render();
+  }
+  function opsAuto() {
+    const m = cur();
+    if (!opsOk() || OPS.el || S.view !== 'live' || !m || !canLive(m) || m.status === 'ferdig' || S.endingSet || S.logsFor !== m.id || DIR.open) return;
+    const nr = (m.current && m.current.set) || 1;
+    if (opsBekreftet(m) || OPS.avvist[m.id + '|' + nr] || (m.lineups && m.lineups.uten)) return;
+    // Settet er allerede i gang uten oppstilling (f.eks. før denne funksjonen fantes): ikke tving velgeren fram
+    if (opsHarHendelser(m, nr)) return;
+    opsAapne(m);
+  }
+
   const DIR = { open: false, el: null, active: null, view: 'lines', who: 'all', set: 'all', kind: 'all', drawing: null };
   const NS = 'http://www.w3.org/2000/svg';
   const svgEl = (t, attrs) => { const n = document.createElementNS(NS, t); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
@@ -3842,7 +4479,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     svg.addEventListener('pointerup', finish);
     svg.addEventListener('pointercancel', () => { DIR.drawing = null; live.setAttribute('d', ''); });
     document.addEventListener('keydown', dirKey);
-    if (window.ForsvarKamp) try { window.ForsvarKamp.apne({ el, svg, matchId: m.id, pfx: PFX, our: usName(m), opp: m.home === usName(m) ? m.away : m.home, ro: DIR.ro, tegner: () => !!DIR.drawing }); } catch (e) { console.error('Forsvarsplan', e); }
+    if (window.ForsvarKamp) try { window.ForsvarKamp.apne({ el, svg, matchId: m.id, pfx: PFX, our: usName(m), opp: m.home === usName(m) ? m.away : m.home, ro: DIR.ro, tegner: () => !!DIR.drawing,
+      oppstilling: () => { const O = window.Oppstilling, c = cur(); return O && c ? O.aktuelt(O.settFor(c, (c.current && c.current.set) || 1)) : null; }, spillere: () => (cur() ? teamRoster(cur()) : []) }); } catch (e) { console.error('Forsvarsplan', e); }
     dirUpdate();
   }
   function dirKey(ev) { if (ev.key === 'Escape' && DIR.open) dirClose(); }
@@ -4029,6 +4667,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       S.view = S.dash ? (canLive(mm) && mm.status === 'pågår' ? 'watch' : 'detail') : canLive(mm) && mm.status !== 'ferdig' && !(mm.source === 'annen' && mm.nvbf && mm.nvbf.src) ? 'live' : 'detail'; S.detailSrc = 'egen';
       if (canLive(mm)) openLogs(mm.id);
       render(); toTop();
+      // Kamp som ikke er startet: rett inn i oppstillingsvelgeren (sett 1 har ingen registreringer ennå)
+      if (S.view === 'live' && mm.status === 'kommende' && opsOk() && !opsBekreftet(mm) && !(mm.lineups && mm.lineups.uten)) opsAapne(mm);
     }
     else if (a === 'back') { S.view = 'list'; S.matchId = null; openLogs(null); closeSeasonLogs(); render(); }
     else if (a === 'season') { S.view = 'season'; S.matchId = null; openLogs(null); openSeasonLogs(); render(); toTop(); }
@@ -4038,6 +4678,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'psort') { const k = b.dataset.k; if (SEASON.sortK === k) SEASON.sortDir = -SEASON.sortDir; else { SEASON.sortK = k; SEASON.sortDir = k === 'name' ? 1 : -1; } render(); }
     else if (a === 'dir' && m) { dirOpen(S.view === 'detail' ? { ro: true } : null); }
     else if (a === 'squad') { S.view = 'squad'; render(); toTop(); }
+    else if (a === 'lineup' && m) { opsAapne(m, true); }
     else if (a === 'to-live') { S.view = S.view === 'sheet' && S.sheetBack === 'detail' ? 'detail' : 'live'; render(); toTop(); }
     else if (a === 'edit' && m) { S.view = 'live'; S.endingSet = false; render(); toTop(); }
     else if (a === 'toview' && m) { S.view = 'detail'; render(); toTop(); }
@@ -4100,7 +4741,15 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       const set = new Set(m[key] || []);
       if (set.has(b.dataset.id)) set.delete(b.dataset.id); else set.add(b.dataset.id);
       const order = teamRoster(m).map((p) => p.id).filter((id) => set.has(id));
-      m[key] = order; render(); saveMatch(m.id, { [key]: order });
+      m[key] = order;
+      const opsNr = (m.current && m.current.set) || 1, opsSt = window.Oppstilling ? Oppstilling.settFor(m, opsNr) : null;
+      if (opsSt && opsSt.confirmed) {
+        // Bekreftet oppstilling: endringen blir bytte/libero i settet (startoppstillingen og registreringer endres ikke)
+        // Ingen mottaker utenfor banen: tas en mottaker av banen, tas hun også ut av mottak (samme oppdatering)
+        if (key === 'onCourt') m.receivers = (m.receivers || []).filter((id) => m.onCourt.includes(id));
+        const ny = Oppstilling.fraToggles(opsSt, m.onCourt, m.receivers, { enhet: deviceId }), lu = { v: 1, sets: { [opsNr]: ny } };
+        m.lineups = Oppstilling.slaSammen(m.lineups, lu); render(); saveMatch(m.id, { [key]: order, receivers: m.receivers, lineups: lu });
+      } else { render(); saveMatch(m.id, { [key]: order }); }
     }
     else if (a === 'addp') { const id = 'p' + Math.random().toString(36).slice(2, 8); saveRoster(S.roster.concat([{ id, nr: '', name: 'Ny spiller', pos: '' }])); }
     else if (a === 'delp') {
@@ -4169,6 +4818,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       const setsHome = setScores.filter((x) => x[0] > x[1]).length, setsAway = setScores.length - setsHome;
       const nc = { set: c.set + 1, home: 0, away: 0 };
       Object.assign(m, { setScores, setsHome, setsAway, current: nc }); S.endingSet = false; S.error = ''; S.statSet = 'all'; render();
+      // Nytt sett: rett inn i oppstillingsvelgeren (med utkast fra forrige sett)
+      if (opsOk() && !opsBekreftet(m) && !(m.lineups && m.lineups.uten)) opsAapne(m);
       saveMatch(m.id, { setScores, setsHome, setsAway, current: nc, status: m.status === 'ferdig' ? 'ferdig' : 'pågår' })
         .then(() => setTimeout(() => publishOpen('sett ' + setScores.length + ' ferdig'), 1500));
       return;
