@@ -33,6 +33,13 @@ h2 { margin: 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase
 .topp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .topp a { color: var(--accent); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 .merke { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); background: var(--warn-bg); padding: 3px 9px; border-radius: 999px; }
+.moduler { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.modul { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 6px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 700 19px/1.1 var(--font-display); text-decoration: none; }
+.modul small { font: 500 12px/1.3 var(--font-body); color: var(--muted); }
+.modul[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.modul[aria-current="page"] small { color: var(--accent-fg); opacity: .85; }
+.modul.kommer { border-style: dashed; background: transparent; color: var(--muted); cursor: default; }
+.modul.kommer small { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
 .kontekst { color: var(--muted); font-size: 14px; }
 .rad { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .skyv { flex: 1 1 0; min-width: 0; }
@@ -53,7 +60,7 @@ select, input[type=email], input[type=password] { min-height: 44px; padding: 0 1
 [hidden] { display: none !important; }
 .felt { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
 .felt select { min-width: 0; }
-@media (max-width: 600px) { .felt { flex: 1 1 100%; } .felt select { flex: 1; } .felt .etikett { width: 62px; } }
+@media (max-width: 600px) { .felt { flex: 1 1 100%; } .felt select { flex: 1; } .felt .etikett { width: 62px; } .plan .felt .etikett { width: auto; } }
 .verktoy { display: flex; flex-direction: column; gap: 8px; padding-block: 4px 8px; border-bottom: 1px solid var(--line); }
 .plan { background: var(--sunk); border-radius: 12px; padding: 8px 10px; }
 .status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--surface); color: var(--muted); }
@@ -81,7 +88,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
   body { background: #FFFFFF; color: #16181D; }
-  .verktoy, .topp, .ikke-utskrift { display: none !important; }
+  .verktoy, .topp, .moduler, .ikke-utskrift { display: none !important; }
   .utskrift-tittel { display: block; font: 700 22px var(--font-display); margin: 0 0 6px; }
   .utskrift-tittel small { display: block; font: 400 13px var(--font-body); color: #4A4F5A; }
   .innhold { display: block; } .panel, .bane { padding: 0; background: none; }
@@ -106,6 +113,12 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     <span class="skyv"></span>
     <a href="../" id="tilbake">‹ Til appen</a>
   </div>
+
+  <nav class="moduler" aria-label="Analysemoduler">
+    <a class="modul" href="#blokk-forsvar" aria-current="page">Blokk/forsvar<small>Slagretninger og forsvarsplan</small></a>
+    <span class="modul kommer" aria-disabled="true">Serve/rotasjon<small>Kommer</small></span>
+    <span class="modul kommer" aria-disabled="true">Videoanalyse<small>Kommer</small></span>
+  </nav>
 
   <div class="verktoy">
     <div class="rad" role="toolbar" aria-label="Utvalg">
@@ -750,7 +763,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </script>
 <script>
 /*
- * Analyse-siden: motstanderens slagretninger på tvers av kamper, per lag eller spiller, og forsvarsplanen mot laget.
+ * Analyse-siden, modulen Blokk/forsvar: motstanderens slagretninger på tvers av kamper, per lag eller spiller, og forsvarsplanen mot laget.
  * Leser bare data (slaghistorikk, motstandere, tropper). Skriver bare forsvarsplaner (stats.forsvar_planer).
  * Registreringen og kampdataene røres ikke.
  * ?demo=1 bruker oppdiktede data uten nett.
@@ -988,7 +1001,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     $('kampliste').innerHTML = Analyse.kamper(utvalg).map((k) => esc(dato(k.dato)) + ' · ' + k.antall + ' slag' + (k.kontekst && S.ktx && k.kontekst !== S.ktx.slug ? ' (annen sesong/lag)' : '')).join('<br>') || '–';
     $('kilde').textContent = S.ekstra.length ? 'Inkluderer ' + S.ekstra.length + ' slag fra andre lag eller sesonger (samme spiller-ID).' : '';
     const fl2 = filter(), deler = [fl2.kamp ? 'én kamp' : 'alle kamper', fl2.sett ? 'sett ' + fl2.sett : null, fl2.type !== 'alle' ? $('type').selectedOptions[0].textContent.toLowerCase() : null, fl2.utfall !== 'alle' ? $('utfall').selectedOptions[0].textContent.toLowerCase() : null, S.visning === 'soner' ? 'soner' : 'piler'].filter(Boolean);
-    $('utskrift-tittel').innerHTML = 'Slagretninger · ' + esc(lag) + ' · ' + esc(navn) + '<small>' + esc(S.ktx ? S.ktx.name : '') + ' · ' + esc(deler.join(' · ')) + ' · ' + sum.antall + ' slag</small>';
+    $('utskrift-tittel').innerHTML = 'Blokk/forsvar · ' + esc(lag) + ' · ' + esc(navn) + '<small>' + esc(S.ktx ? S.ktx.name : '') + ' · ' + esc(deler.join(' · ')) + ' · ' + sum.antall + ' slag</small>';
   }
 
   // ---------- Forsvarsplan ----------
