@@ -2250,9 +2250,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     return ut;
   }
   // Appens kompatible lister fra samme oppsett: onCourt = seks på banen, receivers = mottakere som er på banen
+  // Appens lister: onCourt = de seks grunnspillerne (angrep og serve; liberoen angriper og server ikke, midten står der),
+  // receivers = mottakere blant dem som fysisk er på banen (liberoen er med i mottak når hun er inne).
   function onCourtOgMottak(o) {
-    const pb = paBanen(o), mottak = (o.receivers || []).filter((id) => pb.map(String).includes(String(id)));
-    return { onCourt: pb, receivers: mottak };
+    const pb = paBanen(o).map(String), mottak = (o.receivers || []).filter((id) => pb.includes(String(id)));
+    return { onCourt: ider(o.positions), receivers: mottak };
   }
 
   // Gyldighet: nøyaktig seks ulike, kjente og aktive spillere; libero ikke i grunnseksern; erstatter må stå bak
@@ -2359,23 +2361,23 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function fraToggles(sett, onCourt, receivers, meta) {
     if (!sett || !sett.confirmed) return sett;
     const t = (meta && meta.t) || new Date().toISOString(), s = kopi(sett), o = kopi(s.naa || s.start);
-    const før = paBanen(o).map(String), nå = (onCourt || []).map(String);
+    const før = ider(o.positions).map(String), nå = (onCourt || []).map(String);   // grunnspillerne (onCourt)
     const ut = før.filter((x) => !nå.includes(x)), inn = nå.filter((x) => !før.includes(x));
     const venter = [...new Set((o.venter || []).map(String).concat(ut))].filter((x) => !nå.includes(x));
     const L = o.libero || {};
     let endret = false;
     while (venter.length && inn.length) {
       const u = venter.shift(), i = inn.shift();
-      if (L.aktiv && String(u) === String(L.aktiv)) { L.inne = false; if (String(i) !== String(L.erstatter)) { const p = plassAv(o.positions, L.erstatter); if (p) o.positions[p] = i; } }
-      else if (L.aktiv && String(i) === String(L.aktiv) && erBak(plassAv(o.positions, u)) && /^M/.test((o.roles || {})[u] || '')) { L.inne = true; L.erstatter = u; }
-      else { const p = plassAv(o.positions, u); if (p) o.positions[p] = i; }
-      s.endringer = (s.endringer || []).concat([{ t, type: L.aktiv && (String(u) === String(L.aktiv) || String(i) === String(L.aktiv)) ? 'libero' : 'bytte', ut: [u], inn: [i], kilde: 'tropp', enhet: (meta && meta.enhet) || null }]);
+      // Vanlig bytte på samme plass; innbytteren tar over plassens rolle. Bytter man midten liberoen står for, står hun for innbytteren.
+      const p = plassAv(o.positions, u);
+      if (p) { o.positions[p] = i; o.roles = Object.assign({}, o.roles); o.roles[i] = o.roles[u]; delete o.roles[u]; if (String(L.erstatter) === String(u)) L.erstatter = i; }
+      s.endringer = (s.endringer || []).concat([{ t, type: 'bytte', ut: [u], inn: [i], kilde: 'tropp', enhet: (meta && meta.enhet) || null }]);
       endret = true;
     }
     o.libero = L;
     o.venter = venter.length ? venter : undefined; if (!o.venter) delete o.venter;
     const pb = paBanen(o).map(String);
-    o.receivers = (receivers || []).filter((x) => pb.includes(String(x)) || nå.includes(String(x)));
+    o.receivers = (receivers || []).filter((x) => pb.includes(String(x)));
     s.naa = o; s.updatedAt = t;
     if (!endret && JSON.stringify((sett.naa || sett.start).receivers) !== JSON.stringify(o.receivers)) s.endringer = (s.endringer || []).concat([{ t, type: 'mottak', kilde: 'tropp' }]);
     return s;
@@ -3381,7 +3383,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const m = cur();
     const oppName = m.home === usName(m) ? m.away : m.home;
     const receivers = (m.receivers || []).map(player).filter((p) => p && !p.archived);
-    const onCourt = (m.onCourt || []).map(player).filter((p) => p && !p.archived);
+    // Angrep og serve: grunnspillerne. Med bekreftet oppstilling hentes de fra oppstillingen (liberoen er aldri med; midten står der).
+    const opsO = window.Oppstilling && opsBekreftet(m) ? Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1)) : null;
+    const onCourt = (opsO ? Oppstilling.ider(opsO.positions) : (m.onCourt || [])).map(player).filter((p) => p && !p.archived);
     const oppNums = m.oppNumbers || [];
     const evs = allEvents();
 
@@ -4763,7 +4767,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       if (opsSt && opsSt.confirmed) {
         // Bekreftet oppstilling: endringen blir bytte/libero i settet (startoppstillingen og registreringer endres ikke)
         // Ingen mottaker utenfor banen: tas en mottaker av banen, tas hun også ut av mottak (samme oppdatering)
-        if (key === 'onCourt') m.receivers = (m.receivers || []).filter((id) => m.onCourt.includes(id));
+        // Tas en spiller av banen, tas hun også ut av mottak (liberoen er ikke i «På banen», men blir stående i mottak)
+        if (key === 'onCourt' && !m.onCourt.includes(b.dataset.id)) m.receivers = (m.receivers || []).filter((id) => id !== b.dataset.id);
         const ny = Oppstilling.fraToggles(opsSt, m.onCourt, m.receivers, { enhet: deviceId }), lu = { v: 1, sets: { [opsNr]: ny } };
         m.lineups = Oppstilling.slaSammen(m.lineups, lu); render(); saveMatch(m.id, { [key]: order, receivers: m.receivers, lineups: lu });
       } else { render(); saveMatch(m.id, { [key]: order }); }
