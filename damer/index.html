@@ -1042,7 +1042,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     // Generisk lytter: første øyebliksbilde + Realtime; nytt fullt bilde ved hver endring og ved (re)tilkobling
     function lytt(navn, tabeller, hent, cb, feil) {
       let aktiv = true, timer = null;
-      const kjør = () => { clearTimeout(timer); timer = setTimeout(() => hent().then((x) => { if (aktiv) cb(x); }).catch((e) => feil && feil(e)), 30); };
+      // Bare nye data sendes videre: polling uten endringer skal ikke tegne appen på nytt (nedtrekksmenyer og skjema hopper ellers ut)
+      let sist;
+      const kjør = () => { clearTimeout(timer); timer = setTimeout(() => hent().then((x) => { if (!aktiv) return; let n; try { n = JSON.stringify(x); } catch (e) { n = null; } if (n !== null && n === sist) return; sist = n; cb(x); }).catch((e) => feil && feil(e)), 30); };
       kjør();
       let kanal = null;
       if (sb.channel) {
@@ -3110,7 +3112,18 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   }
 
   // ---------- Visninger ----------
+  // Nedtrekksmenyer og skjema skal ikke hoppe ut når data oppdateres (sanntid/polling hvert 4. sekund):
+  // - mens en nedtrekksmeny er åpen (fokus, ikke valgt ennå) utsettes tegningen til valget er gjort eller fokus forlater den
+  // - verdier brukeren har fylt inn i et skjema (ny kamp, resultat, nytt lag …) beholdes når siden tegnes på nytt
+  const UI = { velger: null, utsatt: false, utkast: {} };
+  app.addEventListener('focusin', (ev) => { if (ev.target.tagName === 'SELECT') UI.velger = ev.target; });
+  app.addEventListener('focusout', (ev) => { if (ev.target === UI.velger) { UI.velger = null; if (UI.utsatt) { UI.utsatt = false; setTimeout(render, 0); } } });
+  const huskUtkast = (ev) => { const el = ev.target; if (el.tagName === 'SELECT' && el === UI.velger && ev.type === 'change') { UI.velger = null; if (UI.utsatt) { UI.utsatt = false; setTimeout(render, 0); } }
+    if (el.id && el.closest && el.closest('form')) UI.utkast[el.id] = el.type === 'checkbox' ? { c: el.checked } : { v: el.value }; };
+  app.addEventListener('input', huskUtkast, true); app.addEventListener('change', huskUtkast, true);
+  app.addEventListener('submit', (ev) => { ev.target.querySelectorAll('[id]').forEach((el) => { delete UI.utkast[el.id]; }); }, true);
   function render() {
+    if (UI.velger && UI.velger.isConnected && document.activeElement === UI.velger) { UI.utsatt = true; return; }
     if (window.Oppstilling) setTimeout(opsAuto, 0);
     if (S.view === 'live' && !S.offline && cur()) {
       const root = document.getElementById('live-root');
@@ -3140,6 +3153,10 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (S.view === 'live') fillMini();
     dirSync();
     if (S.menuOpen) { const pop = app.querySelector('.menu-pop'); if (pop) { const r = pop.getBoundingClientRect(); if (r.left < 8) { pop.style.right = 'auto'; pop.style.left = '0'; } } }
+    // Utfylte skjemafelt beholdes; felt som ikke lenger finnes (skjemaet er lukket) glemmes
+    Object.keys(UI.utkast).forEach((id) => { const el = document.getElementById(id), u = UI.utkast[id];
+      if (!el || !el.closest('form')) { delete UI.utkast[id]; return; }
+      if ('c' in u) el.checked = u.c; else if (el.value !== u.v && (el.tagName !== 'SELECT' || [...el.options].some((o) => o.value === u.v))) el.value = u.v; });
     if (keepId) { const el = document.getElementById(keepId); if (el) { if (keepVal != null && el.tagName === 'INPUT') el.value = keepVal; el.focus(); try { if (selStart != null && el.setSelectionRange) el.setSelectionRange(selStart, selStart); } catch (e) {} } }
   }
 
