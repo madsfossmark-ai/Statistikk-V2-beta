@@ -2837,11 +2837,6 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       try { const r = await client.schema('stats').from('contexts').select('innstillinger').eq('slug', cfg.mainSlug || 'main');
         const inn = r && r.data && r.data[0] && r.data[0].innstillinger; if (inn && inn.nvbf_fyll === false) window.PUBLIC_CTX.nvbfFyll = false; } catch (e) { /* standard */ }
     }
-    // V3 (#23): spør databasen om V3 er aktiv for laget. Feil (f.eks. før migreringen) = av. Demo: ?v3=1
-    if (demo) window.V3_AKTIV = q.has('v3') && q.get('v3') !== 'av';
-    else if (cfg.v3 !== false) {
-      try { const r = await client.schema('stats').rpc('v3_status', { p_slug: cfg.mainSlug || 'main' }); window.V3_AKTIV = !r.error && !!(r.data && r.data.aktiv); } catch (e) { window.V3_AKTIV = false; }
-    }
     const vis = () => statuslinje(store);
     if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
     klar({ store, user, skrive });
@@ -3147,14 +3142,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // Felles toppmeny: lag/sesong, Kamper · Tabell · Dashboard · Analyse, og menyen med det som brukes sjeldnere
   // Bare i V2-bygget (der analysesiden ligger ved siden av lagsiden); slås av med config.analyse = false
   function analyseHref() { return (window.ForsvarKamp && !(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? 'analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') : null; }
-  // V3 Taktikk (#23): bare når databasen sier at V3 er aktiv for laget (window.V3_AKTIV settes av V2-bygget)
-  function taktikkHref() { return (window.V3_AKTIV === true && window.ForsvarKamp && !window.PUBLIC) ? 'taktikk/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') : null; }
   function navHtml(aktiv) {
     const tab = (k, a, l) => '<button class="navtab" data-a="' + a + '"' + (aktiv === k ? ' aria-current="page"' : '') + '>' + l + '</button>';
-    const an = analyseHref(), tk = taktikkHref();
+    const an = analyseHref();
     return '<nav class="topnav" aria-label="Hovedmeny"><div class="tn-id">' + crest(OUR, 'md') + ctxPicker() + '</div>'
       + '<div class="navtabs">' + tab('kamper', 'back', 'Kamper') + tab('tabell', 'table', 'Tabell') + tab('dashboard', 'season', 'Dashboard')
-      + (an ? '<a class="navtab" href="' + an + '">Analyse</a>' : '') + (tk ? '<a class="navtab" href="' + tk + '">Taktikk</a>' : '') + '</div><span class="spacer"></span>' + menuHtml() + '</nav>';
+      + (an ? '<a class="navtab" href="' + an + '">Analyse</a>' : '') + '</div><span class="spacer"></span>' + menuHtml() + '</nav>';
   }
   function ctxPicker() {
     if (window.PUBLIC || S.offline || S.dash) return '<span class="label">' + esc(CTX.name) + '</span>';
