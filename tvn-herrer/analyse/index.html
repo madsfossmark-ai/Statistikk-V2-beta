@@ -59,7 +59,13 @@ select, input[type=email], input[type=password] { min-height: 44px; padding: 0 1
 :focus-visible { outline: 3px solid #F5B700; outline-offset: 2px; }
 [hidden] { display: none !important; }
 /* V3 trenerstøtte (låste moduler) */
+.modul.laast { border-style: dashed; }
 .modul.laast small { color: var(--warn); }
+.modul.laast[aria-current="page"] { border-style: solid; }
+.modul.laast[aria-current="page"] small { color: var(--accent-fg); opacity: .9; }
+.v3-login { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.v3-login h3 { margin: 0; }
+#modul-v3 p { margin: 0; }
 .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .v3-login { max-width: 420px; }
 .v3-tittel { font: 700 24px/1.1 var(--font-display); text-transform: none; letter-spacing: 0; color: var(--fg); }
@@ -123,8 +129,6 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 
   <nav class="moduler" aria-label="Analysemoduler">
     <a class="modul" href="#blokk-forsvar" aria-current="page">Blokk/forsvar<small>Slagretninger og forsvarsplan</small></a>
-    <span class="modul kommer" aria-disabled="true">Serve/rotasjon<small>Kommer</small></span>
-    <span class="modul kommer" aria-disabled="true">Videoanalyse<small>Kommer</small></span>
   </nav>
 
   <div id="modul-blokk">
@@ -788,23 +792,28 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </script>
 <script>
 /*
- * V3 trenerstøtte (issue #23) som låste moduler i modulraden på Analyse-siden.
- *  * Modulene vises bare når databasen sier at V3 er aktiv for sidens lag (stats.v3_status, spurt med sidens vanlige økt).
- *  * Innholdet krever egen V3-innlogging i en egen økt (eget storageKey). Den felles beta-brukeren slipper aldri inn.
- *  * Tilgangen avgjøres i databasen (v3_status og RLS på v3_planer), aldri av lagnavn i nettleseren.
- *  * Demo (?demo=1): &v3=1 (eller tilgang) = aktiv og tilgang etter innlogging, &v3=ingen = aktiv uten tilgang, uten v3 = av.
- * Modulene følger laget som er valgt på siden (lag(slug, navn)), så de også virker på «alle»-siden med lagvelger.
- * Er sidens egen innlogging personlig (ingen autoLogin), brukes den samme økten – da trengs ingen ny innlogging.
+ * Moduler på Analyse-siden som krever tilgang (issue #23). Blokk/forsvar er åpen for alle lag; de andre modulene
+ * (Serve/rotasjon, Videoanalyse, Kampplan, Serveplan, Observasjoner, Treningsprioriteringer) krever tilgang.
+ *  * Uten tilgang: modulen er merket «Krever tilgang» og viser en beskrivelse av hva den inneholder.
+ *  * Tilgangen avgjøres i databasen per bruker og lag (stats.v3_status, v3_tilgang og RLS), aldri av lagnavn i nettleseren.
+ *  * Sider med felles beta-innlogging: egen innlogging i egen økt (eget storageKey). Den felles brukeren får aldri tilgang.
+ *  * Sider med personlig innlogging («alle»): samme økt brukes, ingen ny innlogging.
+ *  * Modulene følger laget som er valgt på siden (lag(slug, navn)).
+ *  * Demo (?demo=1): &v3=1 = laget har modulene og innlogging gir tilgang, &v3=ingen = innlogging uten tilgang, uten v3 = laget har ikke modulene.
  * Forventer i siden: nav.moduler med lenken #blokk-forsvar, #modul-blokk (Blokk/forsvar) og #modul-v3 (tom, skjult).
  */
 window.V3Moduler = (function () {
   'use strict';
+  // [id, navn, undertekst med tilgang, beskrivelse]
   const MODULER = [
-    ['kampplan', 'Kampplan', 'Plan mot neste motstander: mottak, angrepsvalg og fokuspunkter.'],
-    ['serveplan', 'Serveplan', 'Hvem som serves på i hver rotasjon, og hvor.'],
-    ['observasjoner', 'Observasjoner', 'Korte notater fra kamp og trening, knyttet til kamp og spiller.'],
-    ['treningsprioriteringer', 'Treningsprioriteringer', 'Hva statistikken peker på at laget bør trene mer på.'],
+    ['serve-rotasjon', 'Serve/rotasjon', 'Per rotasjon', 'Serve og mottak fordelt på rotasjon: hvor laget vinner og taper poeng, hvilke rotasjoner som sliter i mottak, og hvordan serven virker mot hver motstander.'],
+    ['videoanalyse', 'Videoanalyse', 'Klipp fra kamp', 'Kampvideo koblet til registreringene, så hver aksjon kan ses med statistikken ved siden av – per spiller, rotasjon eller type aksjon.'],
+    ['kampplan', 'Kampplan', 'Mot neste kamp', 'Plan mot neste motstander, bygget på statistikken fra tidligere kamper: hvem som bør serves på, mottaksformasjon, angrepsvalg og fokuspunkter.'],
+    ['serveplan', 'Serveplan', 'Per rotasjon', 'Hvem som serves på i hver rotasjon, og hvor, basert på motstanderens mottakstall.'],
+    ['observasjoner', 'Observasjoner', 'Notater', 'Korte notater fra kamp og trening, knyttet til kamp, sett og spiller, så de kan brukes i neste kampplan.'],
+    ['treningsprioriteringer', 'Treningsprioriteringer', 'Hva vi bør trene', 'Hva statistikken peker på at laget bør trene mer på, med utviklingen gjennom sesongen.'],
   ];
+  const BE_OM = 'Ta kontakt med Randaberg Volleyball for å få modulen slått på for laget ditt.';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (id) => document.getElementById(id);
   const S = { aktiv: false, delt: false, startet: false, statusKlient: null, cfg: {}, demo: false, demoTilstand: 'tilgang', klient: null, bruker: null, tilgang: null, slug: 'main', lagnavn: '', modul: null };
@@ -819,22 +828,11 @@ window.V3Moduler = (function () {
   function lenker() {
     const nav = document.querySelector('nav.moduler'); if (!nav) return;
     nav.querySelectorAll('.v3-modul').forEach((a) => a.remove());
-    MODULER.forEach(([id, navn]) => {
+    MODULER.forEach(([id, navn, under]) => {
       const a = document.createElement('a'); a.className = 'modul v3-modul' + (S.tilgang ? '' : ' laast'); a.href = '#' + id; a.dataset.v3 = id;
-      a.innerHTML = esc(navn) + '<small>' + (S.tilgang ? 'Trenerstøtte' : '<span aria-hidden="true">🔒 </span>Trenerinnlogging') + '</small>';
-      if (!S.tilgang) a.setAttribute('aria-label', navn + ' (låst, krever trenerinnlogging)');
+      a.innerHTML = esc(navn) + '<small>' + (S.tilgang ? esc(under) : '<span aria-hidden="true">🔒 </span>Krever tilgang') + '</small>';
+      if (!S.tilgang) a.setAttribute('aria-label', navn + ' (krever tilgang)');
       nav.appendChild(a);
-    });
-  }
-  // Lag uten V3: samme moduler, men utilgjengelige og merket «Bare Randaberg»
-  function lenkerAv() {
-    const nav = document.querySelector('nav.moduler'); if (!nav) return;
-    nav.querySelectorAll('.v3-modul').forEach((a) => a.remove());
-    MODULER.forEach(([id, navn]) => {
-      const s = document.createElement('span'); s.className = 'modul kommer v3-modul v3-av'; s.dataset.v3 = id;
-      s.setAttribute('aria-disabled', 'true'); s.title = 'Trenerstøtten er bare tilgjengelig for Randaberg-lagene';
-      s.innerHTML = esc(navn) + '<small>Bare Randaberg</small>';
-      nav.appendChild(s);
     });
   }
   function merkAktiv() {
@@ -846,23 +844,20 @@ window.V3Moduler = (function () {
 
   function visInnhold() {
     const el = $('modul-v3'), m = MODULER.find((x) => x[0] === S.modul);
-    if (S.tilgang === null) {
-      el.innerHTML = '<form class="kort v3-login" id="v3-login"><h2 class="v3-tittel">' + esc(m[1]) + '</h2>'
-        + '<p class="liten">Trenerstøtten krever egen innlogging for trenere med V3-tilgang. Føringen og Blokk/forsvar trenger ikke denne.</p>'
+    const ut = S.delt || !S.bruker ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut</button>';
+    if (S.tilgang) {
+      el.innerHTML = '<div class="kort" id="v3-innhold"><div class="rad"><h2 class="v3-tittel">' + esc(m[1]) + '</h2><span class="merke">Kommer</span><span class="skyv"></span>' + ut + '</div>'
+        + '<p>' + esc(m[3]) + '</p><p class="liten">Du har tilgang til denne modulen i ' + esc(S.lagnavn) + '. Innholdet bygges i en senere fase.</p></div>';
+    } else {
+      let mer = '';
+      if (S.bruker) mer = '<p class="liten" id="v3-ingen">Brukeren du er logget inn med, har ikke tilgang til modulen i ' + esc(S.lagnavn) + '.</p>' + ut;
+      else if (S.aktiv && !S.delt) mer = '<form class="v3-login" id="v3-login"><h3 class="etikett">Har du tilgang? Logg inn</h3>'
         + '<label class="etikett" for="v3-e">E-post</label><input id="v3-e" type="email" autocomplete="username" required>'
         + '<label class="etikett" for="v3-p">Passord</label><input id="v3-p" type="password" autocomplete="current-password" required>'
         + '<button class="knapp primar" type="submit">Logg inn</button><p class="v3-feil" id="v3-feil" role="alert"></p></form>';
-      $('v3-login').addEventListener('submit', loggInn);
-      return;
-    }
-    const ut = S.delt ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut av trenerstøtten</button>';
-    if (!S.tilgang) {
-      el.innerHTML = '<div class="kort" id="v3-ingen"><h2 class="v3-tittel">Ingen V3-tilgang</h2><p class="liten">Du er logget inn som ' + esc(S.bruker && S.bruker.email)
-        + ', men brukeren har ikke V3-tilgang i ' + esc(S.lagnavn) + '. Be eieren av laget gi deg tilgang.</p>' + ut + '</div>';
-    } else {
-      el.innerHTML = '<div class="kort" id="v3-innhold"><div class="rad"><h2 class="v3-tittel">' + esc(m[1]) + '</h2><span class="merke">Kommer</span><span class="skyv"></span>'
-        + '<span class="liten">' + esc(S.bruker && S.bruker.email) + '</span>' + ut + '</div><p class="liten">' + esc(m[2]) + '</p>'
-        + '<p class="liten">Denne modulen er bare synlig for trenere med V3-tilgang i laget. Innholdet bygges i en senere fase.</p></div>';
+      el.innerHTML = '<div class="kort" id="v3-beskrivelse"><div class="rad"><h2 class="v3-tittel">' + esc(m[1]) + '</h2><span class="merke">Krever tilgang</span></div>'
+        + '<p>' + esc(m[3]) + '</p><p class="liten">' + BE_OM + '</p>' + mer + '</div>';
+      if ($('v3-login')) $('v3-login').addEventListener('submit', loggInn);
     }
     if ($('v3-ut')) $('v3-ut').onclick = loggUt;
   }
@@ -910,7 +905,7 @@ window.V3Moduler = (function () {
     window.addEventListener('hashchange', rute);
     return true;
   }
-  // Laget som er valgt på siden. Spør databasen om V3 er aktiv for det, og viser eller fjerner modulene.
+  // Laget som er valgt på siden. Spør databasen om modulene er slått på for laget og om brukeren har tilgang.
   async function lag(slug, navn) {
     if (!S.startet) return false;
     S.slug = slug; S.lagnavn = navn || slug;
@@ -918,15 +913,9 @@ window.V3Moduler = (function () {
     else {
       try { const r = await S.statusKlient.schema('stats').rpc('v3_status', { p_slug: slug }); S.aktiv = !r.error && !!(r.data && r.data.aktiv); } catch (e) { S.aktiv = false; }
     }
-    if (!S.aktiv) {
-      lenkerAv();
-      if (MODULER.some((x) => '#' + x[0] === location.hash)) history.replaceState(null, '', location.pathname + location.search);
-      S.modul = null; $('modul-blokk').hidden = false; $('modul-v3').hidden = true; merkAktiv();
-      return false;
-    }
-    await sjekkTilgang();
+    if (S.aktiv) await sjekkTilgang(); else S.tilgang = S.bruker ? false : null;
     lenker(); rute();
-    return true;
+    return S.aktiv;
   }
   return { start, lag, MODULER, tilstand: S };
 })();
