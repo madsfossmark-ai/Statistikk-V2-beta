@@ -80,7 +80,21 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .navtab { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
 .navtab[aria-current="page"] { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
 .sec-h { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
-@media (max-width: 640px) { .topnav .spacer { display: none; } .navtabs { order: 3; width: 100%; } .navtab { flex: 1; justify-content: center; padding: 0 6px; } .topnav .menu-wrap { margin-left: auto; } }
+/* Mobil: lagmerke, lagvelger og meny på første linje (velgeren krymper og kutter lange navn), menyfanene under */
+.topnav .ctx-pick select { max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+@media (max-width: 640px) {
+  .topnav { flex-wrap: wrap; }
+  .topnav .spacer { display: none; }
+  .topnav .tn-id { flex: 1 1 0; min-width: 0; }
+  .topnav .tn-id .crest { width: 30px; height: 35px; font-size: 13px; }
+  .topnav .ctx-pick { flex: 1 1 0; min-width: 0; display: block; }
+  .topnav .ctx-pick select { width: 100%; font-size: 16px; height: 44px; }
+  .topnav .tn-id > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topnav .menu-wrap { margin-left: 0; flex: none; }
+  .topnav .menu-btn { height: 44px; }
+  .navtabs { order: 3; width: 100%; }
+  .navtab { flex: 1; justify-content: center; padding: 0 4px; min-width: 0; }
+}
 
 /* Generelle flater */
 .panel { background: var(--surface); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -1237,7 +1251,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           if (String(sti) === 'config/contexts') {
             return lytt('ctx', [['contexts']], async () => {
               const rader = await hentKontekster();
-              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined, gender: c.gender || undefined })) };
+              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined, gender: c.gender || undefined, nvbfFyll: c.innstillinger && c.innstillinger.nvbf_fyll === false ? false : undefined })) };
             }, (d) => cb(dokSnap(d)), feil);
           }
           if (String(sti) === 'config/access') { setTimeout(() => cb(dokSnap(null)), 0); return () => {}; }
@@ -2799,6 +2813,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const store = await StatsV2.SupabaseStore({ client, deviceId, userId: user.id, mainSlug: demo ? 'main' : (cfg.mainSlug || 'main'), pollMs: demo ? 0 : 4000, ko: StatsV2.Ko(StatsV2.lagLagring('rv-v2-ko' + (cfg.queue ? '-' + cfg.queue : ''))) }).start();
     window.addEventListener('online', () => store.tøm());
     window.__v2 = { store, client };
+    // Innstillinger for sidens eget lag (contexts.innstillinger), f.eks. nvbf_fyll = false for lag uten NVBF-utfylling
+    if (!demo && window.PUBLIC_CTX) {
+      try { const r = await client.schema('stats').from('contexts').select('innstillinger').eq('slug', cfg.mainSlug || 'main');
+        const inn = r && r.data && r.data[0] && r.data[0].innstillinger; if (inn && inn.nvbf_fyll === false) window.PUBLIC_CTX.nvbfFyll = false; } catch (e) { /* standard */ }
+    }
     const vis = () => statuslinje(store);
     if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
     klar({ store, user, skrive });
@@ -4105,8 +4124,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   }
 
   // Mottakssnitt (0–2) for NVBF-kamper, regnet fra antall, feil og perfekt %: perfekt = 2, feil = 0, resten = 1
+  // Per lag/sesong: nvbfFyll = false (contexts.innstillinger.nvbf_fyll) slår av utregnet 0–2 og utfylling fra NVBF-prosenter.
+  // Standard (alle eksisterende kontekster) er uendret.
+  const nvbfFyll = () => CTX.nvbfFyll !== false;
   function addRecAvg(n) {
-    if (!n || !n.teams) return;
+    if (!n || !n.teams || !nvbfFyll()) return;
     const num = (v) => { const x = parseFloat(String(v ?? '').replace('%', '').replace(',', '.').replace('−', '-')); return isNaN(x) ? null : x; };
     n.teams.forEach((t) => {
       let N = 0, Pf = 0, F = 0;
@@ -4127,6 +4149,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const NVCAT = { rec: 'mottak', att: 'angrep', srv: 'serve', opp: 'motstanders mottak' };
   function nvbfFill(m, evs) {
     const out = { extra: [], cats: [] };
+    if (!nvbfFyll()) return out;
     if (!m || m.status !== 'ferdig' || !(m.nvbf && m.nvbf.teams && m.nvbf.teams.length)) return out;
     const us = usName(m), has = (t) => evs.some((e) => e.type === t);
     const tUs = m.nvbf.teams.find((t) => t.name === us), tOpp = m.nvbf.teams.find((t) => t.name !== us);
