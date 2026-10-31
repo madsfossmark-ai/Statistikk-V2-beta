@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><!-- app-ikon -->
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#0D1117;color:#E8EBF0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><!-- app-ikon -->
 <link rel="apple-touch-icon" sizes="180x180" href="../ikoner/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="../ikoner/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="../ikoner/favicon-16x16.png">
@@ -15,31 +15,33 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: benk-verktøy, iPad liggende først – tre kolonner (registrering | registrering | løpende tall), stables på smal skjerm */
+/* Layout: benk-verktøy, iPad liggende først – to registreringsfelt i bredden, nøkkeltall over, løpende tall under. Stables på smal skjerm.
+   Design: mørk benkemodus (valgt 31.10.2026) – mørk flate, store knapper, rød/gul/grønn måler per spiller */
 :root {
-  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --line: #D9D6CD;
-  --fg: #16181D; --muted: #4A4F5A; --faint: #6B7080;
-  --accent: #1B4592; --accent-soft: #DCE4F5; --accent-fg: #FFFFFF; --accent-ink: #122F66; --accent-bar: #2F63C4; --hero: #1B4592;
-  --opp: #8A3E0F; --opp-soft: #F5DFCF; --opp-strong: #C85E1C;
-  --bad: #B3261E; --block: #7A1A14; --neutral: #5C6270; --good: #1F7A4D;
-  --bar: #16181D; --bar-fg: #FFFFFF; --bar-muted: #B8BCC6;
+  --bg: #0D1117; --surface: #161B24; --sunk: #1D2430; --row: #1A202B; --line: #2A3240;
+  --fg: #E8EBF0; --muted: #8B95A5; --faint: #6E7888; --soft: #C9D1DC;
+  --accent: #8FB3FF; --accent-soft: #1E2A44; --accent-fg: #0D1117; --accent-ink: #C9D6F0; --accent-bar: #2E4A86; --hero: #2E4A86;
+  --opp: #FFB547; --opp-soft: #1E1912; --opp-strong: #B4641C; --opp-nr: #8A4A12;
+  --amber: #FFB547; --amber-fg: #1A1203;
+  --bad: #C2362D; --block: #7E2520; --neutral: #4A5464; --good: #1E8A57;
+  --lvl-lo: #F07167; --lvl-mid: #FFC94A; --lvl-hi: #4CD08A;
+  --win-bg: #16402C; --loss-bg: #4A1F1D; --live-bg: #3A2A10;
+  --bar: #161B24; --bar-fg: #FFFFFF; --bar-muted: #8B95A5;
   --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #121418; --surface: #1C1F25; --sunk: #262A32; --line: #343944;
-  --fg: #ECEDEF; --muted: #A7ADB8; --faint: #8E94A0;
-  --accent: #7FA3E8; --accent-soft: #23314F; --accent-fg: #0E1424;
-  --opp: #F0A774; --opp-soft: #3A2A1F; --opp-strong: #D9773A;
-  --bad: #D9473E; --block: #9C2B23; --neutral: #6A7180; --good: #2E9963;
-  --bar: #0B0C0F; --bar-fg: #FFFFFF; --bar-muted: #A7ADB8; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #121418; --surface: #1C1F25; --sunk: #262A32; --line: #343944;
-  --fg: #ECEDEF; --muted: #A7ADB8; --faint: #8E94A0;
-  --accent: #7FA3E8; --accent-soft: #23314F; --accent-fg: #0E1424;
-  --opp: #F0A774; --opp-soft: #3A2A1F; --opp-strong: #D9773A;
-  --bad: #D9473E; --block: #9C2B23; --neutral: #6A7180; --good: #2E9963;
-  --bar: #0B0C0F; --bar-fg: #FFFFFF; --bar-muted: #A7ADB8; color-scheme: dark }
+:root[data-theme="light"] {
+  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --row: #F7F6F2; --line: #D9D6CD;
+  --fg: #16181D; --muted: #4A4F5A; --faint: #6B7080; --soft: #2A2E37;
+  --accent: #1B4592; --accent-soft: #DCE4F5; --accent-fg: #FFFFFF; --accent-ink: #122F66; --accent-bar: #2F63C4; --hero: #1B4592;
+  --opp: #8A3E0F; --opp-soft: #F5DFCF; --opp-strong: #C85E1C; --opp-nr: #C85E1C;
+  --amber: #C27C0E; --amber-fg: #FFFFFF;
+  --bad: #B3261E; --block: #7A1A14; --neutral: #5C6270; --good: #1F7A4D;
+  --lvl-lo: #B3261E; --lvl-mid: #B07D0B; --lvl-hi: #1F7A4D;
+  --win-bg: #DDEFE4; --loss-bg: #F7DCD9; --live-bg: #FBEBCC;
+  --bar: #16181D; --bar-fg: #FFFFFF; --bar-muted: #B8BCC6; color-scheme: light;
+}
 
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px;
@@ -55,7 +57,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .app { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 
 /* Topplinje */
-.bar { background: var(--bar); color: var(--bar-fg); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.bar { background: var(--bar); color: var(--bar-fg); border-radius: 16px; padding: 8px 12px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .bar a, .bar .link { color: #C9D6F0; text-decoration: none; background: none; border: 0; padding: 8px 4px; font-size: 14px; }
 .bar .title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bar .title .display { font-size: 24px; }
@@ -67,11 +69,21 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .sbtn { width: 46px; height: 46px; border-radius: 10px; border: 1px solid #3A3F49; background: transparent; color: #FFFFFF; font-size: 22px; }
 .sbtn.plus-us { background: var(--accent-bar); border-color: var(--accent-bar); }
 .sbtn.plus-them { background: var(--opp-strong); border-color: var(--opp-strong); }
-.barbtn { height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #3A3F49; background: transparent; color: #FFFFFF; font-weight: 600; font-size: 14px; }
+.barbtn { height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: #FFFFFF; font-weight: 600; font-size: 14px; }
 .sets { font-family: var(--font-display); font-size: 18px; color: var(--bar-muted); }
 
+/* Felles toppmeny */
+.topnav { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; background: var(--surface); border-radius: 16px; padding: 8px 10px; }
+.topnav .tn-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topnav .ctx-pick select { height: 44px; border-radius: 12px; background-color: var(--sunk); color: var(--fg); text-transform: none; letter-spacing: 0; font-size: 14px; }
+.navtabs { display: flex; gap: 4px; background: var(--bg); border-radius: 12px; padding: 4px; flex-wrap: wrap; }
+.navtab { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
+.navtab[aria-current="page"] { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.sec-h { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+@media (max-width: 640px) { .topnav .spacer { display: none; } .navtabs { order: 3; width: 100%; } .navtab { flex: 1; justify-content: center; padding: 0 6px; } .topnav .menu-wrap { margin-left: auto; } }
+
 /* Generelle flater */
-.panel { background: var(--surface); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.panel { background: var(--surface); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .panel-head h2 { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .panel.opp .panel-head h2 { color: var(--opp); }
@@ -79,7 +91,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
 
 .score-wrap { display: flex; align-items: center; gap: 18px; }
-.setpill { font-family: var(--font-display); font-weight: 700; font-size: 30px; padding: 2px 14px; border-radius: 10px; background: #2A2E37; }
+.setpill { font-family: var(--font-display); font-weight: 700; font-size: 30px; padding: 2px 14px; border-radius: 10px; background: var(--sunk); color: var(--amber); }
 .barbtn.primary-bar { background: var(--accent-bar); border-color: var(--accent-bar); }
 .setform { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .setin { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--bar-muted); }
@@ -122,18 +134,74 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .addopp input { width: 90px; height: 44px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 0 10px; font-size: 16px; }
 .addopp button { height: 44px; padding: 0 12px; border-radius: 10px; border: 1px dashed var(--opp); background: var(--surface); color: var(--opp); font-weight: 600; }
 
+/* Registrering i nytt design: nr, navn med måler og snitt, store knapper som fyller bredden */
+.kpis2 { display: grid; grid-template-columns: 128px repeat(5, minmax(0, 1fr)); gap: 8px; }
+.kpi2 { background: var(--surface); border-radius: 12px; padding: 6px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.kpi2 .l { font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi2 .v { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.kpi2 .v b { font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1; }
+.kpi2 .v span { font-size: 11px; color: var(--muted); }
+.kpi2.scope { border: 1px solid var(--line); background: var(--sunk); color: var(--fg); text-align: left; justify-content: center; }
+.kpi2.scope b { font-size: 14px; } .kpi2.scope span { font-size: 10px; color: var(--muted); }
+.lvl-lo { color: var(--lvl-lo); } .lvl-mid { color: var(--lvl-mid); } .lvl-hi { color: var(--lvl-hi); } .lvl-na { color: var(--muted); }
+.court-chips { display: flex; gap: 4px; border: 0; background: transparent; padding: 0; }
+.cchip { width: 42px; height: 44px; border-radius: 10px; background: var(--sunk); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--fg); }
+.cchip b { font-family: var(--font-display); font-weight: 800; font-size: 18px; line-height: 1; }
+.cchip i { font-style: normal; font-size: 9px; font-weight: 700; color: var(--accent); }
+.cchip i.r-O { color: var(--amber); } .cchip i.r-L { color: var(--lvl-hi); }
+#live-root .row { grid-template-columns: 150px minmax(0, 1fr); gap: 8px; }
+#live-root .who { grid-template-areas: "nr nm" "nr mini"; }
+#live-root .who .nr { width: 40px; height: 40px; font-size: 20px; }
+#live-root .nm { font-size: 13px; }
+#live-root .who .mini { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; white-space: nowrap; }
+#live-root .who .mini .avgbar { flex-basis: 100%; }
+#live-root .who .mini .weak-tag.reg { margin: 0; font-size: 9px; padding: 1px 6px; }
+#live-root .who .mini .avgbar.blk { width: 100%; height: 7px; border-radius: 4px; margin-top: 3px; background: var(--line); }
+#live-root .mt { font-size: 11px; color: var(--muted); } #live-root .mt b { font-weight: 700; }
+#live-root .codes { gap: 8px; }
+#live-root .code { flex: 1; width: auto; min-width: 0; height: 54px; border-radius: 12px; font-size: 26px; font-weight: 800; }
+#live-root .p-rec .code, #live-root .p-opp .code { height: 58px; font-size: 28px; }
+#live-root .code small { display: none; }
+#live-root .panel-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+#live-root .panel.opp { background: var(--opp-soft); }
+#live-root .nr.opp { background: var(--opp-nr); }
+#live-root .weak-tag.reg { display: inline-block; margin: 2px 0 0; }
+.barbtn.primary-bar, .barbtn.amber { background: var(--amber); border-color: var(--amber); color: var(--amber-fg); font-weight: 700; }
+.ov-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(5, 8, 12, .72); display: grid; place-items: center; padding: 16px; }
+.ov-modal { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--line); border-radius: 20px; padding: 16px; gap: 10px; }
+.bytte-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bytte-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bchip { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); color: var(--fg); text-align: left; }
+.bchip .nr { width: 32px; height: 32px; font-size: 16px; }
+.bchip .nm { flex: 1; font-size: 14px; }
+.bchip i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--accent); }
+.bchip.sel { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+.ov-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.primary:disabled { opacity: .4; cursor: default; }
+@media (max-width: 1100px) { .kpis2 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cchip { width: 36px; height: 40px; } .cchip b { font-size: 16px; } }
+@media (max-width: 759px) { .kpis2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .court-chips { display: none; } #live-root .row { grid-template-columns: minmax(0, 1fr); } .bytte-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Oppstillingsvelgeren (moduler/oppstilling) i mørk benkemodus, uansett innstilling i operativsystemet */
+html:not([data-theme="light"]) .ops-slot { background: rgba(22, 27, 36, .92); }
+html:not([data-theme="light"]) .ops-slot.tom { background: rgba(22, 27, 36, .6); }
+html:not([data-theme="light"]) .ops-slot.libero { background: #3A2E14; }
+html:not([data-theme="light"]) .ops-slot .lib { color: var(--amber); }
+html:not([data-theme="light"]) .ops-feil { background: #3A1614; color: #FFB4AB; }
+html:not([data-theme="light"]) .ops-info { background: #3A2614; color: #F2B27A; }
+html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
 /* Siste registreringer */
 .lastbar { background: var(--surface); border-radius: 14px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .chip { font-size: 13px; padding: 6px 10px; border-radius: 99px; background: var(--sunk); }
 .chip.first { background: var(--accent-soft); font-weight: 600; }
-.undo { height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--bad); background: var(--surface); color: var(--bad); font-weight: 600; }
+.undo { height: 46px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--lvl-lo); background: transparent; color: var(--lvl-lo); font-weight: 600; }
 .undo:disabled { opacity: .4; cursor: default; }
 
 /* Statistikk */
 .seg { display: flex; gap: 4px; flex-wrap: wrap; }
 .seg button { height: 34px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 500; }
-.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 700; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .tbl th { font-size: 11px; font-weight: 500; color: var(--muted); text-align: right; padding: 2px 4px 4px; }
 .tbl th:first-child, .tbl td:first-child { text-align: left; }
@@ -184,15 +252,16 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   .menu-btn span { display: none; } .menu-btn { padding: 0 12px; }
   .list-controls .tabs { order: 1; } .list-controls .menu-wrap { order: 2; }
   .lc-break { display: block; order: 3; flex-basis: 100%; height: 0; }
-  .list-controls > button, .list-controls > a.secondary { order: 4; }
+  .list-controls > button { order: 4; }
 }
 .listhead h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1; }
 .tabs { display: inline-flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: 10px; }
 .tabs button { height: 38px; padding: 0 16px; border: 0; border-radius: 7px; background: transparent; font-weight: 500; }
-.tabs button[aria-pressed="true"] { background: var(--surface); font-weight: 600; }
+.tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 700; }
+.tabs button { color: var(--muted); }
 .primary { height: 46px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 .secondary { height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); font-weight: 600; }
-.next { background: var(--hero); color: #FFFFFF; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.next { background: linear-gradient(135deg, var(--accent-soft), var(--surface)); color: var(--fg); border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
 .next .nx-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
 .next .nx-top .label { color: inherit; opacity: .85; }
 .next .nx-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; }
@@ -204,7 +273,8 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 @media (max-width: 640px) { .next .nx-teams { grid-template-columns: minmax(0, 1fr); gap: 10px; } .next .nx-vs { display: none; } .next .nx-team.r { flex-direction: row-reverse; justify-content: flex-end; text-align: left; } .next .nx-team .display { font-size: 24px; } .next .crest.lg { width: 40px; height: 47px; font-size: 17px; } .next .flag.lg { width: 48px; height: 32px; } }
 .next .display { font-size: 30px; }
 .next .meta { font-size: 13px; opacity: .85; }
-.next button { height: 48px; padding: 0 18px; border: 0; border-radius: 10px; background: #FFFFFF; color: var(--hero); font-weight: 600; }
+.next button { height: 56px; padding: 0 22px; border: 0; border-radius: 14px; background: var(--amber); color: var(--amber-fg); font-weight: 700; font-size: 16px; }
+.next .nx-top .label { color: var(--amber); opacity: 1; font-family: var(--font-display); font-size: 15px; font-weight: 700; }
 .rounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; align-items: start; }
 .round { display: flex; flex-direction: column; gap: 6px; }
 .match { display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; background: var(--sunk); border: 0; border-radius: 10px; padding: 7px 12px; min-height: 46px; color: var(--muted); }
@@ -263,7 +333,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .avg { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .avgbar { width: 48px; height: 4px; border-radius: 2px; background: var(--sunk); overflow: hidden; display: block; }
 .avgbar i { display: block; height: 100%; border-radius: 2px; }
-.avgbar.lo i { background: var(--bad); } .avgbar.mid i { background: #D9A21B; } .avgbar.hi i { background: var(--good); }
+.avgbar.lo i { background: var(--lvl-lo); } .avgbar.mid i { background: var(--lvl-mid); } .avgbar.hi i { background: var(--lvl-hi); }
 .avgbar.wide { width: 100%; height: 6px; border-radius: 3px; margin-top: 4px; }
 .avgbar.inl { display: inline-block; vertical-align: middle; width: 32px; margin-left: 6px; }
 /* Søylen ved navnet i registreringen står på egen linje, så den aldri kuttes på smal skjerm */
@@ -339,9 +409,9 @@ html.dash [data-a="new-toggle"], html.dash [data-a="publish"], html.dash [data-a
 }
 @media (min-width: 1100px) {
   .live-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .p-rec { grid-column: 1; grid-row: 1; } .p-att { grid-column: 2; grid-row: 1; }
-  .p-srv { grid-column: 1; grid-row: 2; } .p-opp { grid-column: 2; grid-row: 2; }
-  .col.stats { grid-column: 1 / -1; grid-row: 3; }
+  .p-rec { grid-column: 1; grid-row: 1; } .p-att { grid-column: 2; grid-row: 1 / span 2; }
+  .p-srv { grid-column: 1; grid-row: 2 / span 2; } .p-opp { grid-column: 2; grid-row: 3; }
+  .col.stats { grid-column: 1 / -1; grid-row: 4; }
   .stats-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
   .codes { gap: 8px; }
   .code { width: 68px; height: 52px; font-size: 24px; }
@@ -843,7 +913,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const uuid4 = () => (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : uuidFra('r' + Math.random() + Date.now()));
   const slug = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/å/g, 'a').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const kopi = (x) => JSON.parse(JSON.stringify(x));
-  const nettverksfeil = (e) => !!e && (e.nettverk || /fetch|network|timeout|timed out|offline|ECONN|load failed|abort|connection|internet/i.test(String(e.message || e)));
+  const nettverksfeil = (e) => !!e && (e.nettverk || /fetch|network|timeout|offline|ECONN/i.test(String(e.message || e)));
 
   // ---------- Mapping (rene funksjoner, testes direkte) ----------
   const KAMPFELT = { home: 'home', away: 'away', venue: 'venue', round: 'round', stage: 'stage', matchNo: 'match_no', type: 'type',
@@ -962,7 +1032,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   }
 
   function Ko(lagring) {
-    let ops = [], lastet = false, kjører = null, forsøk = 0, sisteFeil = null;
+    let ops = [], lastet = false, kjører = null, forsøk = 0;
     const self = {
       async start() { if (!lastet) { ops = await lagring.last(); lastet = true; } return self; },
       antall: () => ops.length,
@@ -972,24 +1042,19 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       async tøm(utfør, påFeil) {
         if (kjører) return kjører;
         kjører = (async () => {
-          try {
-            while (ops.length) {
-              try { await utfør(ops[0]); forsøk = 0; sisteFeil = null; }
-              catch (e) {
-                if (nettverksfeil(e)) { forsøk++; sisteFeil = String((e && e.message) || e); break; }
-                if (påFeil) påFeil(e, ops[0]);
-              }
-              ops.shift();
-              try { await lagring.lagre(ops); } catch (e) { sisteFeil = 'Lokal lagring: ' + String((e && e.message) || e); }
+          while (ops.length) {
+            try { await utfør(ops[0]); forsøk = 0; }
+            catch (e) {
+              if (nettverksfeil(e)) { forsøk++; break; }
+              if (påFeil) påFeil(e, ops[0]);
             }
-          } catch (e) { sisteFeil = String((e && e.message) || e); }
-          finally { kjører = null; }
-          return ops.length;
+            ops.shift(); await lagring.lagre(ops);
+          }
+          kjører = null; return ops.length;
         })();
         return kjører;
       },
       ventetid: () => Math.min(30000, 1000 * Math.pow(2, Math.max(0, forsøk - 1))),
-      sisteFeil: () => sisteFeil,
     };
     return self;
   }
@@ -1111,9 +1176,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     }
     async function utfør(op) {
       if (op.t === 'ins') {
-        let q = db.from('events').upsert(op.rad, { onConflict: 'id', ignoreDuplicates: true });
-        if (q.abortSignal && root.AbortSignal && AbortSignal.timeout) q = q.abortSignal(AbortSignal.timeout(20000));
-        const r = await q;
+        const r = await db.from('events').upsert(op.rad, { onConflict: 'id', ignoreDuplicates: true });
         if (r.error && /events_undo_once|duplicate key/i.test(r.error.message || '')) { status.konflikter++; } // allerede angret = ferdig
         else kast(r);
         const v = ventende[op.rad.match_id]; if (v) { const i = v.findIndex((x) => x.id === op.rad.id); if (i >= 0) v.splice(i, 1); }
@@ -1283,7 +1346,6 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       status: () => Object.assign({ ventende: ko.antall() }, status),
       påStatus(f) { lyttere.add(f); return () => lyttere.delete(f); },
       tøm, device,
-      koOps: () => ko.ops(), sisteFeil: () => (ko.sisteFeil ? ko.sisteFeil() : null),
       settBruker(id) { userId = id; },
       async start() { await ko.start(); varsle(); if (ko.antall()) tøm(); return api; },
       lukk() { clearTimeout(tømTimer); kanaler.forEach((k) => sb.removeChannel && sb.removeChannel(k)); },
@@ -2704,13 +2766,6 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 #v2-status { position: fixed; left: 12px; bottom: 12px; z-index: 9998; font: 600 13px/1.2 system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: #fff7e6; color: #8a5a00; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: none; }
 #v2-status.feil { background: #fde8e8; color: #9b1c1c; }
 #v2-status.ok { background: #e7f6ec; color: #17603a; }
-#v2-status.trykk { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-#v2-kopanel { position: fixed; left: 12px; bottom: 56px; z-index: 9999; width: min(360px, calc(100vw - 24px)); background: #fff; color: #111; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 14px; font: 14px/1.35 system-ui, sans-serif; }
-#v2-kopanel h4 { margin: 0 0 6px; font-size: 15px; }
-#v2-kopanel p { margin: 0 0 10px; color: #444; }
-#v2-kopanel button { display: block; width: 100%; margin: 6px 0 0; padding: 11px 12px; border: 0; border-radius: 10px; font: 600 15px system-ui, sans-serif; background: #eef2ff; color: #1d4ed8; }
-#v2-kopanel button.hoved { background: #1d4ed8; color: #fff; }
-#v2-kopanel .feiltekst { font: 12px ui-monospace, monospace; background: #f5f5f5; padding: 6px 8px; border-radius: 8px; word-break: break-word; margin: 0 0 10px; }
 #v2-demo { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9999; font: 700 12px system-ui, sans-serif; padding: 4px 12px; border-radius: 0 0 10px 10px; background: #b45309; color: #fff; }
 #v2-loggut { position: fixed; right: 12px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
 </style>
@@ -2733,54 +2788,10 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (!demo && cfg.autoLogin) { const d = document.createElement('div'); d.id = 'v2-demo'; d.style.background = '#1d4ed8'; d.textContent = cfg.badge || 'ÅPEN BETA – testdata'; document.body.appendChild(d); }
     if (!demo && !cfg.autoLogin) { const ut = document.createElement('a'); ut.href = '?loggut'; ut.textContent = 'Logg ut'; ut.id = 'v2-loggut'; document.body.appendChild(ut); }
     let skjul = null;
-    // Trykk på banneret når noe venter eller feiler: lagre køen som fil, prøv igjen, se siste feil
-    const koNavn = 'rv-v2-ko' + (cfg.queue ? '-' + cfg.queue : '');
-    async function lesKo() {
-      // Rett fra IndexedDB (det som faktisk er lagret på enheten), med køen i minnet som reserve
-      let lagret = [];
-      try { lagret = await StatsV2.lagLagring(koNavn).last(); } catch (e) { lagret = []; }
-      const minne = store.koOps ? store.koOps() : [];
-      return lagret.length >= minne.length ? lagret : minne;
-    }
-    async function eksporter() {
-      const ops = await lesKo();
-      const st = new Date(), p = (n) => String(n).padStart(2, '0');
-      const navn = 'ko-' + (cfg.mainSlug || 'main') + '-' + st.getFullYear() + p(st.getMonth() + 1) + p(st.getDate()) + '-' + p(st.getHours()) + p(st.getMinutes()) + '.json';
-      const innhold = JSON.stringify({ eksportert: st.toISOString(), side: location.pathname, enhet: deviceId, ko: koNavn,
-        sisteFeil: store.sisteFeil ? store.sisteFeil() : null, antall: ops.length, ops }, null, 1);
-      const fil = new File([innhold], navn, { type: 'application/json' });
-      try {
-        if (navigator.canShare && navigator.canShare({ files: [fil] })) { await navigator.share({ files: [fil], title: navn }); return 'delt'; }
-      } catch (e) { if (e && e.name === 'AbortError') return 'avbrutt'; }
-      try {
-        const a = document.createElement('a'); a.href = URL.createObjectURL(fil); a.download = navn; document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); return 'lastet ned';
-      } catch (e) { /* prøv utklippstavlen */ }
-      try { await navigator.clipboard.writeText(innhold); return 'kopiert'; } catch (e) { return 'feilet'; }
-    }
-    function panel() {
-      let p = document.getElementById('v2-kopanel'); if (p) { p.remove(); return; }
-      p = document.createElement('div'); p.id = 'v2-kopanel';
-      const n = (store.status().ventende || 0), feil = store.sisteFeil ? store.sisteFeil() : null;
-      p.innerHTML = '<h4>' + n + ' registrering' + (n === 1 ? '' : 'er') + ' ikke sendt</h4>'
-        + '<p>De ligger lagret på denne enheten. Ikke tøm nettleserdata eller slett appen før de er sendt.</p>'
-        + (feil ? '<div class="feiltekst">Siste feil: ' + feil.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]) + '</div>' : '')
-        + '<button class="hoved" data-k="eks">Lagre køen som fil</button><button data-k="send">Prøv å sende nå</button><button data-k="lukk">Lukk</button>';
-      p.addEventListener('click', async (ev) => {
-        const k = ev.target && ev.target.dataset && ev.target.dataset.k; if (!k) return;
-        if (k === 'lukk') { p.remove(); return; }
-        if (k === 'send') { ev.target.textContent = 'Sender …'; try { await store.tøm(); } catch (e) {} p.remove(); return; }
-        if (k === 'eks') { ev.target.textContent = 'Lager fil …'; const r = await eksporter();
-          ev.target.textContent = { delt: 'Delt ✓', 'lastet ned': 'Lastet ned ✓', kopiert: 'Kopiert til utklippstavlen ✓', avbrutt: 'Lagre køen som fil', feilet: 'Klarte ikke å lage fil' }[r] || 'Ferdig'; }
-      });
-      document.body.appendChild(p);
-    }
-    el.addEventListener('click', () => { if (el.classList.contains('trykk')) panel(); });
     store.påStatus((s) => {
       clearTimeout(skjul);
-      el.classList.toggle('trykk', !!(s.ventende || s.feil.length));
-      if (s.feil.length) { el.className = 'feil trykk'; el.textContent = 'Ikke lagret: ' + s.feil[s.feil.length - 1].melding; el.style.display = 'block'; return; }
-      if (s.ventende) { el.className = 'trykk'; el.textContent = s.ventende + ' registrering' + (s.ventende > 1 ? 'er' : '') + ' venter på nett … (trykk her)'; el.style.display = 'block'; return; }
+      if (s.feil.length) { el.className = 'feil'; el.textContent = 'Ikke lagret: ' + s.feil[s.feil.length - 1].melding; el.style.display = 'block'; return; }
+      if (s.ventende) { el.className = ''; el.textContent = s.ventende + ' registrering' + (s.ventende > 1 ? 'er' : '') + ' venter på nett …'; el.style.display = 'block'; return; }
       el.className = 'ok'; el.textContent = 'Alt lagret'; el.style.display = 'block'; skjul = setTimeout(() => { el.style.display = 'none'; }, 1500);
     });
   }
@@ -2864,16 +2875,16 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   let CTX = MAIN_CTX, PFX = '', OUR = 'Randaberg';
   // Hver sesong/lag har sin aksentfarge: Randaberg blå, landslaget rødt. Motstander er alltid oransje
   const THEMES = {
-    blue: { a: '#1B4592', soft: '#DCE4F5', ink: '#122F66', bar: '#2F63C4', hero: '#1B4592', aD: '#7FA3E8', softD: '#23314F', inkD: '#C9D6F0', heroD: '#203F7E' },
-    red: { a: '#B0162E', soft: '#F6D5DA', ink: '#7E0F21', bar: '#C8243C', hero: '#B0162E', aD: '#F0899A', softD: '#3E1B22', inkD: '#F6D5DA', heroD: '#8E1226' }
+    blue: { a: '#1B4592', soft: '#DCE4F5', ink: '#122F66', bar: '#2F63C4', hero: '#1B4592', aD: '#8FB3FF', softD: '#1E2A44', inkD: '#C9D6F0', heroD: '#2E4A86', barD: '#2E4A86' },
+    red: { a: '#B0162E', soft: '#F6D5DA', ink: '#7E0F21', bar: '#C8243C', hero: '#B0162E', aD: '#F4A0AD', softD: '#3E1B22', inkD: '#F6D5DA', heroD: '#9E1A2E', barD: '#9E1A2E' }
   };
   function ctxTheme(c) { return THEMES[c && c.theme] || (c && (c.our === 'Norge' || /^u\d/.test(c.id || '')) ? THEMES.red : THEMES.blue); }
   function applyTheme() {
     const t = ctxTheme(CTX); let el = document.getElementById('ctx-theme');
     if (!el) { el = document.createElement('style'); el.id = 'ctx-theme'; document.head.appendChild(el); }
     const light = '--accent:' + t.a + ';--accent-soft:' + t.soft + ';--accent-ink:' + t.ink + ';--accent-bar:' + t.bar + ';--hero:' + t.hero + ';';
-    const dark = '--accent:' + t.aD + ';--accent-soft:' + t.softD + ';--accent-ink:' + t.inkD + ';--accent-bar:' + t.bar + ';--hero:' + t.heroD + ';';
-    el.textContent = 'html:root{' + light + '}@media (prefers-color-scheme: dark){html:root:not([data-theme="light"]){' + dark + '}}html:root[data-theme="dark"]{' + dark + '}';
+    const dark = '--accent:' + t.aD + ';--accent-soft:' + t.softD + ';--accent-ink:' + t.inkD + ';--accent-bar:' + t.barD + ';--hero:' + t.heroD + ';';
+    el.textContent = 'html:root{' + dark + '}html:root[data-theme="light"]{' + light + '}';
   }
   applyTheme();
 
@@ -3090,6 +3101,16 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     }, (e) => { S.error = 'Kunne ikke laste kamper (' + e.code + ').'; render(); }));
   }
 
+  // Felles toppmeny: lag/sesong, Kamper · Tabell · Dashboard · Analyse, og menyen med det som brukes sjeldnere
+  // Bare i V2-bygget (der analysesiden ligger ved siden av lagsiden); slås av med config.analyse = false
+  function analyseHref() { return (window.ForsvarKamp && !(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? 'analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') : null; }
+  function navHtml(aktiv) {
+    const tab = (k, a, l) => '<button class="navtab" data-a="' + a + '"' + (aktiv === k ? ' aria-current="page"' : '') + '>' + l + '</button>';
+    const an = analyseHref();
+    return '<nav class="topnav" aria-label="Hovedmeny"><div class="tn-id">' + crest(OUR, 'md') + ctxPicker() + '</div>'
+      + '<div class="navtabs">' + tab('kamper', 'back', 'Kamper') + tab('tabell', 'table', 'Tabell') + tab('dashboard', 'season', 'Dashboard')
+      + (an ? '<a class="navtab" href="' + an + '">Analyse</a>' : '') + '</div><span class="spacer"></span>' + menuHtml() + '</nav>';
+  }
   function ctxPicker() {
     if (window.PUBLIC || S.offline || S.dash) return '<span class="label">' + esc(CTX.name) + '</span>';
     return '<label class="ctx-pick" for="ctx-pick"><span class="sr">Sesong eller lag</span><select id="ctx-pick" data-a="ctx">'
@@ -3339,10 +3360,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const upcoming = S.matches.filter((m) => isOurs(m) && m.status !== 'ferdig').sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
     const rounds = {};
     ms.forEach((m) => { const r = m.custom ? roundLabel(m) + '|' + m.id : roundLabel(m); (rounds[r] ||= []).push(m); });
-    let h = '<div class="listhead"><div class="lh-ctx">' + ctxPicker() + '</div><div class="lh-id">' + crest(OUR, 'md') + '<h1>Kamper</h1></div>' + '</div>'
-      + '<div class="list-controls"><div class="tabs" role="group" aria-label="Filter">'
-      + [['alle', 'Alle'], ['vare', OUR]].map(([k, l]) => '<button data-a="filter" data-v="' + k + '" aria-pressed="' + (S.filter === k) + '">' + esc(l) + '</button>').join('')
-      + '</div><button class="secondary" data-a="table">Tabell</button><button class="primary" data-a="season">Dashboard</button>' + ((!(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? '<a class="secondary" href="analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') + '" style="display:inline-flex;align-items:center;box-sizing:border-box;text-decoration:none">Analyse</a>' : '') + '<span class="lc-break"></span>' + menuHtml() + '</div>';
+    let h = navHtml('kamper');
     if (S.showNewCtx) h += newCtxForm();
     if (S.showNew) h += newMatchForm();
     if (S.showShare && siteUrl()) h += sharePanel();
@@ -3350,6 +3368,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       h += nextHero(upcoming, upcoming.status === 'pågår');
     }
     if (!ms.length) h += '<div class="panel"><div class="empty">Ingen kamper her ennå. Legg til en med «Ny kamp».</div></div>';
+    h += '<div class="list-controls"><h2 class="sec-h">Terminliste</h2><span class="spacer"></span><div class="tabs" role="group" aria-label="Filter">'
+      + [['alle', 'Alle'], ['vare', OUR]].map(([k, l]) => '<button data-a="filter" data-v="' + k + '" aria-pressed="' + (S.filter === k) + '">' + esc(l) + '</button>').join('') + '</div></div>';
     h += '<div class="rounds">' + Object.entries(rounds).map(([r, list]) => '<section class="round"><h2 class="label">' + esc(r.split('|')[0]) + '</h2>' + list.map(matchRow).join('') + '</section>').join('') + '</div>';
     return h;
   }
@@ -3396,12 +3416,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + '<button class="primary" type="submit">Opprett kamp</button></div></form>';
   }
 
-  function scoreBar(m) {
+  function scoreBar(m, opsO) {
     const c = m.current || { set: 1, home: 0, away: 0 };
     const sets = (m.setScores || []).map((s) => s[0] + '–' + s[1]).join(' · ');
     return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button>'
       + '<div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + '</span><span class="sub" id="bar-sub">' + esc(barSub(m)) + '</span></div>'
-      + '<span class="spacer"></span><div class="score-wrap"><span class="setpill">Sett ' + c.set + '</span></div><span class="spacer"></span><div class="bar-actions">'
+      + '<div class="score-wrap"><span class="setpill">Sett ' + c.set + '</span></div>' + (opsO && !S.endingSet ? courtChips(m, opsO) : '') + '<span class="spacer"></span><div class="bar-actions">'
       + (S.endingSet
         ? '<form id="setform" class="setform"><span class="sub">Resultat sett ' + c.set + '</span>'
           + '<label class="setin"><span>' + esc(shortName(m.home)) + '</span><input id="sv-home" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="25" autocomplete="off"></label>'
@@ -3410,6 +3430,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           + '<button class="barbtn win" type="submit">Lagre og start sett ' + (c.set + 1) + '</button><button class="barbtn" type="button" data-a="setcancel">Avbryt</button></form>'
         : '<button class="barbtn primary-bar" data-a="endset">Avslutt sett ' + c.set + '</button>'
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
+          + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
           + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="squad">Tropp</button><button class="barbtn" data-a="sheet">Kampark</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
       + '</div></header>';
@@ -3431,7 +3452,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function playerRows(ids, type, codes) {
     if (!ids.length) return '<div class="empty">Ingen valgt. Åpne Tropp og velg spillere.</div>';
-    return ids.map((id) => { const p = player(id); if (!p) return ''; return '<div class="row"><div class="who"><span class="nr">' + esc(p.nr || '–') + '</span><span class="nm">' + esc(p.name.split(' ')[0]) + '</span><span class="mini" data-mini="' + type + '|' + esc(id) + '"></span></div><div class="codes">' + codes.map((c) => codeBtn(type, id, c[0], c[1], c[2], c[3])).join('') + '</div></div>'; }).join('');
+    return ids.map((id) => { const p = player(id); if (!p) return ''; return '<div class="row"><div class="who"><span class="nr">' + esc(p.nr || '–') + '</span><span class="nm">' + esc(p.name) + '</span><span class="mini" data-mini="' + type + '|' + esc(id) + '"></span></div><div class="codes">' + codes.map((c) => codeBtn(type, id, c[0], c[1], c[2], c[3])).join('') + '</div></div>'; }).join('');
   }
 
   const REC = [['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'Spillbart'], ['2', 'c-good', '2', 'Perfekt']];
@@ -3448,7 +3469,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const oppNums = m.oppNumbers || [];
     const evs = allEvents();
 
-    let h = '<div id="live-root" data-sig="' + esc(liveSig(m)) + '" style="display:flex;flex-direction:column;gap:12px">' + scoreBar(m);
+    let h = '<div id="live-root" data-sig="' + esc(liveSig(m)) + '" style="display:flex;flex-direction:column;gap:10px">' + scoreBar(m, opsO);
+    h += '<div class="kpis2" id="live-kpis">' + kpiRow(m, evs, oppName) + '</div>';
+    if (S.bytte && opsO) h += bytteHtml(m);
     if (opsOk() && !opsBekreftet(m) && !(m.lineups && m.lineups.uten) && m.status !== 'ferdig' && opsHarHendelser(m, (m.current && m.current.set) || 1)) h += '<div class="notice">Oppstillingen for sett ' + ((m.current && m.current.set) || 1) + ' er ikke bekreftet. <button class="textbtn" data-a="lineup">Sett opp oppstilling</button></div>';
     h += '<div class="lastbar"><span class="label">Siste</span><div class="chips" id="last-chips">' + lastChips(evs, oppName) + '</div><button class="undo" id="undo-btn" data-a="undo"' + (ownCount() ? '' : ' disabled') + '>Angre siste</button></div>';
 
@@ -3465,8 +3488,62 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     return h;
   }
 
+  // Nøkkeltall over registreringen: mottak, angrep, serve i spill, motstanderens mottak og hvem vi bør serve på
+  function kpiRow(m, evs, oppName) {
+    const set = (m.current && m.current.set) || 1, sett = S.kpiScope !== 'kamp';
+    const st = computeStats(sett ? evs.filter((e) => Number(e.set) === Number(set)) : evs);
+    const tile = (l, v, cls, extra) => '<div class="kpi2"><span class="l">' + l + '</span><span class="v"><b class="num lvl-' + cls + '">' + v + '</b><span>' + extra + '</span></span></div>';
+    const ra = st.tRec.n ? st.tRec.s / st.tRec.n : null, aa = st.tAtt.n ? attAvg(st.tAtt) : null, sa = st.tSrv.n ? srvAvg(st.tSrv) : null, oa = st.tOpp.n ? st.tOpp.s / st.tOpp.n : null;
+    const lvl = (v, k) => v == null ? 'na' : avgLvl(v, k);
+    const weak = (Object.entries(st.opp).filter(([, r]) => r.n >= 3).sort((a, b) => (a[1].s / a[1].n) - (b[1].s / b[1].n) || b[1].n - a[1].n)[0]);
+    return '<button class="kpi2 scope" data-a="kpiscope" aria-label="Bytt mellom tall for settet og hele kampen"><b>' + (sett ? 'Sett ' + set : 'Hele kampen') + '</b><span>Trykk for ' + (sett ? 'hele kampen' : 'settet') + ' ⇄</span></button>'
+      + tile('Mottak 0–2', ra == null ? '–' : dec(ra), lvl(ra, 'rec'), st.tRec.n + ' mottak')
+      + tile('Angrep 0–2', aa == null ? '–' : dec(aa), lvl(aa, 'att'), st.tAtt.n + ' angrep')
+      + tile('Serve i spill', st.tSrv.n ? pct(st.tSrv.n - st.tSrv.F, st.tSrv.n) : '–', lvl(sa, 'srv'), 'E ' + st.tSrv.E + ' · F ' + st.tSrv.F)
+      + tile(esc(shortName(oppName)) + ' mottak', oa == null ? '–' : dec(oa), lvl(oa, 'rec'), st.tOpp.n + ' mottak')
+      + tile('Server på', weak ? '#' + esc(weak[0]) : '–', weak ? lvl(weak[1].s / weak[1].n, 'rec') : 'na', weak ? 'snitt ' + dec(weak[1].s / weak[1].n) + ' · n ' + weak[1].n : 'minst 3 mottak');
+  }
+  // Spillerne på banen øverst (fra bekreftet oppstilling): forrekke 4-3-2, bakrekke 5-6-1, liberoen der hun står
+  function courtChips(m, o) {
+    if (!o) return '';
+    const L = o.libero || {}, inne = Oppstilling.liberoInne(o);
+    return '<button class="court-chips" data-a="lineup-chips" aria-label="Spillerne på banen. Trykk for å åpne oppstillingen">' + [4, 3, 2, 5, 6, 1].map((pl) => {
+      let id = o.positions[pl], rolle = (o.roles || {})[id] || '';
+      if (inne && String(L.erstatter) === String(id)) { id = L.aktiv; rolle = 'L'; }
+      const p = player(id) || {};
+      return '<span class="cchip"><b>' + esc(p.nr || '?') + '</b><i class="r-' + esc(rolle.charAt(0)) + '">' + esc(rolle) + '</i></span>';
+    }).join('') + '</button>';
+  }
+  // Bytte under settet: én ut og én inn på samme plass. Innbytteren tar plassen og rollen (logges som bytte i oppstillingen)
+  function bytteHtml(m) {
+    const O = window.Oppstilling, nr = (m.current && m.current.set) || 1, st = O.settFor(m, nr), o = O.aktuelt(st);
+    if (!o) return '';
+    const paa = O.ider(o.positions).map(String), L = o.libero || {};
+    const brukt = (st.endringer || []).filter((e) => e.type === 'bytte').length;
+    const erLib = (p) => /^libero/i.test(p.pos || '') || String(p.id) === String(L.aktiv);
+    const inn = teamRoster(m).filter((p) => !p.archived && !paa.includes(String(p.id)) && !erLib(p));
+    const knapp = (p, a, valgt) => '<button class="bchip' + (valgt ? ' sel' : '') + '" data-a="' + a + '" data-id="' + esc(p.id) + '"><span class="nr">' + esc(p.nr || '–') + '</span><span class="nm">' + esc(p.name) + '</span><i>' + esc((o.roles || {})[p.id] || p.pos || '') + '</i></button>';
+    return '<div class="ov-scrim"><section class="panel ov-modal" role="dialog" aria-modal="true" aria-labelledby="bytte-h"><div class="panel-head"><h2 id="bytte-h">Bytte · sett ' + nr + '</h2><span class="status">Bytter i settet: ' + brukt + ' av 6</span></div>'
+      + '<div class="status">Velg hvem som går ut og hvem som kommer inn. Innbytteren tar plassen og rollen. Libero byttes i Oppstilling.</div>'
+      + '<div class="bytte-grid"><div class="bytte-col"><span class="label">Ut (på banen)</span>' + paa.map((id) => player(id)).filter(Boolean).map((p) => knapp(p, 'bytte-ut', S.bytte.ut === p.id)).join('') + '</div>'
+      + '<div class="bytte-col"><span class="label">Inn (benken)</span>' + (S.bytte.ut ? (inn.length ? inn.map((p) => knapp(p, 'bytte-inn', S.bytte.inn === p.id)).join('') : '<div class="empty">Ingen ledige spillere i troppen.</div>') : '<div class="empty">Velg først hvem som går ut.</div>') + '</div></div>'
+      + (brukt >= 6 ? '<div class="notice">Alle seks bytter i settet er brukt.</div>' : '')
+      + '<div class="ov-actions"><button class="secondary" data-a="bytte-lukk">Avbryt</button><button class="primary" data-a="bytte-ok"' + (S.bytte.ut && S.bytte.inn && brukt < 6 ? '' : ' disabled') + '>Bytt</button></div></section></div>';
+  }
+  async function bytteLagre(m) {
+    const O = window.Oppstilling, nr = (m.current && m.current.set) || 1, st = O.settFor(m, nr), o = O.aktuelt(st);
+    const ut = String(S.bytte.ut), inn = String(S.bytte.inn);
+    const onCourt = O.ider(o.positions).map((id) => String(id) === ut ? inn : id);
+    const receivers = (m.receivers || []).map((id) => String(id) === ut ? inn : id);
+    const ny = O.fraToggles(st, onCourt, receivers, { enhet: deviceId }), lu = { v: 1, sets: { [nr]: ny } };
+    m.lineups = O.slaSammen(m.lineups, lu); m.onCourt = onCourt; m.receivers = ny.naa.receivers;
+    const navn = (id) => { const p = player(id); return p ? '#' + p.nr : id; };
+    const msg = 'Bytte: ' + navn(inn) + ' inn for ' + navn(ut) + '.';
+    S.bytte = null; S.info = msg; render(); setTimeout(() => { if (S.info === msg) { S.info = null; render(); } }, 4000);
+    saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
+  }
   function liveSig(m) {
-    return JSON.stringify([opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -3480,6 +3557,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const chips = document.getElementById('last-chips'); if (chips) chips.innerHTML = lastChips(evs, oppName);
     const u = document.getElementById('undo-btn'); if (u) u.disabled = !ownCount();
     const st = document.getElementById('stats'); if (st) st.innerHTML = statsPanel(m, evs, oppName);
+    const kp = document.getElementById('live-kpis'); if (kp) kp.innerHTML = kpiRow(m, evs, oppName);
     const er = document.getElementById('err'); if (er) er.innerHTML = errHtml();
     fillMini(); dirSync();
   }
@@ -3551,11 +3629,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     app.querySelectorAll('[data-mini]').forEach((el) => {
       const i = el.dataset.mini.indexOf('|'); const t = el.dataset.mini.slice(0, i), id = el.dataset.mini.slice(i + 1);
       const r = ({ rec: st.rec, att: st.att, srv: st.srv, opp: st.opp })[t][id];
-      let txt = '';
+      let txt = '<span class="avgbar blk" aria-hidden="true"></span><span class="mt">0 · snitt –</span>';
+      const lv = (v, k, ps) => '<b class="lvl-' + avgLvl(v, k, ps) + '">' + dec(v) + '</b>';
       if (r && r.n) {
-        if (t === 'rec' || t === 'opp') txt = r.n + ' · snitt ' + dec(r.s / r.n) + avgBarOnly(r.s / r.n, 'blk');
-        else if (t === 'att') txt = r.n + ' · snitt ' + dec(1 + (r.c2 - r.c0 - r.B) / r.n) + avgBarOnly(1 + (r.c2 - r.c0 - r.B) / r.n, 'blk', 'att', posOf(id));
-        else txt = esc(r.n + ' · ' + r.E + ' ess ' + r.F + ' feil') + avgBarOnly(srvAvg(r), 'blk', 'srv');
+        if (t === 'rec' || t === 'opp') txt = avgBarOnly(r.s / r.n, 'blk') + '<span class="mt">' + r.n + ' · snitt ' + lv(r.s / r.n) + '</span>';
+        else if (t === 'att') txt = avgBarOnly(attAvg(r), 'blk', 'att', posOf(id)) + '<span class="mt">' + r.n + ' · snitt ' + lv(attAvg(r), 'att', posOf(id)) + '</span>';
+        else txt = avgBarOnly(srvAvg(r), 'blk', 'srv') + '<span class="mt">' + r.n + ' · ' + lv(srvAvg(r), 'srv') + ' · E ' + r.E + ' F ' + r.F + '</span>';
       }
       if (t === 'opp') txt = scoutMarks(id, txt);
       const weak = t === 'opp' ? id === weakOpp : !!ex[t] && id === ex[t].lo, strong = t !== 'opp' && !!ex[t] && id === ex[t].hi;
@@ -3757,7 +3836,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function tableView() {
     const st = standings(), q = (a, b) => b ? (Math.round(a / b * 1000) / 1000).toFixed(3).replace('.', ',') : (a ? 'MAX' : '–');
     const all = tableMatches(), done = all.filter((m) => m.status === 'ferdig').length;
-    let h = '<header class="bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display">Tabell</span><span class="sub">' + esc(CTX.name) + ' · ' + done + ' av ' + all.length + ' kamper spilt</span></div><span class="spacer"></span></header>';
+    let h = navHtml('tabell') + '<header class="bar"><div class="title"><span class="display">Tabell</span><span class="sub">' + esc(CTX.name) + ' · ' + done + ' av ' + all.length + ' kamper spilt</span></div><span class="spacer"></span></header>';
     h += '<section class="panel"><div class="tbl-wrap"><table class="tbl standings"><thead><tr><th>#</th><th class="l-al">Lag</th><th>K</th><th>V</th><th>T</th><th>Poeng</th><th>Sett</th><th class="hide-sm">Settkv.</th><th class="hide-sm">Ballkv.</th></tr></thead><tbody>'
       + st.map((r, i) => '<tr' + (r.team === OUR ? ' class="us"' : '') + '><td>' + (i + 1) + '</td><td class="key l-al">' + teamTag(r.team, 'sm', shortName(r.team)) + '</td><td>' + r.k + '</td><td>' + r.v + '</td><td>' + r.tap + '</td><td class="key">' + r.p + '</td><td>' + r.sv + '–' + r.st + '</td><td class="hide-sm">' + q(r.sv, r.st) + '</td><td class="hide-sm">' + q(r.bv, r.bt) + '</td></tr>').join('')
       + '</tbody></table></div><div class="code-legend">Rangering: seire, poeng (3–0 og 3–1 gir 3 poeng, 3–2 gir 2 og 2–3 gir 1), settkvotient, ballkvotient.</div></section>';
@@ -4207,10 +4286,10 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(metric.l) + ' kamp for kamp">';
     // Fargesoner for snitt: rød, gul og grønn bak kurven, med samme grenser som søylene
     const pos = metric.kind === 'att' && SEASON.player !== 'team' ? posOf(SEASON.player) : '';
-    const LV = { lo: 'var(--bad)', mid: '#D9A21B', hi: 'var(--good)' };
+    const LV = { lo: 'var(--lvl-lo)', mid: 'var(--lvl-mid)', hi: 'var(--lvl-hi)' };
     if (metric.kind) {
       const [t0, t1] = thr(metric.kind, pos), cl = (v) => Math.max(lo, Math.min(hi, v));
-      [[lo, t0, 'lo'], [t0, t1, 'mid'], [t1, hi, 'hi']].forEach(([a, b, k]) => { if (cl(b) > cl(a)) s += '<rect x="' + ml + '" width="' + (W - ml - mr) + '" y="' + y(cl(b)) + '" height="' + (y(cl(a)) - y(cl(b))) + '" fill="' + LV[k] + '" opacity=".09"></rect>'; });
+      [[t0, 'lo'], [t1, 'hi']].forEach(([t, k]) => { if (t > lo && t < hi) s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="' + LV[k] + '" stroke-width="1.5" stroke-dasharray="6 5" opacity=".85"></line>'; });
       [[t0, 11], [t1, -3]].forEach(([t, dy]) => { s += '<text x="' + (ml + 4) + '" y="' + (y(t) + dy) + '" font-size="10" fill="var(--muted)">' + esc(metric.fmt(t)) + '</text>'; });
     }
     ticks.forEach((t) => { s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="var(--line)" stroke-width="1"></line><text x="' + (ml - 8) + '" y="' + (y(t) + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + esc(metric.fmt(t)) + '</text>'; });
@@ -4262,7 +4341,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
         + (s1 ? ' · serve ' + s1.n + ' (' + s1.E + ' ess, ' + s1.F + ' feil)' : '') + '</div>';
     }
 
-    let h = '<div class="season"><header class="bar"><button class="link" data-a="back">‹ Kamper</button>'
+    let h = '<div class="season">' + navHtml('dashboard') + '<header class="bar">'
       + '<div class="title"><span class="display">Dashboard</span><span class="sub">' + esc(CTX.name) + ' · ' + done.length + ' av ' + rows.length + ' kamper spilt</span></div><span class="spacer"></span>'
       + '<div class="bar-actions">' + (hasTest ? '<button class="barbtn' + (SEASON.inclTest ? ' primary-bar' : '') + '" data-a="incltest" aria-pressed="' + SEASON.inclTest + '">' + (SEASON.inclTest ? 'Testkampen er med' : 'Vis testkampen') + '</button>' : '') + '</div></header>';
 
@@ -4285,7 +4364,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + pickIds.map((id) => '<option value="' + esc(id) + '"' + (String(SEASON.player) === String(id) ? ' selected' : '') + '>' + esc(pickLabel(id)) + (withRegs.has(String(id)) ? '' : ' (ingen reg.)') + '</option>').join('') + '</select></div>'
       + '<div class="seg" role="group" aria-label="Velg nøkkeltall">' + metricsShown.map((x) => '<button data-a="metric" data-v="' + x.k + '" aria-pressed="' + (x.k === M.k) + '">' + x.l + '</button>').join('') + '</div></div>'
       + soloLine
-      + '<div class="chart-box" id="kk-chart">' + lineChart(chartRows, M) + '</div><div class="code-legend">Hele terminplanen langs aksen. Stiplet linje er ' + (solo ? 'spillerens snitt' : 'lagets snitt') + ' for alle førte kamper.' + (solo ? ' Motstanders mottak gjelder bare laget.' : '') + (M.kind ? ' Fargesonene og prikkene viser nivået: grønn, gul og rød etter samme grenser som søylene. ' + legendLink() : '') + '</div></section>';
+      + '<div class="chart-box" id="kk-chart">' + lineChart(chartRows, M) + '</div><div class="code-legend">Hele terminplanen langs aksen. Blå stiplet linje er ' + (solo ? 'spillerens snitt' : 'lagets snitt') + ' for alle førte kamper.' + (solo ? ' Motstanders mottak gjelder bare laget.' : '') + (M.kind ? ' Grønn og rød stiplet linje er grensene, og prikkene viser nivået: grønn, gul og rød etter samme grenser som søylene. ' + legendLink() : '') + '</div></section>';
 
     h += '<section class="panel" aria-labelledby="h-termin"><div class="panel-head"><h2 id="h-termin">Terminplan</h2><span class="status">Trykk en kamp for å føre eller se den</span></div><div class="fixtures">'
       + rows.map((r) => {
@@ -4758,7 +4837,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'psort') { const k = b.dataset.k; if (SEASON.sortK === k) SEASON.sortDir = -SEASON.sortDir; else { SEASON.sortK = k; SEASON.sortDir = k === 'name' ? 1 : -1; } render(); }
     else if (a === 'dir' && m) { dirOpen(S.view === 'detail' ? { ro: true } : null); }
     else if (a === 'squad') { S.view = 'squad'; render(); toTop(); }
-    else if (a === 'lineup' && m) { opsAapne(m, true); }
+    else if ((a === 'lineup' || a === 'lineup-chips') && m) { opsAapne(m, true); }
     else if (a === 'to-live') { S.view = S.view === 'sheet' && S.sheetBack === 'detail' ? 'detail' : 'live'; render(); toTop(); }
     else if (a === 'edit' && m) { S.view = 'live'; S.endingSet = false; render(); toTop(); }
     else if (a === 'toview' && m) { S.view = 'detail'; render(); toTop(); }
@@ -4797,6 +4876,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'log') { logEvent(b.dataset.t, b.dataset.p, b.dataset.c); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 300); }
     else if (a === 'undo') { undo(); }
     else if (a === 'statset') { S.statSet = b.dataset.v; render(); }
+    else if (a === 'kpiscope') { S.kpiScope = S.kpiScope === 'kamp' ? 'sett' : 'kamp'; render(); }
+    else if (a === 'bytte' && m) { if (opsBekreftet(m)) { S.bytte = { ut: null, inn: null }; render(); } else { S.view = 'squad'; render(); toTop(); } }
+    else if (a === 'bytte-ut') { S.bytte = { ut: b.dataset.id, inn: null }; render(); }
+    else if (a === 'bytte-inn') { S.bytte = Object.assign({}, S.bytte, { inn: b.dataset.id }); render(); }
+    else if (a === 'bytte-lukk') { S.bytte = null; render(); }
+    else if (a === 'bytte-ok' && m && S.bytte && S.bytte.ut && S.bytte.inn) { bytteLagre(m); }
     else if (a === 'endset') { S.endingSet = true; render(); }
     else if (a === 'setcancel') { S.endingSet = false; render(); }
     else if (a === 'setwin-unused' && m) {
