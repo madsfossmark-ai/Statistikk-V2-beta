@@ -455,6 +455,10 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const gHist = el('g', { class: 'fv-historikk', 'pointer-events': 'none' });
     svg.appendChild(gHist);
     svg.appendChild(gOver);
+    // Utskrift: spillerne tegnes også i SVG-en (samme koordinater som pilene og skyggen). Knappene over banen er plassert i
+    // skjermpiksler og ville havnet feil når banen får en annen størrelse på papiret, så de skjules ved utskrift.
+    const gMerk = el('g', { class: 'fv-svg-merker', 'pointer-events': 'none', 'aria-hidden': 'true' });
+    svg.appendChild(gMerk);
 
     MARKORER.forEach(({ id, navn }) => {
       const b = root.document.createElement('button');
@@ -516,6 +520,15 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       angrKnapp.hidden = !S.skygge;
       angrKnapp.disabled = S.last;
       angrKnapp.classList.toggle('fv-drar', !!S.angr);
+      const merke = (id, [x, y], fyll, valgt) => {
+        const g = el('g', { 'data-id': id });
+        if (valgt) g.appendChild(el('circle', { cx: x, cy: y, r: 50, fill: 'none', stroke: '#F5B700', 'stroke-width': 9 }));
+        g.appendChild(el('circle', { cx: x, cy: y, r: 40, fill: fyll, stroke: '#FFFFFF', 'stroke-width': 6, 'stroke-dasharray': S.modus === 'bevegelse' && id !== 'A' ? '14 9' : 'none' }));
+        const t = el('text', { x, y: y + 13, 'text-anchor': 'middle', 'font-size': 36, 'font-weight': 700, fill: '#FFFFFF', 'font-family': 'Barlow Condensed, Arial Narrow, sans-serif' });
+        t.textContent = id; g.appendChild(t); return g;
+      };
+      gMerk.style.display = S.vis ? '' : 'none';
+      gMerk.replaceChildren(...MARKORER.map(({ id }) => merke(id, tilBane(pos[id]), '#1B4592', S.valgt === id)).concat(S.skygge ? [merke('A', tilBaneFri(a), '#C85E1C', false)] : []));
       // SVG: skygge, rekkevidde og piler
       gUnder.style.display = gOver.style.display = S.vis ? '' : 'none';
       gSkygge.replaceChildren(...(S.skygge ? blokkskygger(pos, a).map((s) => el('polygon', { points: s.punkter.map((q) => q.join(',')).join(' '), fill: '#0B1F44', 'data-id': s.id })) : []));
@@ -648,7 +661,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       },
       forkast() { return last(S.prefiks, S.motstander); },
       oppdater: tegn,
-      fjern() { if (ro) ro.disconnect(); root.removeEventListener('resize', vent); root.removeEventListener('orientationchange', vent); Object.values(knapper).forEach((b) => b.remove()); angrKnapp.remove(); gUnder.remove(); gHist.remove(); gOver.remove(); },
+      fjern() { if (ro) ro.disconnect(); root.removeEventListener('resize', vent); root.removeEventListener('orientationchange', vent); Object.values(knapper).forEach((b) => b.remove()); angrKnapp.remove(); gUnder.remove(); gHist.remove(); gOver.remove(); gMerk.remove(); },
     };
   }
 
@@ -664,7 +677,9 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     + '.fv-lag.fv-bevegelse .fv-markor:not(.fv-angriper){cursor:crosshair;border-style:dashed}'
     + '.fv-markor.fv-angriper{width:44px;height:44px;background:#C85E1C;font-size:16px}'
     + '.fv-markor[hidden]{display:none}'
-    + '@media (prefers-reduced-motion:reduce){.fv-markor{transition:none}}';
+    + '@media (prefers-reduced-motion:reduce){.fv-markor{transition:none}}'
+    + '.fv-svg-merker{display:none}'
+    + '@media print{.fv-lag{display:none!important}.fv-svg-merker{display:inline!important}}';
 
   const eksport = { MARKORER, ROTASJONER, VARIANTER, oppsettNokkel, oppgrader, spillerNokkel, spillereIHistorikk, historikkFor, SPILLERFARGER, GRUNNOPPSETT, SONER, grunnoppsett, BANE, STANDARD, METER, REKKEVIDDE_M, SKYGGE_BREDDE_M, NETT_GRENSE, ANGRIPER_STANDARD,
     klem, tilBane, fraBane, tilBaneFri, fraBaneFri, nyttOppsett, gyldig, posisjoner, flytt, nullstill, nokkel, slug,
