@@ -826,6 +826,17 @@ window.V3Moduler = (function () {
       nav.appendChild(a);
     });
   }
+  // Lag uten V3: samme moduler, men utilgjengelige og merket «Bare Randaberg»
+  function lenkerAv() {
+    const nav = document.querySelector('nav.moduler'); if (!nav) return;
+    nav.querySelectorAll('.v3-modul').forEach((a) => a.remove());
+    MODULER.forEach(([id, navn]) => {
+      const s = document.createElement('span'); s.className = 'modul kommer v3-modul v3-av'; s.dataset.v3 = id;
+      s.setAttribute('aria-disabled', 'true'); s.title = 'Trenerstøtten er bare tilgjengelig for Randaberg-lagene';
+      s.innerHTML = esc(navn) + '<small>Bare Randaberg</small>';
+      nav.appendChild(s);
+    });
+  }
   function merkAktiv() {
     document.querySelectorAll('nav.moduler a.modul').forEach((a) => {
       const her = S.modul ? a.dataset.v3 === S.modul : a.getAttribute('href') === '#blokk-forsvar';
@@ -883,7 +894,7 @@ window.V3Moduler = (function () {
     cfg = cfg || {}; S.cfg = cfg; S.demo = !!demo; S.statusKlient = statusKlient;
     if (cfg.v3 === false || !$('modul-v3') || !$('modul-blokk')) return false;
     if (S.demo) {
-      const v = q && q.get('v3'); if (!v || v === 'av') return false;
+      const v = q && q.get('v3'); S.demoAv = !v || v === 'av';
       S.demoTilstand = v === 'ingen' ? 'ingen' : 'tilgang';
     } else {
       if (!statusKlient || !window.supabase) return false;
@@ -903,12 +914,12 @@ window.V3Moduler = (function () {
   async function lag(slug, navn) {
     if (!S.startet) return false;
     S.slug = slug; S.lagnavn = navn || slug;
-    if (S.demo) S.aktiv = true;
+    if (S.demo) S.aktiv = !S.demoAv;
     else {
       try { const r = await S.statusKlient.schema('stats').rpc('v3_status', { p_slug: slug }); S.aktiv = !r.error && !!(r.data && r.data.aktiv); } catch (e) { S.aktiv = false; }
     }
     if (!S.aktiv) {
-      document.querySelectorAll('nav.moduler .v3-modul').forEach((a) => a.remove());
+      lenkerAv();
       if (MODULER.some((x) => '#' + x[0] === location.hash)) history.replaceState(null, '', location.pathname + location.search);
       S.modul = null; $('modul-blokk').hidden = false; $('modul-v3').hidden = true; merkAktiv();
       return false;
