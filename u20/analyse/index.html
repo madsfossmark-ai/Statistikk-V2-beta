@@ -793,6 +793,8 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
  *  * Innholdet krever egen V3-innlogging i en egen økt (eget storageKey). Den felles beta-brukeren slipper aldri inn.
  *  * Tilgangen avgjøres i databasen (v3_status og RLS på v3_planer), aldri av lagnavn i nettleseren.
  *  * Demo (?demo=1): &v3=1 (eller tilgang) = aktiv og tilgang etter innlogging, &v3=ingen = aktiv uten tilgang, uten v3 = av.
+ * Modulene følger laget som er valgt på siden (lag(slug, navn)), så de også virker på «alle»-siden med lagvelger.
+ * Er sidens egen innlogging personlig (ingen autoLogin), brukes den samme økten – da trengs ingen ny innlogging.
  * Forventer i siden: nav.moduler med lenken #blokk-forsvar, #modul-blokk (Blokk/forsvar) og #modul-v3 (tom, skjult).
  */
 window.V3Moduler = (function () {
@@ -805,7 +807,7 @@ window.V3Moduler = (function () {
   ];
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (id) => document.getElementById(id);
-  const S = { aktiv: false, demo: false, demoTilstand: 'tilgang', klient: null, bruker: null, tilgang: null, slug: 'main', lagnavn: '', modul: null };
+  const S = { aktiv: false, delt: false, startet: false, statusKlient: null, cfg: {}, demo: false, demoTilstand: 'tilgang', klient: null, bruker: null, tilgang: null, slug: 'main', lagnavn: '', modul: null };
 
   async function sjekkTilgang() {
     if (S.demo) { S.tilgang = S.bruker ? S.demoTilstand !== 'ingen' : null; return; }
@@ -842,7 +844,7 @@ window.V3Moduler = (function () {
       $('v3-login').addEventListener('submit', loggInn);
       return;
     }
-    const ut = '<button class="knapp stille" type="button" id="v3-ut">Logg ut av trenerstøtten</button>';
+    const ut = S.delt ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut av trenerstøtten</button>';
     if (!S.tilgang) {
       el.innerHTML = '<div class="kort" id="v3-ingen"><h2 class="v3-tittel">Ingen V3-tilgang</h2><p class="liten">Du er logget inn som ' + esc(S.bruker && S.bruker.email)
         + ', men brukeren har ikke V3-tilgang i ' + esc(S.lagnavn) + '. Be eieren av laget gi deg tilgang.</p>' + ut + '</div>';
@@ -851,7 +853,7 @@ window.V3Moduler = (function () {
         + '<span class="liten">' + esc(S.bruker && S.bruker.email) + '</span>' + ut + '</div><p class="liten">' + esc(m[2]) + '</p>'
         + '<p class="liten">Denne modulen er bare synlig for trenere med V3-tilgang i laget. Innholdet bygges i en senere fase.</p></div>';
     }
-    $('v3-ut').onclick = loggUt;
+    if ($('v3-ut')) $('v3-ut').onclick = loggUt;
   }
   async function loggInn(ev) {
     ev.preventDefault(); $('v3-feil').textContent = '';
@@ -876,30 +878,46 @@ window.V3Moduler = (function () {
     if (S.modul) visInnhold();
   }
 
-  // statusKlient: sidens vanlige Supabase-klient (eller null i demo). cfg: V2_CONFIG.
-  async function start({ statusKlient, demo, cfg, q }) {
-    cfg = cfg || {};
+  // Oppsett. statusKlient: sidens vanlige Supabase-klient (null i demo), bruker: sidens innloggede bruker. cfg: V2_CONFIG.
+  async function start({ statusKlient, bruker, demo, cfg, q }) {
+    cfg = cfg || {}; S.cfg = cfg; S.demo = !!demo; S.statusKlient = statusKlient;
     if (cfg.v3 === false || !$('modul-v3') || !$('modul-blokk')) return false;
-    S.demo = !!demo; S.slug = cfg.mainSlug || 'main'; S.lagnavn = (cfg.main && cfg.main.name) || 'laget';
     if (S.demo) {
       const v = q && q.get('v3'); if (!v || v === 'av') return false;
-      S.aktiv = true; S.demoTilstand = v === 'ingen' ? 'ingen' : 'tilgang';
+      S.demoTilstand = v === 'ingen' ? 'ingen' : 'tilgang';
     } else {
       if (!statusKlient || !window.supabase) return false;
-      try { const r = await statusKlient.schema('stats').rpc('v3_status', { p_slug: S.slug }); S.aktiv = !r.error && !!(r.data && r.data.aktiv); } catch (e) { S.aktiv = false; }
-      if (!S.aktiv) return false;
-      S.klient = window.supabase.createClient(cfg.url, cfg.publishableKey, { auth: { storageKey: 'sb-rv-v3-' + S.slug } });
-      const { data } = await S.klient.auth.getSession();
-      const b = data && data.session && data.session.user;
-      if (b && !(cfg.autoLogin && cfg.autoLogin.email === b.email)) S.bruker = b; else if (b) await S.klient.auth.signOut();
+      if (bruker && !(cfg.autoLogin && cfg.autoLogin.email)) { S.delt = true; S.klient = statusKlient; S.bruker = bruker; }
+      else {
+        S.klient = window.supabase.createClient(cfg.url, cfg.publishableKey, { auth: { storageKey: 'sb-rv-v3-' + (cfg.queue || cfg.mainSlug || 'main') } });
+        const { data } = await S.klient.auth.getSession();
+        const b = data && data.session && data.session.user;
+        if (b && !(cfg.autoLogin && cfg.autoLogin.email === b.email)) S.bruker = b; else if (b) await S.klient.auth.signOut();
+      }
     }
-    await sjekkTilgang();
-    lenker();
+    S.startet = true;
     window.addEventListener('hashchange', rute);
-    rute();
     return true;
   }
-  return { start, MODULER, tilstand: S };
+  // Laget som er valgt på siden. Spør databasen om V3 er aktiv for det, og viser eller fjerner modulene.
+  async function lag(slug, navn) {
+    if (!S.startet) return false;
+    S.slug = slug; S.lagnavn = navn || slug;
+    if (S.demo) S.aktiv = true;
+    else {
+      try { const r = await S.statusKlient.schema('stats').rpc('v3_status', { p_slug: slug }); S.aktiv = !r.error && !!(r.data && r.data.aktiv); } catch (e) { S.aktiv = false; }
+    }
+    if (!S.aktiv) {
+      document.querySelectorAll('nav.moduler .v3-modul').forEach((a) => a.remove());
+      if (MODULER.some((x) => '#' + x[0] === location.hash)) history.replaceState(null, '', location.pathname + location.search);
+      S.modul = null; $('modul-blokk').hidden = false; $('modul-v3').hidden = true; merkAktiv();
+      return false;
+    }
+    await sjekkTilgang();
+    lenker(); rute();
+    return true;
+  }
+  return { start, lag, MODULER, tilstand: S };
 })();
 
 </script>
@@ -984,7 +1002,7 @@ window.V3Moduler = (function () {
   async function start() {
     if (demo || !window.supabase || !cfg.url) {
       if (!demo && !cfg.url) { $('kilde').textContent = 'Mangler config.js – viser demodata.'; }
-      if (window.V3Moduler) V3Moduler.start({ statusKlient: null, demo: true, cfg, q }).catch((e) => console.error('V3', e));
+      if (window.V3Moduler) await V3Moduler.start({ statusKlient: null, bruker: null, demo: true, cfg, q }).catch((e) => console.error('V3', e));
       return kjør(demoKilde(), true);
     }
     const client = window.supabase.createClient(cfg.url, cfg.publishableKey, cfg.queue ? { auth: { storageKey: 'sb-rv-' + cfg.queue } } : undefined);
@@ -998,7 +1016,7 @@ window.V3Moduler = (function () {
       bruker = r.data.user;
     }
     if (!bruker) return innlogging(client);
-    if (window.V3Moduler) V3Moduler.start({ statusKlient: client, demo: false, cfg, q }).catch((e) => console.error('V3', e));
+    if (window.V3Moduler) await V3Moduler.start({ statusKlient: client, bruker, demo: false, cfg, q }).catch((e) => console.error('V3', e));
     return kjør(supabaseKilde(client, bruker), false);
   }
   function innlogging(client) {
@@ -1028,11 +1046,13 @@ window.V3Moduler = (function () {
         const v = $('kontekst'); v.hidden = false;
         v.innerHTML = S.kontekster.map((c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>').join('');
         v.value = S.ktx.slug;
-        v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); });
+        v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); v3Lag(); });
       } else $('kontekst-navn').textContent = S.ktx.name + (erDemo ? ' · oppdiktede data' : '');
+      v3Lag();
       await lastKontekst();
     } catch (e) { visFeil('Kunne ikke hente data: ' + e.message); }
   }
+  function v3Lag() { if (window.V3Moduler && S.ktx) V3Moduler.lag(S.ktx.slug, S.ktx.name).catch((e) => console.error('V3', e)); }
   async function lastKontekst() {
     S.motstandere = await kilde.motstandere(S.ktx);
     S.tropp = await kilde.tropp(S.ktx, S.motstandere);

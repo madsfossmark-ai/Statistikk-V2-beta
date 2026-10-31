@@ -21,6 +21,5 @@ window.V2_CONFIG = {
     ]
   },
   "locked": false,
-  "queue": "alle",
-  "v3": false
+  "queue": "alle"
 };
