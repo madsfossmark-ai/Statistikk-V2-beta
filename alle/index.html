@@ -2791,15 +2791,17 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 </script>
 <style>
 #v2-login { position: fixed; inset: 0; z-index: 9999; background: var(--bg, #f4f2ee); display: flex; align-items: center; justify-content: center; padding: 16px; }
-#v2-login form { background: var(--panel, #fff); border-radius: 14px; padding: 22px; width: min(380px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
-#v2-login input { min-height: 44px; font-size: 16px; padding: 0 12px; border-radius: 8px; border: 1px solid #ccc; }
-#v2-login button { min-height: 44px; font-size: 16px; font-weight: 600; border-radius: 8px; border: 0; background: var(--accent, #1d4ed8); color: #fff; }
+#v2-login form { background: var(--surface, #fff); color: var(--fg, #16181D); border: 1px solid var(--line, transparent); border-radius: 14px; padding: 22px; width: min(380px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
+#v2-login input { min-height: 44px; font-size: 16px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line, #ccc); background: var(--sunk, #fff); color: var(--fg, #16181D); }
+#v2-login form > div:not(.feil) { color: var(--muted, #666) !important; }
+#v2-login button { min-height: 44px; font-size: 16px; font-weight: 600; border-radius: 8px; border: 0; background: var(--accent, #1d4ed8); color: var(--accent-fg, #fff); }
 #v2-login .lenke { background: none; color: var(--accent, #1d4ed8); }
-#v2-login .feil { color: #b91c1c; font-size: 14px; min-height: 18px; }
+#v2-login .feil { color: var(--lvl-lo, #b91c1c); font-size: 14px; min-height: 18px; }
 #v2-status { position: fixed; left: 12px; bottom: 12px; z-index: 9998; font: 600 13px/1.2 system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: #fff7e6; color: #8a5a00; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: none; }
 #v2-status.feil { background: #fde8e8; color: #9b1c1c; }
 #v2-status.ok { background: #e7f6ec; color: #17603a; }
 #v2-demo { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9999; font: 700 12px system-ui, sans-serif; padding: 4px 12px; border-radius: 0 0 10px 10px; background: #b45309; color: #fff; }
+#v2-tilgang { position: fixed; right: 100px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
 #v2-loggut { position: fixed; right: 12px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
 </style>
 <script>
@@ -2851,7 +2853,35 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
       return;
     }
+    if (!demo && !cfg.autoLogin && roller.includes('owner')) {
+      const vis = () => { const a = document.createElement('a'); a.href = 'tilgang/'; a.textContent = 'Tilgang'; a.id = 'v2-tilgang'; document.body.appendChild(a); };
+      if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
+    }
     start(client, user, roller.some((r) => r !== 'viewer'));
+  }
+  // Invitasjon / nytt passord: ?lenke=<token>&type=invite|recovery (lages av eier på Tilgang-siden)
+  async function lenkeInn(client) {
+    const type = q.get('type') === 'recovery' ? 'recovery' : 'invite';
+    await client.auth.signOut().catch(() => {});
+    const r = await client.auth.verifyOtp({ token_hash: q.get('lenke'), type });
+    const v = document.createElement('div'); v.id = 'v2-login';
+    const vis = () => document.body.appendChild(v); if (document.body) vis(); else document.addEventListener('DOMContentLoaded', vis);
+    if (r.error || !r.data || !r.data.user) {
+      v.innerHTML = '<form><h2 style="margin:0">Lenken virker ikke</h2><div style="color:#666">Lenken er brukt eller utløpt. Be den som ga deg tilgang om en ny lenke.</div><a href="' + location.pathname + '" class="lenke" style="text-align:center">Til innlogging</a></form>';
+      return;
+    }
+    v.innerHTML = '<form><h2 style="margin:0">' + (type === 'invite' ? 'Velkommen' : 'Nytt passord') + '</h2><div style="color:#666;font-size:14px">Lag et passord for ' + String(r.data.user.email || '').replace(/[<>&"]/g, '') + '. Du logger inn med e-posten og dette passordet senere.</div>'
+      + '<input type="password" name="p" autocomplete="new-password" placeholder="Nytt passord (minst 8 tegn)" minlength="8" required aria-label="Nytt passord">'
+      + '<input type="password" name="p2" autocomplete="new-password" placeholder="Gjenta passordet" minlength="8" required aria-label="Gjenta passordet">'
+      + '<button type="submit">Lagre passord</button><div class="feil"></div></form>';
+    const f = v.querySelector('form'), feil = v.querySelector('.feil');
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault(); feil.textContent = '';
+      if (f.p.value !== f.p2.value) { feil.textContent = 'Passordene er ikke like.'; return; }
+      const u = await client.auth.updateUser({ password: f.p.value });
+      if (u.error) { feil.textContent = 'Ikke lagret: ' + u.error.message; return; }
+      location.replace(location.pathname);
+    });
   }
   function innlogging(client) {
     const v = document.createElement('div'); v.id = 'v2-login';
@@ -2887,6 +2917,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
         if (r.error) { innlogging(client); return; }
         return videre(client, r.data.user);
       }
+      if (q.has('lenke')) return lenkeInn(client);
       if (q.has('loggut') && data && data.session) { await client.auth.signOut(); location.replace(location.pathname); return; }
       if (data && data.session) videre(client, data.session.user); else innlogging(client);
     });

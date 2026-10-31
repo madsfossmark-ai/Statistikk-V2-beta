@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tilgang</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tilgang: eier gir personer tilgang til ett eller flere lag. Mørk benkemodus som appen; lyst tema med data-theme="light". */
+:root {
+  --bg: #0D1117; --surface: #161B24; --sunk: #1D2430; --line: #2A3240; --fg: #E8ECF2; --muted: #9AA4B2;
+  --accent: #8FB3FF; --accent-fg: #0D1117; --accent-soft: #1E2A44; --warn-bg: #3A2614; --warn: #F2B27A; --ok: #4CD08A; --bad: #F07167;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif; --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --line: #D9D6CD; --fg: #16181D; --muted: #4A4F5A;
+  --accent: #1B4592; --accent-fg: #FFFFFF; --accent-soft: #DCE4F5; --warn-bg: #FBF3EC; --warn: #8A3E0F; --ok: #1F7A4D; --bad: #B3261E; color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body); }
+main { max-width: 980px; margin: 0 auto; padding-block: 10px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; }
+h1 { margin: 0; font: 700 32px/1.05 var(--font-display); }
+h2 { margin: 0; font: 700 22px/1.1 var(--font-display); }
+.topp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.topp a { color: var(--accent); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.skyv { flex: 1; }
+.merke { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); background: var(--warn-bg); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.merke.ok { color: var(--ok); background: transparent; border: 1px solid var(--line); }
+.liten { font-size: 13px; color: var(--muted); margin: 0; }
+.etikett { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+input, button, select { font: inherit; color: var(--fg); }
+input[type=email], input[type=password], input[type=text], select { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); font-size: 16px; max-width: 100%; }
+.knapp { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; cursor: pointer; }
+.knapp.primar { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.knapp.fare { border-color: var(--bad); color: var(--bad); background: transparent; }
+.knapp.stille { background: transparent; }
+.knapp:disabled { opacity: .45; cursor: default; }
+:focus-visible { outline: 3px solid #F5B700; outline-offset: 2px; }
+[hidden] { display: none !important; }
+.kort { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.rad { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lagliste { display: flex; flex-direction: column; gap: 6px; }
+.lagrad { display: grid; grid-template-columns: minmax(0, 1fr) 150px 150px auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--sunk); }
+.lagrad .navn { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.lagrad.av .navn { color: var(--muted); font-weight: 500; }
+.chk { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+.chk.deaktiv { opacity: .45; cursor: default; }
+@media (max-width: 640px) { .lagrad { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .lagrad .navn { grid-column: 1 / -1; } }
+.person { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.person:first-of-type { border-top: 0; padding-top: 0; }
+.person .epost { font-weight: 600; overflow-wrap: anywhere; }
+.lenke { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: var(--accent-soft); border-radius: 12px; padding: 12px; }
+.lenke input { flex: 1 1 260px; min-width: 0; font-size: 14px; }
+.status { font-size: 14px; min-height: 20px; margin: 0; }
+.status.feil { color: var(--bad); } .status.ok { color: var(--ok); }
+details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--muted); }
+.roller { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.roller div { background: var(--sunk); border-radius: 10px; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+.roller b { color: var(--fg); display: block; font-size: 14px; }
+</style>
+<!-- app-ikon -->
+<link rel="apple-touch-icon" sizes="180x180" href="../../ikoner/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../../ikoner/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../../ikoner/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../../ikoner/icon-512.png">
+<meta name="apple-mobile-web-app-title" content="Tilgang">
+<!-- /app-ikon -->
+</head>
+<body>
+<main>
+  <div class="topp">
+    <h1>Tilgang</h1><span class="merke" id="demo-merke" hidden>Demo – oppdiktede personer</span>
+    <span class="skyv"></span>
+    <a href="../" id="tilbake">‹ Til appen</a>
+  </div>
+  <div id="app" aria-live="polite"><p class="liten">Laster …</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script>
+/*
+ * Tilgang-siden: eier gir personer tilgang til ett eller flere lag (rolle og analysemoduler per lag).
+ *  * Data og alle sjekker i databasen: stats.tilgang_oversikt() og stats.tilgang_sett() (bare eier av laget).
+ *  * Nye personer inviteres via Edge-funksjonen «inviter-bruker». Den lager en lenke personen bruker til å lage
+ *    sitt eget passord på «alle»-siden. Eier sender lenken selv (SMS/e-post). Ingen hemmelige nøkler i nettleseren.
+ *  * Samme innlogging som «alle»-siden (samme økt). ?demo=1 viser siden med oppdiktede personer, uten nett.
+ */
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const q = new URLSearchParams(location.search), demo = q.has('demo');
+  const cfg = window.V2_CONFIG || {};
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  try { if (localStorage.getItem('rv-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) { /* mørk */ }
+  const ROLLER = [['viewer', 'Se'], ['scorer', 'Føre'], ['coach', 'Trener']];
+  const ROLLENAVN = { viewer: 'Se', scorer: 'Føre', coach: 'Trener', owner: 'Eier' };
+  const sideUrl = () => new URL('../', location.href).href.split('?')[0];
+  const S = { data: null, api: null, lenke: null, lenkeFor: '', status: '', statusFeil: false };
+
+  // ---------- Datakilder ----------
+  function supabaseApi(client) {
+    const db = client.schema('stats');
+    const kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
+    const fn = async (body) => {
+      const r = await client.functions.invoke('inviter-bruker', { body });
+      if (r.error) { let m = r.error.message; try { const j = await r.error.context.json(); if (j && j.feil) m = j.feil; } catch (e) { /* standard */ } throw new Error(m); }
+      return r.data;
+    };
+    return {
+      oversikt: async () => kast(await db.rpc('tilgang_oversikt')),
+      sett: async (bruker, lag, rolle, moduler) => kast(await db.rpc('tilgang_sett', { p_bruker: bruker, p_lag: lag, p_rolle: rolle, p_moduler: !!moduler })),
+      inviter: (epost, lag) => fn({ handling: 'inviter', epost, lag, side: sideUrl() }),
+      lenke: (epost) => fn({ handling: 'lenke', epost, side: sideUrl() }),
+    };
+  }
+  function demoApi() {
+    const L = [{ id: 'l1', slug: 'randaberg', navn: 'Randaberg damer (demo)' }, { id: 'l2', slug: 'randaberg-herrer', navn: 'Randaberg herrer (demo)' },
+               { id: 'l3', slug: 'tvn-damer', navn: 'ToppVolley damer (demo)' }];
+    const P = [
+      { id: 'meg', epost: 'eier@eksempel.no', felles: false, invitert: false, lag: L.map((l) => ({ lag: l.id, rolle: 'owner', moduler: true })) },
+      { id: 'p1', epost: 'trener@eksempel.no', felles: false, invitert: false, lag: [{ lag: 'l1', rolle: 'coach', moduler: true }, { lag: 'l2', rolle: 'viewer', moduler: false }] },
+      { id: 'p2', epost: 'forer@eksempel.no', felles: false, invitert: true, lag: [{ lag: 'l3', rolle: 'scorer', moduler: false }] },
+      { id: 'f1', epost: 'damer@randaberg-beta.invalid', felles: true, invitert: false, lag: [{ lag: 'l1', rolle: 'scorer', moduler: false }] },
+    ];
+    const kopi = () => JSON.parse(JSON.stringify({ meg: 'meg', lag: L, personer: P }));
+    let n = 0;
+    return {
+      oversikt: async () => kopi(),
+      sett: async (bruker, lag, rolle, moduler) => {
+        if (moduler && rolle !== 'coach') throw new Error('Analysemodulene krever rollen trener');
+        const p = P.find((x) => x.id === bruker); const i = p.lag.findIndex((x) => x.lag === lag);
+        if (rolle === null) { if (i >= 0) p.lag.splice(i, 1); return; }
+        if (i >= 0) Object.assign(p.lag[i], { rolle, moduler: !!moduler }); else p.lag.push({ lag, rolle, moduler: !!moduler });
+      },
+      inviter: async (epost, lag) => {
+        let p = P.find((x) => x.epost === epost);
+        if (!p) { p = { id: 'n' + (++n), epost, felles: false, invitert: true, lag: [] }; P.push(p); }
+        lag.forEach((l) => { const i = p.lag.findIndex((x) => x.lag === l.lag); const v = { lag: l.lag, rolle: l.rolle, moduler: !!l.moduler }; if (i >= 0) p.lag[i] = v; else p.lag.push(v); });
+        return { bruker: p.id, ny: true, lenke: sideUrl() + '?lenke=DEMO-' + p.id + '&type=invite' };
+      },
+      lenke: async (epost) => ({ lenke: sideUrl() + '?lenke=DEMO-NY&type=recovery' }),
+    };
+  }
+
+  // ---------- Visning ----------
+  const lagNavn = (id) => ((S.data.lag.find((l) => l.id === id) || {}).navn || 'Ukjent lag');
+  const rolleValg = (navn, valgt, attr) => '<select name="' + navn + '" aria-label="Rolle" ' + (attr || '') + '>'
+    + ROLLER.map(([v, t]) => '<option value="' + v + '"' + (v === valgt ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>';
+  const modulValg = (pa, rolle, attr) => '<label class="chk' + (rolle === 'coach' ? '' : ' deaktiv') + '"><input type="checkbox" ' + (pa ? 'checked ' : '') + (rolle === 'coach' ? '' : 'disabled ') + (attr || '') + '> Analysemoduler</label>';
+
+  function vis() {
+    const d = S.data;
+    if (!d.lag.length) {
+      $('app').innerHTML = '<div class="kort" id="ikke-eier"><h2>Bare for eier</h2><p class="liten">Du er ikke eier av noe lag, og kan derfor ikke gi andre tilgang. Ta kontakt med Randaberg Volleyball hvis du trenger tilgang til flere lag.</p></div>';
+      return;
+    }
+    const personer = d.personer.filter((p) => !p.felles && p.id !== d.meg);
+    const felles = d.personer.filter((p) => p.felles);
+    let h = '';
+    h += '<div class="kort"><div class="roller">'
+      + '<div><b>Se</b>Ser kamper, tabell, dashboard og Blokk/forsvar.</div>'
+      + '<div><b>Føre</b>Kan i tillegg føre statistikk og opprette kamper.</div>'
+      + '<div><b>Trener</b>Kan i tillegg endre tropp og kamper. Kan få analysemodulene.</div>'
+      + '<div><b>Analysemoduler</b>Serve/rotasjon, Videoanalyse, Kampplan, Serveplan, Observasjoner og Treningsprioriteringer.</div></div></div>';
+    // Inviter
+    h += '<form class="kort" id="inviter"><h2>Gi en person tilgang</h2><p class="liten">Skriv e-posten og velg ett eller flere lag. Personen får en lenke for å lage sitt eget passord, og ser deretter bare lagene som er valgt.</p>'
+      + '<label class="etikett" for="inv-e">E-post</label><input id="inv-e" type="email" autocomplete="off" required placeholder="navn@eksempel.no">'
+      + '<div class="lagliste">' + d.lag.map((l) => '<div class="lagrad av" data-lag="' + esc(l.id) + '">'
+          + '<label class="chk navn"><input type="checkbox" class="med"> ' + esc(l.navn) + '</label>'
+          + rolleValg('rolle', 'viewer', 'disabled') + modulValg(false, 'viewer', 'class="mod"') + '<span></span></div>').join('') + '</div>'
+      + '<div class="rad"><button class="knapp primar" type="submit" id="inv-knapp">Lag invitasjon</button><p class="status" id="inv-status" role="status"></p></div>'
+      + (S.lenke ? '<div class="lenke" id="lenke"><div style="flex:1 1 100%"><b>Lenke til ' + esc(S.lenkeFor) + '</b><p class="liten">Send lenken til personen på SMS eller e-post. Den virker én gang og bare en kort stund. Personen lager passord og logger inn med e-posten sin. Lag en ny lenke hvis den går ut.</p></div>'
+          + '<input type="text" readonly id="lenke-tekst" aria-label="Invitasjonslenke" value="' + esc(S.lenke) + '"><button class="knapp" type="button" id="kopier">Kopier</button>'
+          + (navigator.share ? '<button class="knapp" type="button" id="del">Del …</button>' : '') + '</div>' : '')
+      + '</form>';
+    // Personer
+    h += '<div class="kort" id="personer"><h2>Personer med tilgang</h2>'
+      + (personer.length ? '' : '<p class="liten">Ingen personer er lagt til ennå.</p>')
+      + personer.map((p) => {
+          const mangler = d.lag.filter((l) => !p.lag.some((x) => x.lag === l.id));
+          return '<div class="person" data-person="' + esc(p.id) + '" data-epost="' + esc(p.epost) + '"><div class="rad"><span class="epost">' + esc(p.epost) + '</span>'
+            + (p.invitert ? '<span class="merke">Invitert – ikke logget inn ennå</span>' : '') + '<span class="skyv"></span>'
+            + '<button class="knapp stille" type="button" data-a="ny-lenke">Ny innloggingslenke</button></div>'
+            + '<div class="lagliste">' + p.lag.map((x) => x.rolle === 'owner'
+                ? '<div class="lagrad" data-lag="' + esc(x.lag) + '"><span class="navn">' + esc(lagNavn(x.lag)) + '</span><span class="liten">Eier</span><span></span><span></span></div>'
+                : '<div class="lagrad" data-lag="' + esc(x.lag) + '"><span class="navn">' + esc(lagNavn(x.lag)) + '</span>' + rolleValg('rolle', x.rolle, 'data-a="rolle"')
+                  + modulValg(x.moduler, x.rolle, 'data-a="moduler"') + '<button class="knapp fare" type="button" data-a="fjern">Fjern</button></div>').join('') + '</div>'
+            + (mangler.length ? '<div class="rad"><select data-a="legg-til" aria-label="Gi tilgang til et lag til"><option value="">+ Gi tilgang til et lag til …</option>'
+                + mangler.map((l) => '<option value="' + esc(l.id) + '">' + esc(l.navn) + '</option>').join('') + '</select></div>' : '')
+            + '</div>';
+        }).join('')
+      + '<p class="status" id="p-status" role="status"></p></div>';
+    if (felles.length) h += '<details class="kort"><summary>Felles lenker (' + felles.length + ') – kan ikke endres her</summary><p class="liten">Lenkene per lag med automatisk innlogging. De beholdes til alle har egne brukere.</p>'
+      + felles.map((p) => '<p class="liten">' + esc(p.lag.map((x) => lagNavn(x.lag)).join(', ')) + ' · ' + esc(ROLLENAVN[(p.lag[0] || {}).rolle] || '') + '</p>').join('') + '</details>';
+    $('app').innerHTML = h;
+    kobleInviter(); koblePersoner();
+    if (S.status) { const el = $('p-status'); el.textContent = S.status; el.className = 'status ' + (S.statusFeil ? 'feil' : 'ok'); }
+  }
+
+  function kobleInviter() {
+    const f = $('inviter');
+    f.querySelectorAll('.lagrad').forEach((r) => {
+      const med = r.querySelector('.med'), rolle = r.querySelector('select'), mod = r.querySelector('.mod');
+      const opp = () => {
+        r.classList.toggle('av', !med.checked); rolle.disabled = !med.checked;
+        const kan = med.checked && rolle.value === 'coach'; mod.disabled = !kan; if (!kan) mod.checked = false;
+        mod.closest('.chk').classList.toggle('deaktiv', !kan);
+      };
+      med.onchange = opp; rolle.onchange = opp;
+    });
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const st = $('inv-status'); st.className = 'status'; st.textContent = '';
+      const epost = $('inv-e').value.trim().toLowerCase();
+      const lag = [...f.querySelectorAll('.lagrad')].filter((r) => r.querySelector('.med').checked)
+        .map((r) => ({ lag: r.dataset.lag, rolle: r.querySelector('select').value, moduler: r.querySelector('.mod').checked }));
+      if (!lag.length) { st.className = 'status feil'; st.textContent = 'Velg minst ett lag.'; return; }
+      $('inv-knapp').disabled = true; st.textContent = 'Lager invitasjon …';
+      try {
+        const r = await S.api.inviter(epost, lag);
+        S.lenke = r.lenke; S.lenkeFor = epost; S.status = r.ny === false ? epost + ' fantes fra før og har fått tilgang til lagene. Lenken lar personen lage nytt passord.' : 'Invitasjon laget for ' + epost + '.'; S.statusFeil = false;
+        await last();
+      } catch (e) { st.className = 'status feil'; st.textContent = 'Ikke laget: ' + e.message; $('inv-knapp').disabled = false; }
+    });
+    const k = $('kopier');
+    if (k) k.onclick = async () => { const t = $('lenke-tekst'); t.select(); try { await navigator.clipboard.writeText(t.value); k.textContent = 'Kopiert'; } catch (e) { document.execCommand('copy'); k.textContent = 'Kopiert'; } };
+    const dl = $('del');
+    if (dl) dl.onclick = () => navigator.share({ title: 'Kampstatistikk – lag passord', text: 'Lenke for å lage passord til Kampstatistikk:', url: S.lenke }).catch(() => {});
+  }
+
+  function koblePersoner() {
+    const box = $('personer'); if (!box) return;
+    const lagre = async (fn, ok) => {
+      try { await fn(); S.status = ok; S.statusFeil = false; } catch (e) { S.status = 'Ikke lagret: ' + e.message; S.statusFeil = true; }
+      await last();
+    };
+    box.querySelectorAll('.person').forEach((p) => {
+      const id = p.dataset.person, epost = p.dataset.epost;
+      p.querySelectorAll('.lagrad').forEach((r) => {
+        const lag = r.dataset.lag, rolle = r.querySelector('[data-a="rolle"]'), mod = r.querySelector('[data-a="moduler"]'), fjern = r.querySelector('[data-a="fjern"]');
+        if (rolle) rolle.onchange = () => lagre(() => S.api.sett(id, lag, rolle.value, rolle.value === 'coach' && mod.checked), 'Rollen er endret for ' + epost + ' i ' + lagNavn(lag) + '.');
+        if (mod) mod.onchange = () => lagre(() => S.api.sett(id, lag, rolle.value, mod.checked), (mod.checked ? 'Analysemodulene er slått på' : 'Analysemodulene er slått av') + ' for ' + epost + ' i ' + lagNavn(lag) + '.');
+        if (fjern) fjern.onclick = () => { if (fjern.dataset.sikker) lagre(() => S.api.sett(id, lag, null, false), epost + ' er fjernet fra ' + lagNavn(lag) + '.'); else { fjern.dataset.sikker = '1'; fjern.textContent = 'Bekreft fjerning'; } };
+      });
+      const leggTil = p.querySelector('[data-a="legg-til"]');
+      if (leggTil) leggTil.onchange = () => { if (leggTil.value) lagre(() => S.api.sett(id, leggTil.value, 'viewer', false), epost + ' kan nå se ' + lagNavn(leggTil.value) + '.'); };
+      p.querySelector('[data-a="ny-lenke"]').onclick = async () => {
+        try { const r = await S.api.lenke(epost); S.lenke = r.lenke; S.lenkeFor = epost; S.status = 'Ny innloggingslenke laget for ' + epost + ' (øverst).'; S.statusFeil = false; }
+        catch (e) { S.status = 'Kunne ikke lage lenke: ' + e.message; S.statusFeil = true; }
+        vis(); window.scrollTo(0, 0);
+      };
+    });
+  }
+
+  async function last() {
+    try { S.data = await S.api.oversikt(); vis(); }
+    catch (e) { $('app').innerHTML = '<div class="kort"><h2>Kunne ikke hente tilgang</h2><p class="liten">' + esc(e.message) + '</p></div>'; }
+  }
+
+  async function start() {
+    $('tilbake').href = demo ? '../?demo=1' : '../';
+    if (demo) { $('demo-merke').hidden = false; S.api = demoApi(); return last(); }
+    if (!window.supabase || !cfg.url) { $('app').innerHTML = '<div class="kort"><p class="liten">Mangler oppsett (config.js).</p></div>'; return; }
+    if (cfg.autoLogin) { $('app').innerHTML = '<div class="kort"><h2>Ikke tilgjengelig her</h2><p class="liten">Tilgang styres fra siden med egen innlogging.</p></div>'; return; }
+    const client = window.supabase.createClient(cfg.url, cfg.publishableKey, cfg.queue ? { auth: { storageKey: 'sb-rv-' + cfg.queue } } : undefined);
+    const { data } = await client.auth.getSession();
+    if (!data || !data.session) { $('app').innerHTML = '<div class="kort"><h2>Logg inn først</h2><p class="liten">Logg inn i appen, og åpne Tilgang derfra.</p><a class="knapp primar" style="display:inline-flex;align-items:center;align-self:flex-start;text-decoration:none" href="../">Til innlogging</a></div>'; return; }
+    S.api = supabaseApi(client); return last();
+  }
+  start();
+})();
+
+</script>
+</body>
+</html>
