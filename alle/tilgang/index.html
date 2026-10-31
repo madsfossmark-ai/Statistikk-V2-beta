@@ -52,6 +52,7 @@ input[type=email], input[type=password], input[type=text], select { min-height: 
 .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
 .chk.deaktiv { opacity: .45; cursor: default; }
 @media (max-width: 640px) { .lagrad { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .lagrad .navn { grid-column: 1 / -1; } }
+.lagrad.felles a.knapp { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--fg); }
 .person { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .person:first-of-type { border-top: 0; padding-top: 0; }
 .person .epost { font-weight: 600; overflow-wrap: anywhere; }
@@ -100,6 +101,9 @@ details summary { cursor: pointer; min-height: 44px; display: flex; align-items:
   try { if (localStorage.getItem('rv-theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) { /* mørk */ }
   const ROLLER = [['viewer', 'Se'], ['scorer', 'Føre'], ['coach', 'Trener']];
   const ROLLENAVN = { viewer: 'Se', scorer: 'Føre', coach: 'Trener', owner: 'Eier' };
+  // Felles lenker: e-postens første del er mappen til lagsiden (damer@randaberg-beta.invalid → ../../damer/)
+  const FELLES_SIDER = ['damer', 'herrer', 'u20', 'tvn-damer', 'tvn-herrer'];
+  const fellesSide = (epost) => { const m = String(epost).split('@')[0]; return FELLES_SIDER.includes(m) ? m : null; };
   const sideUrl = () => new URL('../', location.href).href.split('?')[0];
   const S = { data: null, api: null, lenke: null, lenkeFor: '', status: '', statusFeil: false };
 
@@ -196,8 +200,16 @@ details summary { cursor: pointer; min-height: 44px; display: flex; align-items:
             + '</div>';
         }).join('')
       + '<p class="status" id="p-status" role="status"></p></div>';
-    if (felles.length) h += '<details class="kort"><summary>Felles lenker (' + felles.length + ') – kan ikke endres her</summary><p class="liten">Lenkene per lag med automatisk innlogging. De beholdes til alle har egne brukere.</p>'
-      + felles.map((p) => '<p class="liten">' + esc(p.lag.map((x) => lagNavn(x.lag)).join(', ')) + ' · ' + esc(ROLLENAVN[(p.lag[0] || {}).rolle] || '') + '</p>').join('') + '</details>';
+    const medSide = felles.filter((p) => fellesSide(p.epost)).sort((a, b) => FELLES_SIDER.indexOf(fellesSide(a.epost)) - FELLES_SIDER.indexOf(fellesSide(b.epost)));
+    const test = felles.filter((p) => !fellesSide(p.epost));
+    if (felles.length) h += '<div class="kort" id="felles"><h2>Felles lenker</h2><p class="liten">Lenkene per lag med automatisk innlogging. Trykk for å åpne siden slik de som får lenken ser den. De beholdes til alle har egne brukere, og kan ikke endres her.</p>'
+      + '<div class="lagliste">' + medSide.map((p) => { const m = fellesSide(p.epost), base = demo ? '#' : '../../' + m + '/';
+          return '<div class="lagrad felles" data-side="' + esc(m) + '"><span class="navn">' + esc(p.lag.map((x) => lagNavn(x.lag)).join(', ')) + '</span>'
+            + '<span class="liten">' + esc(ROLLENAVN[(p.lag[0] || {}).rolle] || '') + ' · /' + esc(m) + '/</span>'
+            + '<a class="knapp" href="' + base + '" target="_blank" rel="noopener">Åpne</a>'
+            + '<a class="knapp stille" href="' + (demo ? '#' : base + 'analyse/') + '" target="_blank" rel="noopener">Analyse</a></div>'; }).join('') + '</div>'
+      + (test.length ? '<details><summary>Testbrukere uten egen side (' + test.length + ')</summary>' + test.map((p) => '<p class="liten">' + esc(p.lag.map((x) => lagNavn(x.lag)).join(', ')) + '</p>').join('') + '</details>' : '')
+      + '</div>';
     $('app').innerHTML = h;
     kobleInviter(); koblePersoner();
     if (S.status) { const el = $('p-status'); el.textContent = S.status; el.className = 'status ' + (S.statusFeil ? 'feil' : 'ok'); }
