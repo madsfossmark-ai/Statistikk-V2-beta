@@ -1376,7 +1376,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const db = klient.schema('stats'), kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
     const c = kast(await db.from('contexts').select('id,our_team').eq('slug', slug))[0]; if (!c) throw new Error('Fant ikke laget');
     const [m, sp, op, ev, po] = await Promise.all([
-      alle(() => db.from('matches').select('id,legacy_id,home,away,starts_at,status,focus_team,round,is_test,legacy').eq('context_id', c.id).order('id')),
+      alle(() => db.from('matches').select('id,legacy_id,home,away,starts_at,status,focus_team,round,is_test,venue,sets_home,sets_away,legacy').eq('context_id', c.id).order('id')),
       alle(() => db.from('squad_players').select('id,legacy_id,jersey,name').eq('context_id', c.id).order('id')),
       alle(() => db.from('opponents').select('id,name').eq('context_id', c.id).order('id')),
       alle(() => db.from('events').select('id,match_id,type,code,squad_player_id,opp_jersey,undoes').eq('context_id', c.id).in('type', ['opp', 'srv', 'rec', 'undo']).order('id')),
@@ -1418,20 +1418,28 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       tropp: (id) => navnTropp[id] || null, serve: serveTall(ev), bp,
       motstanderTropp: (mot) => ((opponents[mot] || {}).players || []).map((p) => ({ nr: String(p.nr), navn: p.name || '' })),
       planer: Object.fromEntries(r.planer.map((p) => [p.motstander, { data: p.data, versjon: p.versjon }])),
-      lagre: async (mot, data, versjon) => {
+      // Til Kampplan: samme grunnlag uten ny henting
+      profil: (mot) => (modell ? scout.lagprofil(modell, mot, {}) : null), kamper, poeng: r.poeng, ctx: r.ctx, db: r.db, our,
+      kamperMot: (mot) => r.matches.filter((k) => { const vi = k.focus_team || our; return (k.home === mot || k.away === mot) && (k.home === vi || k.away === vi); })
+        .map((k) => ({ id: k.id, dato: k.starts_at, status: k.status, sted: k.venue || '', hjemme: k.home === (k.focus_team || our), oss: k.home === (k.focus_team || our) ? k.sets_home : k.sets_away, dem: k.home === (k.focus_team || our) ? k.sets_away : k.sets_home }))
+        .sort((a, b) => String(b.dato || '').localeCompare(String(a.dato || ''))),
+      lagre: (mot, data, versjon) => lagreI(r, 'serveplaner', mot, data, versjon),
+      hentPlan: (mot) => hentI(r, 'serveplaner', mot),
+    };
+  }
+  // Plan med versjonskontroll (serveplaner, kampplaner): oppdater bare samme versjon, ellers konflikt
+  async function lagreI(r, tabell, mot, data, versjon) {
         if (versjon) {
-          const u = await r.db.from('serveplaner').update({ data }).eq('context_id', r.ctx.id).eq('motstander', mot).eq('versjon', versjon).select('versjon');
+          const u = await r.db.from(tabell).update({ data }).eq('context_id', r.ctx.id).eq('motstander', mot).eq('versjon', versjon).select('versjon');
           if (u.error) throw new Error(u.error.message);
           if (!u.data.length) throw Object.assign(new Error('konflikt'), { konflikt: true });
           return u.data[0].versjon;
         }
-        const i = await r.db.from('serveplaner').insert({ context_id: r.ctx.id, motstander: mot, data }).select('versjon');
+        const i = await r.db.from(tabell).insert({ context_id: r.ctx.id, motstander: mot, data }).select('versjon');
         if (i.error) { if (/duplicate key/i.test(i.error.message)) throw Object.assign(new Error('konflikt'), { konflikt: true }); throw new Error(i.error.message); }
         return i.data[0].versjon;
-      },
-      hentPlan: async (mot) => { const x = await r.db.from('serveplaner').select('data,versjon').eq('context_id', r.ctx.id).eq('motstander', mot); if (x.error) throw new Error(x.error.message); return x.data[0] || null; },
-    };
   }
+  async function hentI(r, tabell, mot) { const x = await r.db.from(tabell).select('data,versjon').eq('context_id', r.ctx.id).eq('motstander', mot); if (x.error) throw new Error(x.error.message); return x.data[0] || null; }
 
   // ---------- Visning ----------
   const CSS = `
@@ -1556,8 +1564,267 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     }
   }
 
-  const eksport = { roter, servereFra, sisteOppstilling, serveTall, fyllForslag, bygg, demo, vis };
+  const eksport = { roter, servereFra, sisteOppstilling, serveTall, fyllForslag, hent, bygg, lagreI, hentI, demo, vis };
   if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Serveplan = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
+ * Analysemodulen Kampplan (V3, issue #23). Godkjent 01.11.2026: A (ett ark før kamp) + C (rotasjon for rotasjon på benken).
+ * Samler det de andre modulene vet om motstanderen, uten egne beregninger:
+ *  * deres mottak og angripere: scouting-modellen (via Serveplan.bygg), slagretninger: stats.slaghistorikk + Analyse.oppsummer
+ *  * vår serve: stats.serveplaner, våre rotasjoner: poengtellingen (ServeRotasjon)
+ * Det treneren skriver selv lagres i stats.kampplaner: tre fokuspunkter, forsvarsvalg (linje/dia) og notat per rotasjon, og et notat.
+ * Forsvarsplanen i Blokk/forsvar har både linje- og diaoppsett per rotasjon; valget av hvilket som gjelder gjøres her.
+ */
+(function (root) {
+  'use strict';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pst = (a, n) => (n ? Math.round(100 * a / n) : null);
+  const kopi = (x) => JSON.parse(JSON.stringify(x));
+  const ROT = [1, 2, 3, 4, 5, 6];
+  const nesteRot = (r) => (r === 1 ? 6 : r - 1);
+  const dato = (d, lang) => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString('nb-NO', lang ? { weekday: 'long', day: 'numeric', month: 'long' } : { day: 'numeric', month: 'short' }); };
+  const kl = (d) => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }); };
+
+  // ---------- Visningsmodell (ren funksjon, testes i Node) ----------
+  // d: Serveplan.bygg(...), mot: motstander, x: { slag: [Analyse-slag], forsvarLagret: iso|null }
+  function modell(d, mot, x) {
+    x = x || {}; const A = root.Analyse, SR = root.ServeRotasjon;
+    const kamper = d.kamperMot(mot), neste = kamper.filter((k) => k.status === 'kommende').sort((a, b) => String(a.dato).localeCompare(String(b.dato)))[0] || null;
+    const tidligere = kamper.filter((k) => k.status === 'ferdig').slice(0, 3);
+    const profil = d.profil(mot), lm = profil && profil.lagMottak;
+    const slag = x.slag || [], oppsum = (l) => (A && l.length ? A.oppsummer(l) : null);
+    const alleR = oppsum(slag);
+    const angrep = ((profil && profil.spillere) || []).filter((s) => s.angrep && s.angrep.n).sort((a, b) => b.angrep.n - a.angrep.n).slice(0, 4)
+      .map((s) => { const r = oppsum(slag.filter((z) => String(z.nr) === String(s.nr))); return { nr: s.nr, navn: s.navn, n: s.angrep.n, andel: s.angrep.andel, killPct: s.angrep.killPct, retning: r ? Object.assign({ n: r.antall }, r.andel) : null }; });
+    const rader = d.rader(mot), plan = (d.planer[mot] || {}).data || {}, mottNr = (nr) => rader.find((r) => String(r.nr) === String(nr));
+    const serve = {}; ROT.forEach((r) => { const p = (plan.rot || {})[r] || {}, id = d.servere && d.servere[r]; serve[r] = { server: id ? d.tropp(id) : null, mal: p.mal || null, sone: p.sone || null, reserve: p.reserve || null, malFeil: p.mal && mottNr(p.mal) ? mottNr(p.mal).feilPct : null }; });
+    let rot = null;
+    if (SR && d.poeng.length) {
+      const s = SR.stat(SR.ballvekslinger(d.kamper, d.poeng)), med = ROT.filter((r) => s.r[r].son + s.r[r].bpn > 0);
+      if (s.tot.son + s.tot.bpn) rot = { per: s.r, tot: s.tot, svak: med.length ? med.slice().sort((a, b) => s.r[a].netto - s.r[b].netto)[0] : null, best: med.length ? med.slice().sort((a, b) => s.r[b].netto - s.r[a].netto)[0] : null };
+    }
+    // Rotasjonen nå: pågående kamp mot motstanderen, siste ballveksling i poengtellingen
+    let naaRot = null; const paagar = kamper.find((k) => k.status === 'pågår');
+    if (paagar && SR) {
+      const k = d.kamper.find((z) => z.id === paagar.id), l = SR.ballvekslinger([k], d.poeng.filter((p) => p.match_id === paagar.id)), b = l[l.length - 1];
+      if (b && b.rot) naaRot = b.vinn && b.mottak ? nesteRot(b.rot) : b.rot;
+    }
+    return { mot, neste, tidligere, mottak: lm ? { n: lm.n, feilPct: lm.feilPct, posPct: lm.positiv ? lm.positiv.pct : null } : null, angrep, retning: alleR ? Object.assign({ n: alleR.antall }, alleR.andel) : null,
+      forslagForsvar: alleR ? (alleR.type.linje > alleR.type.diagonal ? 'linje' : 'dia') : null, serve, harServeplan: !!d.planer[mot], svakestMott: rader.find((r) => r.rang === 1) || null,
+      rot, naaRot, forsvarLagret: x.forsvarLagret || null, oppstillingFra: d.oppstillingFra };
+  }
+
+  // ---------- Demodata (oppdiktet) ----------
+  function demoVm(mot) {
+    const per = { 1: [13, 27, 7, 21, -8], 2: [13, 25, 10, 23, -2], 3: [13, 26, 10, 23, -3], 4: [13, 20, 7, 20, 0], 5: [13, 25, 8, 21, -4], 6: [12, 19, 9, 23, 0] };
+    const r = {}; ROT.forEach((i) => { const p = per[i]; r[i] = { so: p[0], son: p[1], bp: p[2], bpn: p[3], netto: p[4] }; });
+    const S = { 1: ['4', 'Spiller Fire', '7', 5, '11'], 2: ['7', 'Spiller Sju', '11', 1, '7'], 3: ['2', 'Spiller To', '7', 6, '14'], 4: ['10', 'Spiller Ti', '14', 1, '11'], 5: ['8', 'Spiller Åtte', '11', 5, '7'], 6: ['6', 'Spiller Seks', '7', 1, null] };
+    const serve = {}; ROT.forEach((i) => { const s = S[i]; serve[i] = { server: { nr: s[0], navn: s[1] }, mal: s[2], sone: s[3], reserve: s[4], malFeil: { 7: 12, 11: 10, 14: 11 }[s[2]] }; });
+    return { mot, neste: { dato: '2026-11-07T17:00:00Z', sted: 'Randaberghallen', hjemme: true }, tidligere: [{ dato: '2026-10-24T16:00:00Z', oss: 1, dem: 3 }],
+      mottak: { n: 160, feilPct: 7, posPct: 45 }, angrep: [{ nr: '9', navn: 'Kant Ni', n: 96, andel: 31, killPct: 41, retning: { n: 60, diagonal: 55, linje: 30, dip: 15 } }, { nr: '14', navn: 'Diagonal Fjorten', n: 74, andel: 24, killPct: 36, retning: { n: 44, diagonal: 40, linje: 45, dip: 15 } },
+        { nr: '5', navn: 'Kant Fem', n: 56, andel: 18, killPct: 33, retning: { n: 30, diagonal: 60, linje: 20, dip: 20 } }, { nr: '2', navn: 'Midt To', n: 43, andel: 14, killPct: 48, retning: null }],
+      retning: { n: 134, diagonal: 52, linje: 33, dip: 15 }, forslagForsvar: 'dia', serve, harServeplan: true, svakestMott: { nr: '7', navn: 'Kant Sju', feilPct: 12 },
+      rot: { per: r, tot: { so: 77, son: 142, bp: 51, bpn: 131 }, svak: 1, best: 4 }, naaRot: null, forsvarLagret: '2026-10-30T20:00:00Z', oppstillingFra: 'oppdiktet kamp, sett 1' };
+  }
+
+  // ---------- Henting ----------
+  async function hent(klient, slug) {
+    const SP = root.Serveplan, r = await SP.hent(klient, slug), d = SP.bygg(r), db = r.db, kast = (x) => { if (x.error) throw new Error(x.error.message); return x.data; };
+    const [kp, fp] = await Promise.all([db.from('kampplaner').select('motstander,data,versjon').eq('context_id', r.ctx.id), db.from('forsvar_planer').select('motstander,updated_at').eq('context_id', r.ctx.id)]);
+    d.kampplaner = Object.fromEntries(kast(kp).map((p) => [p.motstander, { data: p.data, versjon: p.versjon }]));
+    d.forsvar = Object.fromEntries(kast(fp).map((p) => [p.motstander, p.updated_at]));
+    d.slag = async (mot) => { const rows = kast(await db.rpc('slaghistorikk', { p_lag: mot, p_person: null })); return rows.filter((x) => x.kontekst === slug).map(root.Analyse.fraRad); };
+    d.lagreKp = (mot, data, v) => SP.lagreI(r, 'kampplaner', mot, data, v);
+    d.hentKp = (mot) => SP.hentI(r, 'kampplaner', mot);
+    return d;
+  }
+
+  // ---------- Visning ----------
+  const CSS = `
+.kp { display: flex; flex-direction: column; gap: 14px; }
+.kp-seg { display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; gap: 2px; }
+.kp-seg button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; color: var(--muted); font: 600 14px var(--font-body); cursor: pointer; }
+.kp-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.kp-status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.kp-status.ulagret { background: var(--warn-bg); color: var(--warn); } .kp-status.lagret { color: var(--ok); } .kp-status.feil { color: var(--bad); }
+.kp-ark { --p: #FFFFFF; --b: #16181D; --bs: #5A6070; --pl: #DAD7CF; background: var(--p); color: var(--b); border-radius: 6px; padding: 28px 30px; display: flex; flex-direction: column; gap: 18px; max-width: 840px; margin: 0 auto; width: 100%; box-shadow: 0 2px 18px rgba(0,0,0,.35); }
+.kp-ark h2 { margin: 0; font: 700 30px/1.05 var(--font-display); color: var(--b); text-transform: none; letter-spacing: 0; }
+.kp-ark h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--bs); border-bottom: 2px solid var(--b); padding-bottom: 4px; }
+.kp-ark .hode { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px 12px; flex-wrap: wrap; border-bottom: 4px solid var(--b); padding-bottom: 10px; }
+.kp-ark .hode p, .kp-ark .kilde { color: var(--bs); margin: 0; } .kp-ark .hode p { font-size: 14px; } .kp-ark .kilde { font-size: 11px; }
+.kp-ark p { margin: 0; font-size: 14px; }
+.kp-to { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 24px; }
+@media (max-width: 680px) { .kp-to { grid-template-columns: minmax(0, 1fr); } .kp-ark { padding: 18px 16px; } }
+.kp-ark section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.kp-ark table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.kp-ark th { text-align: left; font-size: 11px; font-weight: 600; color: var(--bs); padding: 3px 4px; border-bottom: 1px solid var(--pl); }
+.kp-ark td { padding: 4px; border-bottom: 1px solid var(--pl); vertical-align: middle; }
+.kp-ark td.r { font: 700 16px var(--font-display); }
+.kp-stolpe { display: flex; height: 14px; border-radius: 3px; overflow: hidden; font-size: 10px; color: #FFFFFF; font-weight: 600; min-width: 90px; }
+.kp-stolpe span { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.kp-fokus { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: f; }
+.kp-fokus li { counter-increment: f; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; font-size: 15px; align-items: baseline; }
+.kp-fokus li::before { content: counter(f); font: 700 26px/1 var(--font-display); color: #B3261E; }
+.kp-tom { color: var(--bs); font-style: italic; }
+.kp-band { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 16px; }
+.kp-band .kp-fokus li { font-size: 17px; font-weight: 600; } .kp-band .kp-fokus li::before { color: var(--accent); }
+.kp-trinn { display: flex; gap: 6px; flex-wrap: wrap; }
+.kp-trinn button { min-width: 56px; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); font: 700 22px var(--font-display); cursor: pointer; position: relative; }
+@media (max-width: 440px) { .kp-trinn button { min-width: 46px; font-size: 19px; } }
+.kp-trinn button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.kp-trinn button.svak { box-shadow: inset 0 -4px 0 var(--bad); }
+.kp-trinn button small { position: absolute; top: -8px; right: -6px; font: 700 10px var(--font-body); background: var(--ok); color: #0D1117; border-radius: 999px; padding: 1px 5px; }
+.kp-kort { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .kp-kort { grid-template-columns: minmax(0, 1fr); } }
+.kp-kort > div { background: var(--sunk); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.kp-kort h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.kp-kort .stor { font: 700 32px/1 var(--font-display); } .kp-kort .stor.bad { color: var(--bad); }
+.kp-notat { background: var(--sunk); border-radius: 12px; padding: 10px 12px; font-size: 15px; border-left: 4px solid var(--warn); }
+.kp-red { display: flex; flex-direction: column; gap: 10px; background: var(--sunk); border-radius: 14px; padding: 14px; }
+.kp-red input[type=text], .kp-red textarea { width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 15px var(--font-body); padding: 8px 10px; }
+.kp-red textarea { min-height: 60px; resize: vertical; }
+.kp-red .rr { display: grid; grid-template-columns: 40px auto minmax(0, 1fr); gap: 8px; align-items: center; }
+@media (max-width: 560px) { .kp-red .rr { grid-template-columns: 40px minmax(0, 1fr); } .kp-red .rr input { grid-column: 1 / -1; } }
+.kp-red .rr b { font: 700 20px var(--font-display); }
+@media print {
+  body.kp-utskrift #modul-v3 { display: block !important; }
+  body.kp-utskrift .topp, body.kp-utskrift .moduler, body.kp-utskrift #modul-blokk, body.kp-utskrift .kp-ikke-ark { display: none !important; }
+  body.kp-utskrift .kp-ark { box-shadow: none; max-width: none; padding: 0; }
+  body.kp-utskrift .kort { border: 0 !important; background: none !important; padding: 0 !important; }
+}
+`;
+  function vis(el, opt) {
+    if (!document.getElementById('kp-css')) { const s = document.createElement('style'); s.id = 'kp-css'; s.textContent = CSS; document.head.appendChild(s); }
+    const S = { d: null, mot: null, vm: null, plan: null, versjon: null, red: false, endret: false, status: '', tekst: '', fane: 'ark', rot: 1, demoPlaner: {} };
+    el.innerHTML = '<div class="kort kp"><p class="liten">Henter kampplan …</p></div>';
+    const start = opt.demo ? Promise.resolve({ demo: true, motstandere: ['Motlag', 'Naboland'], valgt: 'Motlag' }) : hent(opt.klient, opt.slug);
+    start.then((d) => { S.d = d; return velg(d.valgt || d.motstandere[0] || null); }).catch((e) => { el.innerHTML = '<div class="kort kp"><p class="liten">Kunne ikke hente data: ' + esc(e.message) + '</p></div>'; });
+
+    async function velg(mot) {
+      S.mot = mot; S.red = false; S.endret = false; S.status = ''; S.tekst = '';
+      if (!mot) { S.vm = null; return tegn(); }
+      el.querySelector('.kp') && el.querySelector('.kp').setAttribute('aria-busy', 'true');
+      if (opt.demo) { S.vm = demoVm(mot); const p = S.demoPlaner[mot]; S.plan = p ? kopi(p.data) : (mot === 'Motlag' ? { fokus: ['Serv på #7 – hun har 12 % feil i mottak. Unngå liberoen.', 'Linjeforsvar mot #9 i R1–R3; blokken tar diagonalen.', 'R1: rask ball på 4 når mottaket er bra.'], rot: { 1: { forsvar: 'linje', notat: 'Rask ball på 4 ved perfekt mottak.' }, 2: { forsvar: 'linje' }, 3: { forsvar: 'linje', notat: 'Midten dekker dip fra #9.' }, 4: { forsvar: 'dia' }, 5: { forsvar: 'dia' }, 6: { forsvar: 'dia', notat: 'Kort serve på #11 i sone 1.' } }, notat: '' } : null); S.versjon = p ? p.versjon : null; }
+      else {
+        let slag = []; try { slag = await S.d.slag(mot); } catch (e) { slag = []; }
+        S.vm = modell(S.d, mot, { slag, forsvarLagret: S.d.forsvar[mot] || null });
+        const p = S.d.kampplaner[mot]; S.plan = p ? kopi(p.data) : null; S.versjon = p ? p.versjon : null;
+      }
+      S.plan = S.plan || { fokus: [], rot: {}, notat: '' }; S.plan.rot = S.plan.rot || {}; S.plan.fokus = S.plan.fokus || [];
+      S.rot = S.vm.naaRot || (S.vm.rot && S.vm.rot.svak) || 1;
+      tegn();
+    }
+    const fokusListe = (cls) => { const f = (S.plan.fokus || []).filter((x) => x && x.trim()); return f.length ? '<ol class="kp-fokus' + (cls ? ' ' + cls : '') + '">' + f.map((x) => '<li><span>' + esc(x) + '</span></li>').join('') + '</ol>' : '<p class="kp-tom">Ingen fokuspunkter ennå. Trykk «Rediger plan».</p>'; };
+    const forsvarFor = (r) => ((S.plan.rot[r] || {}).forsvar) || null;
+
+    function tegn() {
+      const v = S.vm;
+      let h = '<div class="kort kp"><div class="rad kp-ikke-ark"><h2 class="v3-tittel">Kampplan</h2>' + (opt.demo ? '<span class="merke">Oppdiktede data</span>' : '') + '<span class="skyv"></span>' + (opt.ut || '') + '</div>';
+      if (!v) { el.innerHTML = h + '<p>Ingen motstandere i ' + esc(opt.lagnavn || 'laget') + ' ennå.</p></div>'; return opt.etter && opt.etter(); }
+      h += '<div class="rad kp-ikke-ark"><label class="etikett" for="kp-mot">Motstander</label><select id="kp-mot">' + S.d.motstandere.map((m) => '<option' + (m === S.mot ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select>'
+        + '<div class="kp-seg" role="group" id="kp-fane"><button type="button" data-v="ark" aria-pressed="' + (S.fane === 'ark') + '">Ark før kamp</button><button type="button" data-v="benk" aria-pressed="' + (S.fane === 'benk') + '">Benk</button></div>'
+        + '<span class="skyv"></span><span class="kp-status ' + (S.status || (S.endret ? 'ulagret' : S.versjon ? 'lagret' : '')) + '" role="status" aria-live="polite">' + esc(S.tekst || (S.endret ? 'Ikke lagret' : S.versjon ? 'Lagret' : 'Ingen plan ennå')) + '</span>'
+        + (S.red ? '<button class="knapp" type="button" id="kp-avbryt">Avbryt</button><button class="knapp primar" type="button" id="kp-lagre"' + (S.endret ? '' : ' disabled') + '>Lagre plan</button>'
+          : '<button class="knapp" type="button" id="kp-red">Rediger plan</button>' + (S.fane === 'ark' ? '<button class="knapp stille" type="button" id="kp-skriv">Skriv ut</button>' : '')) + '</div>';
+      if (S.red) h += redigering();
+      h += S.fane === 'ark' ? ark() : benk();
+      el.innerHTML = h + '</div>';
+      bind(); if (opt.etter) opt.etter();
+    }
+
+    function ark() {
+      const v = S.vm, lag = opt.lagnavn || 'Vi', n = v.neste;
+      const tittel = n ? (n.hjemme ? esc(lag) + ' – ' + esc(v.mot) : esc(v.mot) + ' – ' + esc(lag)) : esc(lag) + ' mot ' + esc(v.mot);
+      const under = n ? esc(dato(n.dato, true)) + ' kl. ' + esc(kl(n.dato)) + (n.sted ? ' · ' + esc(n.sted) : '') : 'Ingen kommende kamp registrert';
+      const tidl = v.tidligere.length ? 'Tidligere: ' + v.tidligere.map((k) => k.oss + '–' + k.dem + ' (' + dato(k.dato) + ')').join(', ') : 'Ingen tidligere kamper mot dem';
+      let h = '<article class="kp-ark" id="kp-ark"><div class="hode"><div><h2>' + tittel + '</h2><p>' + under + '</p></div><p>' + esc(tidl) + '</p></div>'
+        + '<section><h3>Fokus</h3>' + fokusListe() + '</section><div class="kp-to">';
+      // Deres angrep
+      h += '<section><h3>Deres angrep</h3>';
+      if (v.angrep.length) h += '<table><thead><tr><th>Spiller</th><th>Andel</th><th>Kill</th><th>Retning</th></tr></thead><tbody>' + v.angrep.map((a) => '<tr><td><b>#' + esc(a.nr) + '</b> ' + esc(a.navn) + '</td><td>' + (a.andel != null ? Math.round(a.andel) + ' %' : '–') + '</td><td>' + (a.killPct != null ? Math.round(a.killPct) + ' %' : '–') + '</td><td>'
+        + (a.retning ? '<div class="kp-stolpe" title="' + a.retning.n + ' slag"><span style="width:' + a.retning.diagonal + '%;background:#1B4592">' + (a.retning.diagonal >= 15 ? 'D' : '') + '</span><span style="width:' + a.retning.linje + '%;background:#B3261E">' + (a.retning.linje >= 15 ? 'L' : '') + '</span><span style="width:' + a.retning.dip + '%;background:#8A6D1F">' + (a.retning.dip >= 15 ? 'dip' : '') + '</span></div>' : '<span class="kilde">ingen slag</span>') + '</td></tr>').join('') + '</tbody></table>';
+      else h += '<p class="kp-tom">Ingen angrepstall for ' + esc(v.mot) + ' ennå.</p>';
+      h += '<p class="kilde">Angrep fra scouting (NVBF/CEV og egen føring). Retning fra slagretninger' + (v.retning ? ', ' + v.retning.n + ' slag' : '') + '.' + (v.mottak ? ' Lagets mottak: ' + Math.round(v.mottak.feilPct) + ' % feil' + (v.mottak.posPct != null ? ', ' + Math.round(v.mottak.posPct) + ' % positivt' : '') + '.' : '') + '</p></section>';
+      // Vår serve
+      h += '<section><h3>Vår serve</h3>';
+      if (v.harServeplan || ROT.some((r) => v.serve[r].server)) h += '<table><thead><tr><th>Rot.</th><th>Server</th><th>Mål</th><th>Sone</th></tr></thead><tbody>' + ROT.map((r) => { const s = v.serve[r]; return '<tr><td class="r">R' + r + '</td><td>' + (s.server ? '#' + esc(s.server.nr) : '–') + '</td><td><b>' + (s.mal ? '#' + esc(s.mal) : '–') + '</b>' + (s.reserve ? ' <span class="kilde">/ #' + esc(s.reserve) + '</span>' : '') + '</td><td>' + (s.sone || '–') + '</td></tr>'; }).join('') + '</tbody></table>';
+      h += '<p class="kilde">' + (v.harServeplan ? 'Fra Serveplan.' : 'Ingen serveplan mot ' + esc(v.mot) + ' ennå.') + (v.svakestMott ? ' Svakeste mottaker: #' + esc(v.svakestMott.nr) + (v.svakestMott.feilPct != null ? ' (' + Math.round(v.svakestMott.feilPct) + ' % feil)' : '') + '.' : '') + '</p></section>';
+      // Vårt forsvar
+      const fv = ROT.map((r) => forsvarFor(r)), linje = ROT.filter((r, i) => fv[i] === 'linje'), dia = ROT.filter((r, i) => fv[i] === 'dia');
+      h += '<section><h3>Vårt forsvar</h3><p>' + (linje.length || dia.length ? (linje.length ? 'Linjeforsvar i R' + linje.join(', R') + '. ' : '') + (dia.length ? 'Diaforsvar i R' + dia.join(', R') + '.' : '') : 'Forsvarsvalg per rotasjon er ikke satt.') + '</p>'
+        + (v.retning ? '<p>' + esc(v.mot) + ' slår ' + v.retning.diagonal + ' % diagonal, ' + v.retning.linje + ' % linje og ' + v.retning.dip + ' % dip.</p>' : '')
+        + '<p class="kilde">' + (v.forsvarLagret ? 'Oppsettene ligger i forsvarsplanen i Blokk/forsvar (lagret ' + esc(dato(v.forsvarLagret)) + ').' : 'Ingen forsvarsplan mot ' + esc(v.mot) + ' i Blokk/forsvar ennå; lagets standard brukes.') + '</p></section>';
+      // Våre rotasjoner
+      h += '<section><h3>Våre rotasjoner</h3>' + (v.rot ? '<p>Sideout ' + pst(v.rot.tot.so, v.rot.tot.son) + ' %, breakpoint ' + pst(v.rot.tot.bp, v.rot.tot.bpn) + ' %.' + (v.rot.svak ? ' <b>R' + v.rot.svak + ' er svakest</b> (' + (v.rot.per[v.rot.svak].netto > 0 ? '+' : '') + v.rot.per[v.rot.svak].netto + ' netto, sideout ' + (pst(v.rot.per[v.rot.svak].so, v.rot.per[v.rot.svak].son) ?? '–') + ' %).' : '') + (v.rot.best ? ' Best: R' + v.rot.best + '.' : '') + '</p>'
+        : '<p class="kp-tom">Ingen poengtelling ennå. Før kamper i Avansert for å få tall per rotasjon.</p>')
+        + '<p class="kilde">Fra Serve/rotasjon, alle kamper med poengtelling.</p></section></div>';
+      const notater = ROT.filter((r) => (S.plan.rot[r] || {}).notat);
+      if (notater.length || S.plan.notat) h += '<section><h3>Notater</h3>' + (S.plan.notat ? '<p>' + esc(S.plan.notat) + '</p>' : '') + notater.map((r) => '<p><b>R' + r + ':</b> ' + esc(S.plan.rot[r].notat) + '</p>').join('') + '</section>';
+      return h + '</article>';
+    }
+
+    function benk() {
+      const v = S.vm, r = S.rot, s = v.serve[r], rp = v.rot && v.rot.per[r], f = forsvarFor(r);
+      let h = '<div class="rad kp-ikke-ark"><span class="skyv"></span><div class="kp-trinn" id="kp-trinn" role="group" aria-label="Rotasjon">'
+        + ROT.map((i) => '<button type="button" data-r="' + i + '" aria-pressed="' + (i === r) + '"' + (v.rot && v.rot.svak === i ? ' class="svak"' : '') + '>R' + i + (v.naaRot === i ? '<small>nå</small>' : '') + '</button>').join('') + '</div></div>';
+      h += '<div class="kp-band">' + fokusListe() + '</div><div class="kp-kort">'
+        + '<div><h3>Vi server</h3><div class="stor">' + (s.server ? '#' + esc(s.server.nr) : '?') + ' → ' + (s.mal ? '#' + esc(s.mal) : '?') + '</div><span class="liten">' + (s.sone ? 'sone ' + s.sone : 'ingen sone') + (s.reserve ? ' · reserve #' + esc(s.reserve) : '') + (rp && rp.bpn ? ' · breakpoint ' + pst(rp.bp, rp.bpn) + ' %' : '') + '</span></div>'
+        + '<div><h3>Vi mottar</h3><div class="stor' + (rp && rp.son && pst(rp.so, rp.son) < 50 ? ' bad' : '') + '">' + (rp && rp.son ? pst(rp.so, rp.son) + ' %' : '–') + '</div><span class="liten">' + (rp ? 'sideout i R' + r + ' · netto ' + (rp.netto > 0 ? '+' : '') + rp.netto : 'ingen poengtelling ennå') + '</span></div>'
+        + '<div><h3>Forsvar</h3><div class="stor">' + (f === 'linje' ? 'Linje' : f === 'dia' ? 'Dia' : '–') + '</div><span class="liten">' + (v.retning ? esc(v.mot) + ': ' + v.retning.diagonal + ' % diagonal, ' + v.retning.linje + ' % linje' : 'ingen slagretninger') + (!f && v.forslagForsvar ? ' · forslag: ' + (v.forslagForsvar === 'dia' ? 'dia' : 'linje') : '') + '</span></div></div>';
+      const n = (S.plan.rot[r] || {}).notat;
+      h += '<div class="kp-notat">' + (n ? esc(n) : 'Ingen notat for R' + r + '.') + '</div>'
+        + '<p class="liten">' + (v.naaRot ? 'Kampen pågår: R' + v.naaRot + ' er rotasjonen nå ifølge poengtellingen.' : 'Rød strek = svakeste rotasjon fra Serve/rotasjon. Under kamp markeres rotasjonen nå når poengene telles i Avansert.') + '</p>';
+      return h;
+    }
+
+    function redigering() {
+      const v = S.vm, f = S.plan.fokus || [];
+      let h = '<div class="kp-red kp-ikke-ark"><h3 class="etikett">Tre fokuspunkter</h3>' + [0, 1, 2].map((i) => '<input type="text" id="kp-f' + i + '" maxlength="140" value="' + esc(f[i] || '') + '" placeholder="Fokuspunkt ' + (i + 1) + '" aria-label="Fokuspunkt ' + (i + 1) + '">').join('')
+        + '<h3 class="etikett">Forsvar og notat per rotasjon</h3>' + (v.forslagForsvar ? '<p class="liten">' + esc(v.mot) + ' slår mest ' + (v.forslagForsvar === 'dia' ? 'diagonalt' : 'på linje') + ' (' + v.retning.n + ' slag). Forslag: ' + (v.forslagForsvar === 'dia' ? 'dia' : 'linje') + '.</p>' : '');
+      ROT.forEach((r) => { const x = S.plan.rot[r] || {};
+        h += '<div class="rr"><b>R' + r + '</b><div class="kp-seg" role="group" aria-label="Forsvar i R' + r + '">' + [['linje', 'Linje'], ['dia', 'Dia']].map(([k, t]) => '<button type="button" data-r="' + r + '" data-f="' + k + '" aria-pressed="' + (x.forsvar === k) + '">' + t + '</button>').join('') + '</div>'
+          + '<input type="text" id="kp-n' + r + '" data-r="' + r + '" maxlength="160" value="' + esc(x.notat || '') + '" placeholder="Notat for R' + r + '" aria-label="Notat for R' + r + '"></div>'; });
+      return h + '<label class="etikett" for="kp-notat">Notat</label><textarea id="kp-notat" maxlength="600">' + esc(S.plan.notat || '') + '</textarea></div>';
+    }
+
+    function merkEndret() { if (!S.endret) { S.endret = true; S.status = ''; S.tekst = ''; const st = el.querySelector('.kp-status'); if (st) { st.className = 'kp-status ulagret'; st.textContent = 'Ikke lagret'; } const l = el.querySelector('#kp-lagre'); if (l) l.disabled = false; } }
+    function bind() {
+      const $ = (s) => el.querySelector(s);
+      if ($('#kp-mot')) $('#kp-mot').onchange = (e) => { if (S.endret && !S.vilBytte) { S.vilBytte = true; S.status = 'feil'; S.tekst = 'Lagre eller avbryt før du bytter motstander.'; e.target.value = S.mot; S.vilBytte = false; return tegn(); } velg(e.target.value); };
+      if ($('#kp-fane')) $('#kp-fane').onclick = (e) => { const b = e.target.closest('button'); if (b) { S.fane = b.dataset.v; tegn(); } };
+      if ($('#kp-trinn')) $('#kp-trinn').onclick = (e) => { const b = e.target.closest('button'); if (b) { S.rot = +b.dataset.r; tegn(); } };
+      if ($('#kp-red')) $('#kp-red').onclick = () => { S.red = true; S.lagretKopi = kopi(S.plan); tegn(); const f = $('#kp-f0'); if (f) f.focus(); };
+      if ($('#kp-avbryt')) $('#kp-avbryt').onclick = () => { S.plan = S.lagretKopi || S.plan; S.red = false; S.endret = false; S.status = ''; S.tekst = ''; tegn(); };
+      if ($('#kp-lagre')) $('#kp-lagre').onclick = lagre;
+      if ($('#kp-skriv')) $('#kp-skriv').onclick = () => { document.body.classList.add('kp-utskrift'); const ferdig = () => { document.body.classList.remove('kp-utskrift'); window.removeEventListener('afterprint', ferdig); }; window.addEventListener('afterprint', ferdig); window.print(); setTimeout(ferdig, 1500); };
+      [0, 1, 2].forEach((i) => { const f = $('#kp-f' + i); if (f) f.oninput = () => { S.plan.fokus[i] = f.value; merkEndret(); }; });
+      el.querySelectorAll('.kp-red [data-f]').forEach((b) => { b.onclick = () => { const x = S.plan.rot[b.dataset.r] || (S.plan.rot[b.dataset.r] = {}); x.forsvar = x.forsvar === b.dataset.f ? undefined : b.dataset.f; if (!x.forsvar) delete x.forsvar;
+        b.parentNode.querySelectorAll('button').forEach((y) => y.setAttribute('aria-pressed', String(y.dataset.f === x.forsvar))); merkEndret(); }; });
+      el.querySelectorAll('.kp-red input[data-r]').forEach((n) => { n.oninput = () => { const x = S.plan.rot[n.dataset.r] || (S.plan.rot[n.dataset.r] = {}); if (n.value) x.notat = n.value; else delete x.notat; merkEndret(); }; });
+      if ($('#kp-notat')) $('#kp-notat').oninput = (e) => { S.plan.notat = e.target.value; merkEndret(); };
+    }
+    async function lagre() {
+      const data = { fokus: (S.plan.fokus || []).slice(0, 3).map((x) => String(x || '').slice(0, 140)), rot: S.plan.rot, notat: String(S.plan.notat || '').slice(0, 600) };
+      try {
+        if (opt.demo) { S.versjon = (S.versjon || 0) + 1; S.demoPlaner[S.mot] = { data: kopi(data), versjon: S.versjon }; }
+        else { S.versjon = await S.d.lagreKp(S.mot, data, S.versjon); S.d.kampplaner[S.mot] = { data: kopi(data), versjon: S.versjon }; }
+        S.red = false; S.endret = false; S.status = ''; S.tekst = 'Lagret';
+      } catch (e) {
+        if (e.konflikt && !opt.demo) {
+          const p = await S.d.hentKp(S.mot).catch(() => null);
+          if (p) { S.d.kampplaner[S.mot] = p; S.plan = kopi(p.data); S.plan.rot = S.plan.rot || {}; S.plan.fokus = S.plan.fokus || []; S.versjon = p.versjon; S.endret = false; }
+          S.status = 'feil'; S.tekst = 'Noen andre lagret planen i mellomtiden. Du ser nå deres versjon – gjør endringen på nytt.';
+        } else { S.status = 'feil'; S.tekst = 'Ikke lagret: ' + e.message; }
+      }
+      tegn();
+    }
+  }
+
+  const eksport = { modell, demoVm, vis };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Kampplan = eksport;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -1579,7 +1846,7 @@ window.V3Moduler = (function (root) {
   const MODULER = [
     ['serve-rotasjon', 'Serve/rotasjon', 'Sideout og breakpoint', 'Serve og mottak fordelt på rotasjon: hvor laget vinner og taper poeng, hvilke rotasjoner som sliter i mottak, og hvordan serven virker mot hver motstander.'],
     ['videoanalyse', 'Videoanalyse', 'Klipp fra kamp', 'Kampvideo koblet til registreringene, så hver aksjon kan ses med statistikken ved siden av – per spiller, rotasjon eller type aksjon.'],
-    ['kampplan', 'Kampplan', 'Mot neste kamp', 'Plan mot neste motstander, bygget på statistikken fra tidligere kamper: hvem som bør serves på, mottaksformasjon, angrepsvalg og fokuspunkter.'],
+    ['kampplan', 'Kampplan', 'Ark og benk', 'Plan mot neste motstander, bygget på statistikken fra tidligere kamper: hvem som bør serves på, mottaksformasjon, angrepsvalg og fokuspunkter.'],
     ['serveplan', 'Serveplan', 'Mål per rotasjon', 'Hvem som serves på i hver rotasjon, og hvor, basert på motstanderens mottakstall.'],
     ['observasjoner', 'Observasjoner', 'Notater', 'Korte notater fra kamp og trening, knyttet til kamp, sett og spiller, så de kan brukes i neste kampplan.'],
     ['treningsprioriteringer', 'Treningsprioriteringer', 'Hva vi bør trene', 'Hva statistikken peker på at laget bør trene mer på, med utviklingen gjennom sesongen.'],
@@ -1616,7 +1883,7 @@ window.V3Moduler = (function (root) {
   function visInnhold() {
     const el = $('modul-v3'), m = MODULER.find((x) => x[0] === S.modul);
     const ut = S.delt || !S.bruker ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut</button>';
-    const ferdig = { 'serve-rotasjon': root.ServeRotasjon, serveplan: root.Serveplan }[S.modul];
+    const ferdig = { 'serve-rotasjon': root.ServeRotasjon, serveplan: root.Serveplan, kampplan: root.Kampplan }[S.modul];
     if (S.tilgang && ferdig) {
       // Ferdige moduler (V3 fase 3): tegnes av egen fil med samme klient som tilgangen ble sjekket med
       ferdig.vis(el, { klient: S.klient, slug: S.slug, lagnavn: S.lagnavn, demo: S.demo, ut,
