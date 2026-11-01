@@ -951,6 +951,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
  *   <prefix>matches[/id]                  → stats.matches + match_sets (resultat med versjonskontroll)
  *   <prefix>matches/id/log/<enhet>-s<sett> set({events}) → nye elementer blir hendelser (append),
  *                                         et fjernet siste element blir en «undo»-rad (tombstone)
+ *   <prefix>matches/id/poeng/<enhet>-s<sett> set({poeng}) → stats.poeng (V3 fase 3), samme mønster: nye elementer settes inn,
+ *                                         et fjernet element blir en «angre»-rad, endret grunn oppdateres
  * Hendelser går via en lokal kø (IndexedDB i nettleseren) og sendes med fast id, så gjentak aldri gir duplikater.
  * Ren JavaScript uten DOM-avhengighet (unntatt valgfri IndexedDB). Testes i Node med en falsk klient.
  */
@@ -1076,6 +1078,30 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       });
     return docs;
   }
+  // Poeng (V3 fase 3). Appens element: { id, t, type: 'poeng'|'start', v, k, g, e } / { id, t, type: 'start', so, sd, ss }
+  function poengTilRad(x, k) {
+    const rad = { id: k.id, match_id: k.matchId, context_id: k.ctxId, device_id: k.device, seq: k.seq, set_no: +k.set || 1,
+      recorded_at: new Date(x.t || Date.now()).toISOString(), recorded_by: k.userId, type: x.type === 'start' ? 'start' : 'poeng' };
+    if (rad.type === 'start') Object.assign(rad, { start_oss: +x.so || 0, start_dem: +x.sd || 0, start_server: x.ss === 'dem' ? 'dem' : 'oss' });
+    else Object.assign(rad, { vinner: x.v === 'dem' ? 'dem' : 'oss', kilde: x.k === 'auto' ? 'auto' : 'manuell', grunn: x.g ? String(x.g).slice(0, 60) : null, event_id: k.eventId || null });
+    return rad;
+  }
+  function radTilPoeng(r, evT) {
+    const x = { id: r.id, t: Date.parse(r.recorded_at), type: r.type };
+    if (r.type === 'start') Object.assign(x, { so: r.start_oss, sd: r.start_dem, ss: r.start_server });
+    else Object.assign(x, { v: r.vinner, k: r.kilde, g: r.grunn || null, e: (r.event_id && evT && evT(r.event_id)) || null });
+    return x;
+  }
+  // Rader → appens poengdokumenter <enhet>-s<sett>, uten angrede poeng og uten angre-radene
+  function grupperPoeng(rader, evT) {
+    const angret = new Set(rader.filter((r) => r.type === 'angre').map((r) => r.angrer));
+    const docs = {};
+    rader.filter((r) => r.type !== 'angre' && !angret.has(r.id))
+      .sort((a, b) => a.seq - b.seq || Date.parse(a.recorded_at) - Date.parse(b.recorded_at))
+      .forEach((r) => { const key = r.device_id + '-s' + r.set_no; (docs[key] || (docs[key] = { device: r.device_id, set: r.set_no, poeng: [] })).poeng.push(radTilPoeng(r, evT)); });
+    return docs;
+  }
+
   // Stabil id for en hendelse fra appen (eventets egen id hvis den finnes, ellers innhold + plass)
   function hendelsesId(matchId, key, ev) {
     if (erUuid(ev.id)) return ev.id;
@@ -1104,6 +1130,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       async tøm(utfør, påFeil) {
         if (kjører) return kjører;
         kjører = (async () => {
+          // Vent ett steg: ellers settes kjører = null (tom kø) før løftet er lagret, og køen låser seg for godt
+          await null;
           while (ops.length) {
             try { await utfør(ops[0]); forsøk = 0; }
             catch (e) {
@@ -1133,6 +1161,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const loggKjent = {};         // matchUuid → Map(id → {key, ev}) – det appen har sett
     const ventende = {};          // matchUuid → [rad] i kø, vises i øyeblikksbilder
     const seqNeste = {};          // matchUuid → neste seq for denne enheten
+    const poengKjent = {};        // matchUuid → Map(id → {key, x}) – poengene appen har sett
+    const poengVent = {};         // matchUuid → [rad] i kø
+    const grunnVent = {};         // poeng-id → grunn som venter på å bli sendt
     // seq må være unik per (kamp, enhet) også når enheten starter offline: tidsbasert (tidels sekunder siden 2026),
     // og alltid større enn forrige. Passer i int4 til ca. 2032.
     const nesteSeq = (m) => { const s = Math.max(seqNeste[m] || 0, Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 100)); seqNeste[m] = s + 1; return s; };
@@ -1236,7 +1267,71 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       varsle();
       return tøm();
     }
+    // ----- poeng (V3 fase 3) -----
+    // Registreringen et autopoeng kom fra: appen sender tidspunktet (ev.t), databasen lagrer hendelsens id
+    const hendelseFraT = (mUuid, key, t) => { for (const [id, v] of (loggKjent[mUuid] || new Map())) if (v.key === key && v.ev.t === t) return id; return null; };
+    const tFraHendelse = (mUuid) => (id) => { const v = (loggKjent[mUuid] || new Map()).get(id); return v ? v.ev.t : null; };
+    async function hentPoeng(mUuid) {
+      const rader = kast(await db.from('poeng').select('*').eq('match_id', mUuid));
+      const alle = rader.concat((poengVent[mUuid] || []).filter((v) => !rader.some((r) => r.id === v.id)));
+      alle.forEach((r) => { if (grunnVent[r.id] !== undefined) r.grunn = grunnVent[r.id]; });
+      const egen = alle.filter((r) => r.device_id === device);
+      seqNeste[mUuid] = Math.max(seqNeste[mUuid] || 0, egen.reduce((a, r) => Math.max(a, r.seq + 1), 0));
+      const kjent = poengKjent[mUuid] || (poengKjent[mUuid] = new Map()), evT = tFraHendelse(mUuid);
+      const docs = grupperPoeng(alle, (id) => evT(id));
+      Object.entries(docs).forEach(([key, d]) => d.poeng.forEach((x, i) => {
+        const g = kjent.get(x.id); if (g && g.x.e && !x.e) d.poeng[i] = x = Object.assign({}, x, { e: g.x.e });   // tidspunktet appen sendte
+        kjent.set(x.id, { key, x });
+      }));
+      return docs;
+    }
+    async function settPoeng(ctxId, mUuid, key, data) {
+      const kjent = poengKjent[mUuid] || (poengKjent[mUuid] = new Map());
+      const nye = data.poeng || [];
+      const ids = nye.map((x) => (erUuid(x.id) ? x.id : uuidFra(['p', mUuid, key, x.id || '', x.t, x.type, x.v].join('|'))));
+      const før = [...kjent.entries()].filter(([, v]) => v.key === key).map(([id]) => id);
+      const set = +data.set || +String(key).split('-s').pop() || 1;
+      const vent = poengVent[mUuid] || (poengVent[mUuid] = []);
+      for (let i = 0; i < nye.length; i++) {
+        const g = kjent.get(ids[i]);
+        if (g) {   // kjent: bare grunnen kan endres
+          const ny = nye[i].g ? String(nye[i].g).slice(0, 60) : null, gml = g.x.g || null;
+          if (nye[i].type !== 'start' && ny !== gml) { grunnVent[ids[i]] = ny; await ko.legg({ t: 'pgrunn', id: ids[i], grunn: ny, match_id: mUuid }); }
+          kjent.set(ids[i], { key, x: Object.assign({}, g.x, { g: ny }) });
+          continue;
+        }
+        const rad = poengTilRad(nye[i], { id: ids[i], matchId: mUuid, ctxId, device, seq: nesteSeq(mUuid), set, userId,
+          eventId: nye[i].e ? hendelseFraT(mUuid, device + '-s' + set, nye[i].e) : null });
+        kjent.set(ids[i], { key, x: Object.assign({}, nye[i], { id: ids[i] }) });
+        vent.push(rad);
+        await ko.legg({ t: 'pins', rad });
+      }
+      for (const id of før) {
+        if (ids.includes(id)) continue;
+        const rad = { id: uuidFra('angre|' + id), match_id: mUuid, context_id: ctxId, device_id: device, seq: nesteSeq(mUuid), set_no: set,
+          recorded_at: new Date().toISOString(), recorded_by: userId, type: 'angre', angrer: id };
+        kjent.delete(id);
+        const i = vent.findIndex((r) => r.id === id); if (i >= 0) vent.splice(i, 1);
+        vent.push(rad);
+        await ko.legg({ t: 'pins', rad });
+      }
+      varsle();
+      return tøm();
+    }
+
     async function utfør(op) {
+      if (op.t === 'pins') {
+        const r = await db.from('poeng').upsert(op.rad, { onConflict: 'id', ignoreDuplicates: true });
+        if (r.error && /poeng_angre_en|duplicate key/i.test(r.error.message || '')) { status.konflikter++; } // allerede angret = ferdig
+        else kast(r);
+        const v = poengVent[op.rad.match_id]; if (v) { const i = v.findIndex((x) => x.id === op.rad.id); if (i >= 0) v.splice(i, 1); }
+        return;
+      }
+      if (op.t === 'pgrunn') {
+        kast(await db.from('poeng').update({ grunn: op.grunn }).eq('id', op.id));
+        if (grunnVent[op.id] === op.grunn) delete grunnVent[op.id];
+        return;
+      }
       if (op.t === 'ins') {
         const r = await db.from('events').upsert(op.rad, { onConflict: 'id', ignoreDuplicates: true });
         if (r.error && /events_undo_once|duplicate key/i.test(r.error.message || '')) { status.konflikter++; } // allerede angret = ferdig
@@ -1246,7 +1341,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     }
     let tømTimer = null;
     async function tøm() {
-      const igjen = await ko.tøm(utfør, (e, op) => { status.feil.push({ melding: e.message, kode: e.code, op: op.rad && op.rad.id }); });
+      const igjen = await ko.tøm(utfør, (e, op) => { status.feil.push({ melding: e.message, kode: e.code, op: (op.rad && op.rad.id) || op.id }); });
       varsle();
       clearTimeout(tømTimer);
       if (igjen) tømTimer = setTimeout(tøm, ko.ventetid());
@@ -1370,6 +1465,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
             if (pl.length) kast(await db.from('opponent_players').upsert(pl, { onConflict: 'opponent_id,jersey' }));
             return;
           }
+          if (deler[0] === 'matches' && deler[2] === 'poeng' && deler[3]) return settPoeng(c.id, await kampUuid(c.id, deler[1]), deler[3], data);
           if (deler[0] === 'matches' && deler[2] === 'log' && deler[3]) return settLogg(c.id, await kampUuid(c.id, deler[1]), deler[3], data);
           if (deler[0] === 'matches' && deler[1] && deler.length === 2) return oppdaterKamp(c.id, deler[1], data);
           if (p === 'config/logos') {
@@ -1388,7 +1484,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
         async delete() {
           const c = await ctxFor(s);
           if (deler[0] === 'matches' && deler.length === 2) { kast(await db.from('matches').delete().eq('id', await kampUuid(c.id, deler[1]))); return; }
-          if (deler[2] === 'log') return; // hendelser slettes med kampen (append-only)
+          if (deler[2] === 'log' || deler[2] === 'poeng') return; // hendelser og poeng slettes med kampen (append-only)
           throw Object.assign(new Error('Sletting støttes ikke for ' + sti), { code: 'ukjent-sti' });
         },
       };
@@ -1405,6 +1501,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
             else if (deler[0] === 'matches' && deler[2] === 'log') {
               const u = await kampUuid(c.id, deler[1]);
               av = lytt('logg', [['events', 'match_id=eq.' + u]], async () => Object.entries(await hentLogger(c.id, u)), (x) => cb(samSnap(x)), feil);
+            } else if (deler[0] === 'matches' && deler[2] === 'poeng') {
+              const u = await kampUuid(c.id, deler[1]);
+              av = lytt('poeng', [['poeng', 'match_id=eq.' + u]], async () => Object.entries(await hentPoeng(u)), (x) => cb(samSnap(x)), feil);
             } else if (deler[0] === 'opponents')
               av = lytt('motst', [['opponents', 'context_id=eq.' + c.id], ['opponent_players']], async () => {
                 const o = kast(await db.from('opponents').select('*').eq('context_id', c.id));
@@ -1442,7 +1541,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function ClaudeStore(db) { return db; }
 
-  const eksport = { SupabaseStore, ClaudeStore, Ko, lagLagring, uuidFra, erUuid, hendelsesId, eventTilRad, radTilEvent, grupperLogger,
+  const eksport = { SupabaseStore, ClaudeStore, Ko, lagLagring, uuidFra, erUuid, hendelsesId, eventTilRad, radTilEvent, grupperLogger, poengTilRad, radTilPoeng, grupperPoeng,
     kampTilClaude, patchTilKamp, rosterTilClaude, rosterTilRader, lokalTid, fraLokalTid, slug };
   if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.StatsV2 = eksport;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1457,7 +1556,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 (function (root) {
   'use strict';
   function FakeDb(seed) {
-    const t = { contexts: [], squad_players: [], opponents: [], opponent_players: [], matches: [], match_sets: [], events: [], scouting_notes: [], logos: [] };
+    const t = { contexts: [], squad_players: [], opponents: [], opponent_players: [], matches: [], match_sets: [], events: [], poeng: [], scouting_notes: [], logos: [] };
     Object.assign(t, JSON.parse(JSON.stringify(seed || {})));
     const lyttere = [];
     return {
@@ -1467,7 +1566,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     };
   }
   function match(filter, rad) { const m = String(filter).match(/^(\w+)=eq\.(.+)$/); return !m || !rad || String(rad[m[1]]) === m[2]; }
-  const nøkler = { events: ['id'], matches: ['id'], contexts: ['id'], squad_players: ['context_id', 'legacy_id'], opponents: ['context_id', 'slug'],
+  const nøkler = { events: ['id'], poeng: ['id'], matches: ['id'], contexts: ['id'], squad_players: ['context_id', 'legacy_id'], opponents: ['context_id', 'slug'],
     opponent_players: ['opponent_id', 'jersey'], match_sets: ['match_id', 'set_no'], scouting_notes: ['context_id', 'opponent_slug', 'jersey'], logos: ['context_id', 'team'] };
   const uid = () => 'f' + Math.random().toString(16).slice(2, 10) + '-0000-4000-8000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0');
 
@@ -1490,7 +1589,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
         if (db.nekt && db.nekt(tabell, op)) return { data: null, error: { message: 'new row violates row-level security policy', code: '42501' } };
         const T = db.t[tabell]; const passer = (r) => filtre.every((f) => f(r));
         if (op === 'select') return { data: JSON.parse(JSON.stringify(T.filter(passer))), error: null };
-        if (op === 'delete') { const ut = T.filter(passer); db.t[tabell] = T.filter((r) => !passer(r)); if (tabell === 'matches') ut.forEach((m) => { db.t.events = db.t.events.filter((e) => e.match_id !== m.id); db.t.match_sets = db.t.match_sets.filter((s) => s.match_id !== m.id); }); ut.forEach((r) => db.varsle(tabell, r)); return { data: retur ? ut : null, error: null }; }
+        if (op === 'delete') { const ut = T.filter(passer); db.t[tabell] = T.filter((r) => !passer(r)); if (tabell === 'matches') ut.forEach((m) => { db.t.events = db.t.events.filter((e) => e.match_id !== m.id); db.t.poeng = db.t.poeng.filter((e) => e.match_id !== m.id); db.t.match_sets = db.t.match_sets.filter((s) => s.match_id !== m.id); }); ut.forEach((r) => db.varsle(tabell, r)); return { data: retur ? ut : null, error: null }; }
         if (op === 'update') {
           const ut = [];
           T.filter(passer).forEach((r) => { Object.assign(r, JSON.parse(JSON.stringify(patch))); if (tabell === 'matches') r.version = (r.version || 1) + 1; ut.push(r); db.varsle(tabell, r); });
@@ -1502,6 +1601,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           const r = JSON.parse(JSON.stringify(r0));
           if (tabell === 'events' && r.type === 'undo' && T.some((e) => e.undoes === r.undoes && e.id !== r.id))
             return { data: null, error: { message: 'duplicate key value violates unique constraint "events_undo_once"', code: '23505' } };
+          if (tabell === 'poeng' && r.type === 'angre' && T.some((e) => e.angrer === r.angrer && e.id !== r.id))
+            return { data: null, error: { message: 'duplicate key value violates unique constraint "poeng_angre_en"', code: '23505' } };
           const fins = T.find((x) => k.every((f) => String(x[f]) === String(r[f])));
           if (fins) {
             if (op === 'insert') return { data: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } };
@@ -1510,7 +1611,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           }
           if (!r.id && tabell !== 'match_sets' && tabell !== 'opponent_players' && tabell !== 'scouting_notes' && tabell !== 'logos') r.id = uid();
           if (tabell === 'matches') Object.assign(r, Object.assign({ version: 1, status: 'kommende', current_set: 1, current_home: 0, current_away: 0, sets_home: 0, sets_away: 0, publish: true, is_test: false }, r));
-          if (tabell === 'events') r.received_at = new Date().toISOString();
+          if (tabell === 'events' || tabell === 'poeng') r.received_at = new Date().toISOString();
           T.push(r); ut.push(r); db.varsle(tabell, r);
         }
         return { data: retur ? JSON.parse(JSON.stringify(ut)) : null, error: null };
@@ -3111,7 +3212,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   const S = {
     db: null, dl: null, ready: false, offline: false,
-    roster: [], matches: [], logs: {}, logUnsub: null, opps: {}, contexts: [MAIN_CTX], ctxReady: false, showNewCtx: false,
+    roster: [], matches: [], logs: {}, logUnsub: null, plogs: {}, plogUnsub: null, opps: {}, contexts: [MAIN_CTX], ctxReady: false, showNewCtx: false,
     view: 'list', matchId: null, filter: 'alle', statSet: 'all',
     showNew: false, flash: null, error: '',
     // Dashboard: lesetilgang uten registrering (den åpne siden, eller personer med «Kan se»-tilgang)
@@ -3306,8 +3407,14 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function openLogs(id) {
     if (S.logUnsub) { S.logUnsub(); S.logUnsub = null; }
-    S.logs = {}; S.logsFor = null;
+    if (S.plogUnsub) { S.plogUnsub(); S.plogUnsub = null; }
+    S.logs = {}; S.logsFor = null; S.plogs = {};
     if (!S.db || !id) return;
+    // Poeng i Avansert (V3 fase 3): egne lister per enhet og sett, som registreringene
+    S.plogUnsub = S.db.collection(PFX + 'matches/' + id + '/poeng').onSnapshot((snap) => {
+      const p = {}; snap.docs.forEach((d) => { p[d.id] = (d.data().poeng || []).slice(); });
+      S.plogs = p; render();
+    }, () => {});
     S.logUnsub = S.db.collection(PFX + 'matches/' + id + '/log').onSnapshot((snap) => {
       const logs = {};
       snap.docs.forEach((d) => { logs[d.id] = (d.data().events || []).slice(); });
@@ -3333,7 +3440,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // ---------- Poengmodus (V3 fase 3, variant D – til test) ----------
   // Avgjørende registreringer gir poeng automatisk; resten tas med +1 oss / +1 dem (valgfri grunn).
   // Slått på per kamp, og bare der siden tillater det (V2_CONFIG.poengmodus). Ellers føres det nøyaktig som før.
-  // Testversjon: poengene lagres i kampens legacy-felt «poeng» per sett, og stillingen i current. Endelig versjon får egen hendelsestype.
+  // Poengene lagres som egne registreringer (stats.poeng): én liste per enhet og sett, angre blir en egen rad. Stillingen lagres også i current.
   const POENG_AV = { 'att-2': ['oss', 'Kill'], 'srv-E': ['oss', 'Ess'], 'opp-0': ['oss', 'Motstander mottaksfeil'],
     'att-0': ['dem', 'Angrepsfeil'], 'att-B': ['dem', 'Blokkert'], 'srv-F': ['dem', 'Servefeil'], 'rec-0': ['dem', 'Mottaksfeil'] };
   const POENG_PAR = { 'srv-E': 'opp-0', 'opp-0': 'srv-E' };   // samme ballveksling sett fra begge sider: telles én gang
@@ -3378,12 +3485,29 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function poengTillatt() { return !S.dash && !window.PUBLIC; }
   function poengPaa(m) { return poengTillatt() && !!m && erAv(m); }
   function poengSett(m) { return (m.current && m.current.set) || 1; }
-  function poengListe(m, set) { return ((m.poeng || {})[String(set)] || []); }
+  const pUuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
+  const pKey = (set) => deviceId + '-s' + set;
+  function pEgen(set) { return (S.plogs[pKey(set)] || []).slice(); }
+  // Alle enheters poeng i settet, i tidsrekkefølge. Siste «start» (Avansert slått på midt i settet) er utgangspunktet.
+  function poengAlle(set) {
+    const alle = []; Object.entries(S.plogs || {}).forEach(([k, l]) => { if (k.endsWith('-s' + set)) alle.push(...l); });
+    alle.sort((a, b) => a.t - b.t);
+    let base = null; alle.forEach((x) => { if (x.type === 'start') base = x; });
+    return { base, poeng: alle.filter((x) => x.type !== 'start' && (!base || x.t >= base.t)) };
+  }
+  function poengListe(m, set) { return poengAlle(set).poeng; }
+  function egneSistePoeng(set) { const l = pEgen(set), { base } = poengAlle(set); for (let i = l.length - 1; i >= 0; i--) { if (l[i].type === 'start') return -1; if (!base || l[i].t >= base.t) return i; } return -1; }
+  async function poengSkriv(m, set, liste) {
+    S.plogs = Object.assign({}, S.plogs, { [pKey(set)]: liste });
+    const vent = S.loggSkriv;   // autopoeng: registreringen lagres først, så poenget kan peke på den
+    try { if (vent) await vent; await S.db.doc(PFX + 'matches/' + m.id + '/poeng/' + pKey(set)).set({ device: deviceId, set, poeng: liste }); }
+    catch (e) { S.error = 'Poenget ble ikke lagret (' + (e.code || e.message) + ').'; render(); }
+  }
   function poengTilstand(m) {
     const set = poengSett(m), st = (m.lineups && m.lineups.sets && m.lineups.sets[String(set)] && m.lineups.sets[String(set)].start) || null;
-    const base = (m.poengStart || {})[String(set)] || null;
-    const t = { set, oss: base ? base.oss : 0, dem: base ? base.dem : 0, server: base ? base.server : (st && st.firstServe === 'motstander' ? 'dem' : 'oss'), rot: (st && st.rotation) || null, auto: 0, n: 0, kjentStart: !!st };
-    poengListe(m, set).forEach((x) => {
+    const a = poengAlle(set), base = a.base ? { oss: a.base.so, dem: a.base.sd, server: a.base.ss } : null;
+    const t = { set, oss: base ? base.oss : 0, dem: base ? base.dem : 0, server: base ? base.server : (st && st.firstServe === 'motstander' ? 'dem' : 'oss'), rot: (st && st.rotation) || null, auto: 0, n: 0, egne: egneSistePoeng(set) >= 0, kjentStart: !!st };
+    a.poeng.forEach((x) => {
       t.n++; if (x.k === 'auto') t.auto++;
       if (x.v === 'oss') { t.oss++; if (t.server === 'dem' && t.rot && window.Oppstilling) t.rot = Oppstilling.rotasjonEtter(t.rot, 1); t.server = 'oss'; }
       else { t.dem++; t.server = 'dem'; }
@@ -3393,17 +3517,17 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   function poengLagre(m) {
     const t = poengTilstand(m), hjemme = m.home === usName(m);
     m.current = { set: t.set, home: hjemme ? t.oss : t.dem, away: hjemme ? t.dem : t.oss };
-    saveMatch(m.id, { poeng: m.poeng, current: m.current });
+    saveMatch(m.id, { current: m.current });
   }
   function poengLegg(m, v, k, g, e) {
-    const set = poengSett(m); m.poeng = Object.assign({}, m.poeng || {});
-    m.poeng[String(set)] = poengListe(m, set).concat([{ v, k, g: g || null, e: e || null, t: Date.now(), d: deviceId }]);
-    poengLagre(m);
+    const set = poengSett(m), l = pEgen(set).concat([{ id: pUuid(), t: Date.now(), type: 'poeng', v, k, g: g || null, e: e || null }]);
+    poengSkriv(m, set, l); poengLagre(m);
   }
+  // Angre poeng: denne enhetens siste poeng i settet (som «Angre» for registreringer)
   function poengAngre(m) {
-    const set = poengSett(m), l = poengListe(m, set); if (!l.length) return;
-    m.poeng = Object.assign({}, m.poeng || {}); m.poeng[String(set)] = l.slice(0, -1);
-    S.poengKv = null; S.poengGrunn = null; S.poengSiste = null; poengLagre(m); render();
+    const set = poengSett(m), i = egneSistePoeng(set); if (i < 0) return;
+    const l = pEgen(set); l.splice(i, 1);
+    S.poengKv = null; S.poengGrunn = null; S.poengSiste = null; poengSkriv(m, set, l); poengLagre(m); render();
   }
   function poengNr(m, ev) { return ev.type === 'opp' ? ev.p : ((player(ev.p) || {}).nr || ''); }
   function poengFraReg(m, ev) {
@@ -3418,8 +3542,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // Angre siste registrering: et poeng som kom fra den registreringen, angres også
   function poengVedAngre(m, ev) {
     if (!poengPaa(m) || !ev) return;
-    const set = poengSett(m), l = poengListe(m, set), x = l[l.length - 1];
-    if (x && x.k === 'auto' && x.e === ev.t) { m.poeng = Object.assign({}, m.poeng); m.poeng[String(set)] = l.slice(0, -1); poengLagre(m); }
+    const set = poengSett(m), i = egneSistePoeng(set), l = pEgen(set), x = l[i];
+    if (x && x.k === 'auto' && x.e === ev.t) { l.splice(i, 1); poengSkriv(m, set, l); poengLagre(m); }
     S.poengKv = null; S.poengSiste = null;
   }
   function poengRad(m) {
@@ -3429,7 +3553,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     let h = '<div class="poengrad"><div class="pstill"><span class="sdot' + (sv ? '' : ' skjult') + '" title="Server"></span><b>' + venstre + '</b><span>–</span><b>' + hoyre + '</b><span class="sdot' + (sv ? ' skjult' : '') + '" title="Server"></span></div>'
       + '<span class="prot">' + (t.rot ? 'Rotasjon <b>' + esc(t.rot) + '</b> · ' : '') + (t.server === 'oss' ? 'vi server' : 'vi mottar') + (t.kjentStart ? '' : ' · <span title="Bekreft oppstilling for å følge rotasjonen">uten oppstilling</span>') + '</span>'
       + '<span class="spacer"></span><button class="pknapp oss" data-a="poeng" data-v="oss">+1 ' + esc(shortName(usName(m))) + '</button><button class="pknapp dem" data-a="poeng" data-v="dem">+1 ' + esc(shortName(oppTeam(m))) + '</button>'
-      + '<button class="barbtn" data-a="poeng-angre"' + (t.n ? '' : ' disabled') + '>Angre poeng</button></div>';
+      + '<button class="barbtn" data-a="poeng-angre"' + (t.egne ? '' : ' disabled') + '>Angre poeng</button></div>';
     if (S.poengKv && S.poengKv.lik) h += '<div class="pkvitt lik" role="status">' + esc(S.poengKv.tekst) + '</div>';
     else if (S.poengKv) h += '<div class="pkvitt' + (S.poengKv.v === 'dem' ? ' dem' : '') + '" role="status"><b>+1 ' + esc(shortName(S.poengKv.v === 'oss' ? usName(m) : oppTeam(m))) + '</b><span>' + esc(S.poengKv.tekst) + ' · telt automatisk</span><span class="spacer"></span><button class="barbtn" data-a="poeng-angre">Angre</button></div>';
     else if (S.poengGrunn) h += '<div class="pgrunner" role="group" aria-label="Grunn for poenget"><span class="liten-p">Poeng til ' + esc(shortName(S.poengGrunn === 'oss' ? usName(m) : oppTeam(m))) + '. Grunn (valgfritt):</span>'
@@ -3447,9 +3571,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (nm && !String(nm).startsWith('#')) ev.n = nm;
     own.push(ev);
     S.logs[key] = own;
+    const lagre = S.db.doc(PFX + 'matches/' + m.id + '/log/' + key).set({ device: deviceId, set, events: own });
+    S.loggSkriv = lagre.catch(() => {});
     poengFraReg(m, ev);
     render();
-    try { await S.db.doc(PFX + 'matches/' + m.id + '/log/' + key).set({ device: deviceId, set, events: own }); }
+    try { await lagre; }
     catch (e) { S.error = 'Registreringen ble ikke lagret (' + e.code + ').'; render(); }
     if (m.status !== 'pågår' && m.status !== 'ferdig') saveMatch(m.id, { status: 'pågår' });
   }
@@ -4217,6 +4343,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     try {
       const logs = await S.db.collection(PFX + 'matches/' + m.id + '/log').get();
       for (const d of logs.docs) await S.db.doc(PFX + 'matches/' + m.id + '/log/' + d.id).delete();
+      const pl = await S.db.collection(PFX + 'matches/' + m.id + '/poeng').get();
+      for (const d of pl.docs) await S.db.doc(PFX + 'matches/' + m.id + '/poeng/' + d.id).delete();
       await S.db.doc(PFX + 'matches/' + m.id).delete();
       closeSeasonLogs(); openLogs(null); S.view = 'list'; S.matchId = null; render(); toTop();
     } catch (e) { S.error = 'Kampen ble ikke slettet (' + e.code + ').'; render(); }
@@ -5232,7 +5360,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'poeng-paa' && m) { m.poengmodus = true; S.poengKv = null; S.poengGrunn = null; S.poengSiste = null; saveMatch(m.id, { poengmodus: true }); poengLagre(m); render(); }
     else if (a === 'poeng-av' && m) { m.poengmodus = false; S.poengKv = null; S.poengGrunn = null; saveMatch(m.id, { poengmodus: false }); render(); }
     else if (a === 'poeng' && m && poengPaa(m)) { poengLegg(m, b.dataset.v, 'manuell', null); S.poengKv = null; S.poengSiste = null; S.poengGrunn = b.dataset.v; render(); }
-    else if (a === 'poeng-grunn' && m) { const l = poengListe(m, poengSett(m)); if (l.length && b.dataset.v) { l[l.length - 1].g = b.dataset.v; saveMatch(m.id, { poeng: m.poeng }); } S.poengGrunn = null; render(); }
+    else if (a === 'poeng-grunn' && m) { const set = poengSett(m), i = egneSistePoeng(set); if (i >= 0 && b.dataset.v) { const l = pEgen(set); l[i] = Object.assign({}, l[i], { g: b.dataset.v }); poengSkriv(m, set, l); } S.poengGrunn = null; render(); }
     else if (a === 'poeng-angre' && m) { poengAngre(m); }
     else if (a === 'rett-res' && m) { S.retting = S.retting === m.id ? null : m.id; S.retteVarsel = null; S.retteBekreftet = null; S.retteUtkast = null; render(); }
     else if (a === 'reopen' && m) { m.status = 'pågår'; render(); saveMatch(m.id, { status: 'pågår' }); }
@@ -5354,10 +5482,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       if (isNaN(o) || isNaN(d) || o < 0 || d < 0) { S.error = 'Skriv inn stillingen med tall.'; render(); return; }
       const set = poengSett(m);
       m.modus = 'avansert'; S.modusBytt = null; S.error = '';
-      m.poengStart = Object.assign({}, m.poengStart || {}); m.poengStart[String(set)] = { oss: o, dem: d, server: S.mbServe === 'dem' ? 'dem' : 'oss' };
-      m.poeng = Object.assign({}, m.poeng || {}); m.poeng[String(set)] = [];
+      poengSkriv(m, set, pEgen(set).concat([{ id: pUuid(), t: Date.now(), type: 'start', so: o, sd: d, ss: S.mbServe === 'dem' ? 'dem' : 'oss' }]));
       try { localStorage.setItem('rv-modus-' + CTX.id, 'avansert'); } catch (e) {}
-      saveMatch(m.id, { modus: 'avansert', poengStart: m.poengStart, poeng: m.poeng }); poengLagre(m); render();
+      saveMatch(m.id, { modus: 'avansert' }); poengLagre(m); render();
       if (opsOk() && !opsBekreftet(m)) opsAapne(m);
       return;
     }
