@@ -72,6 +72,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .sbtn.plus-us { background: var(--accent-bar); border-color: var(--accent-bar); }
 .sbtn.plus-them { background: var(--opp-strong); border-color: var(--opp-strong); }
 .barbtn { height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: #FFFFFF; font-weight: 600; font-size: 14px; }
+.barbtn.hn-knapp { border-color: #FFB547; color: #FFB547; white-space: nowrap; }
 .sets { font-family: var(--font-display); font-size: 18px; color: var(--bar-muted); }
 
 /* Felles toppmeny */
@@ -1556,7 +1557,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 (function (root) {
   'use strict';
   function FakeDb(seed) {
-    const t = { contexts: [], squad_players: [], opponents: [], opponent_players: [], matches: [], match_sets: [], events: [], poeng: [], scouting_notes: [], logos: [] };
+    const t = { contexts: [], squad_players: [], opponents: [], opponent_players: [], matches: [], match_sets: [], events: [], poeng: [], observasjoner: [], scouting_notes: [], logos: [] };
     Object.assign(t, JSON.parse(JSON.stringify(seed || {})));
     const lyttere = [];
     return {
@@ -1566,7 +1567,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     };
   }
   function match(filter, rad) { const m = String(filter).match(/^(\w+)=eq\.(.+)$/); return !m || !rad || String(rad[m[1]]) === m[2]; }
-  const nøkler = { events: ['id'], poeng: ['id'], matches: ['id'], contexts: ['id'], squad_players: ['context_id', 'legacy_id'], opponents: ['context_id', 'slug'],
+  const nøkler = { events: ['id'], poeng: ['id'], observasjoner: ['id'], matches: ['id'], contexts: ['id'], squad_players: ['context_id', 'legacy_id'], opponents: ['context_id', 'slug'],
     opponent_players: ['opponent_id', 'jersey'], match_sets: ['match_id', 'set_no'], scouting_notes: ['context_id', 'opponent_slug', 'jersey'], logos: ['context_id', 'team'] };
   const uid = () => 'f' + Math.random().toString(16).slice(2, 10) + '-0000-4000-8000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0');
 
@@ -1611,6 +1612,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           }
           if (!r.id && tabell !== 'match_sets' && tabell !== 'opponent_players' && tabell !== 'scouting_notes' && tabell !== 'logos') r.id = uid();
           if (tabell === 'matches') Object.assign(r, Object.assign({ version: 1, status: 'kommende', current_set: 1, current_home: 0, current_away: 0, sets_home: 0, sets_away: 0, publish: true, is_test: false }, r));
+          if (tabell === 'observasjoner') Object.assign(r, { initialer: db.initialer || 'DM', laget_av: '00000000-0000-0000-0000-0000000000c1', laget_at: new Date().toISOString(), stjerne: false });
           if (tabell === 'events' || tabell === 'poeng') r.received_at = new Date().toISOString();
           T.push(r); ut.push(r); db.varsle(tabell, r);
         }
@@ -1622,6 +1624,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     async function rpc(navn, a) {
       db.kall++;
       if (db.offline) return { data: null, error: { message: 'TypeError: Failed to fetch' } };
+      // V3 i demo: laget har modulene og demobrukeren har tilgang; initialer og stjerne for observasjoner
+      if (navn === 'v3_status') return { data: { aktiv: true, tilgang: true }, error: null };
+      if (navn === 'mine_initialer') return { data: db.initialer || 'DM', error: null };
+      if (navn === 'sett_initialer') { const v = String(a.p_initialer || '').trim().toUpperCase(); if (!/^[A-ZÆØÅ]{1,4}$/.test(v)) return { data: null, error: { message: 'Initialer må være 1–4 bokstaver' } }; db.initialer = v; db.t.observasjoner.forEach((o) => { if (o.laget_av === '00000000-0000-0000-0000-0000000000c1') o.initialer = v; }); return { data: v, error: null }; }
+      if (navn === 'obs_stjerne') { const o = db.t.observasjoner.find((x) => x.id === a.p_id); if (!o) return { data: null, error: { message: 'Ingen tilgang' } }; o.stjerne = !!a.p_stjerne; return { data: o.stjerne, error: null }; }
       if (navn !== 'korriger_sett') return { data: null, error: { message: 'ukjent funksjon ' + navn, code: '42883' } };
       const m = db.t.matches.find((x) => x.id === a.p_match); if (!m) return { data: null, error: { message: 'Ukjent kamp', code: 'P0002' } };
       if (db.nekt && db.nekt('match_sets', 'update')) return { data: null, error: { message: 'Du har ikke skriverett i dette laget', code: '42501' } };
@@ -2998,6 +3005,198 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Oppstilling = eksport;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
+<script>/*
+ * Hurtignotat i registreringen (Observasjoner, V3 issue #23, variant A godkjent 01.11.2026).
+ * «✎ Notat» i topplinjen åpner et ark nedenfra: kamp, sett, stilling og rotasjon er fylt inn, du velger merkelapp
+ * og eventuelt spiller, skriver og lagrer. Lagres i stats.observasjoner (bare trenere med V3-tilgang).
+ *  * Knappen vises bare når laget har V3-modulene (stats.v3_status.aktiv).
+ *  * Har appens bruker ikke V3-tilgang (felles føringsbruker), logger treneren inn i arket. Samme egne økt som
+ *    V3-modulene på Analyse-siden (storageKey sb-rv-v3-<kø|lag>), så innlogging der gjelder også her.
+ *  * Uten nett legges notatet i en kø i nettleseren og sendes når nettet er tilbake (fast id, så ingen duplikater).
+ * Brukes bare i V2-bygget (window.__v2 = { client, cfg, demo }).
+ */
+(function (root) {
+  'use strict';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const MERK = [['motstander', 'Motstander', '#E2A35F'], ['eget', 'Eget lag', '#8FB3FF'], ['taktikk', 'Taktikk', '#B07CC6'], ['trening', 'Trening', '#4FB3A0']];
+  const KO = 'rv-obs-ko';
+  const status = {};   // slug → { aktiv, klient, initialer, sjekker }
+  let gjengi = () => {}, ctxCache = {}, kampCache = {}, timer = null;
+  const uuid = () => (root.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
+  const erUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || ''));
+  const v2 = () => root.__v2 || null;
+  const lesKo = () => { try { return JSON.parse(localStorage.getItem(KO) || '[]'); } catch (e) { return []; } };
+  const skrivKo = (l) => { try { localStorage.setItem(KO, JSON.stringify(l)); } catch (e) { /* privat modus */ } };
+  const nettfeil = (e) => !!e && /fetch|network|timeout|offline|Failed/i.test(String(e.message || e));
+
+  function egenKlient() {
+    const v = v2(), cfg = (v && v.cfg) || {};
+    if (!v || v.demo || !root.supabase) return null;
+    if (!v.v3klient) v.v3klient = root.supabase.createClient(cfg.url, cfg.publishableKey, { auth: { storageKey: 'sb-rv-v3-' + (cfg.queue || cfg.mainSlug || 'main') } });
+    return v.v3klient;
+  }
+  async function v3status(klient, slug) {
+    const r = await klient.schema('stats').rpc('v3_status', { p_slug: slug });
+    if (r.error) throw new Error(r.error.message);
+    return r.data || {};
+  }
+  // Finn ut om laget har modulene, og hvilken klient (appens eller egen trenerøkt) som har tilgang
+  async function sjekk(slug) {
+    const v = v2(); if (!v) return;
+    const s = status[slug] || (status[slug] = {});
+    if (v.demo) { Object.assign(s, { aktiv: true, klient: v.client, initialer: 'DM' }); return; }
+    try {
+      const a = await v3status(v.client, slug); s.aktiv = !!a.aktiv;
+      if (!s.aktiv) return;
+      if (a.tilgang) { s.klient = v.client; }
+      else {
+        const k = egenKlient(), sess = k && (await k.auth.getSession()).data.session;
+        s.klient = sess && (await v3status(k, slug)).tilgang ? k : null;
+      }
+      if (s.klient) { const i = await s.klient.schema('stats').rpc('mine_initialer'); s.initialer = i.data || ''; }
+    } catch (e) { if (s.aktiv === undefined) s.aktiv = false; }
+  }
+  function knapp(slug) {
+    const s = status[slug];
+    if (!v2()) return '';
+    if (!s) { status[slug] = { sjekker: true }; sjekk(slug).then(() => { status[slug].sjekker = false; gjengi(); }); return ''; }
+    return s.aktiv ? '<button class="barbtn hn-knapp" data-a="notat" title="Skriv et notat (observasjon)">✎ Notat</button>' : '';
+  }
+
+  // ---------- Sending (med kø) ----------
+  async function ctxId(klient, slug) {
+    if (ctxCache[slug]) return ctxCache[slug];
+    const r = await klient.schema('stats').from('contexts').select('id').eq('slug', slug); if (r.error) throw new Error(r.error.message);
+    if (!r.data.length) throw new Error('Fant ikke laget');
+    return (ctxCache[slug] = r.data[0].id);
+  }
+  async function kampId(klient, ctx, id) {
+    if (!id) return null; if (erUuid(id)) return id;
+    const k = ctx + '|' + id; if (kampCache[k]) return kampCache[k];
+    const r = await klient.schema('stats').from('matches').select('id').eq('context_id', ctx).eq('legacy_id', id); if (r.error) throw new Error(r.error.message);
+    return (kampCache[k] = r.data.length ? r.data[0].id : null);
+  }
+  async function send(n) {
+    const s = status[n.slug]; if (!s || !s.klient) throw new Error('Ikke innlogget som trener');
+    const ctx = await ctxId(s.klient, n.slug), match = await kampId(s.klient, ctx, n.kamp);
+    const rad = Object.assign({}, n.rad, { id: n.id, context_id: ctx, match_id: match });
+    const r = await s.klient.schema('stats').from('observasjoner').upsert(rad, { onConflict: 'id', ignoreDuplicates: true });
+    if (r.error) { const e = new Error(r.error.message); e.code = r.error.code; throw e; }
+  }
+  async function tømKo() {
+    clearTimeout(timer); let l = lesKo(); if (!l.length) return 0;
+    const igjen = [];
+    for (const n of l) {
+      try { if (!status[n.slug]) await sjekk(n.slug); await send(n); }
+      catch (e) { if (nettfeil(e) || !status[n.slug] || !status[n.slug].klient) igjen.push(n); else console.error('Notat forkastet', e); }
+    }
+    skrivKo(igjen);
+    if (igjen.length) timer = setTimeout(tømKo, 20000);
+    return igjen.length;
+  }
+  if (root.addEventListener) root.addEventListener('online', () => { tømKo(); });
+
+  // ---------- Arket ----------
+  const CSS = `
+.hn-ark, .hn-ark * { box-sizing: border-box; }
+.hn-bak { position: fixed; inset: 0; z-index: 9990; background: rgba(0,0,0,.45); }
+.hn-ark { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9991; margin: 0 auto; max-width: 720px; background: var(--surface, #161B24); color: var(--fg, #E8EBF0);
+  border: 1px solid var(--line, #2A3240); border-bottom: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45);
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 10px; max-height: 92vh; overflow-y: auto; font: 15px/1.4 var(--font-body, system-ui, sans-serif); }
+.hn-ark h2 { margin: 0; font: 700 22px/1.1 var(--font-display, sans-serif); display: flex; align-items: center; gap: 8px; }
+.hn-ark .hn-x { margin-left: auto; min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--muted, #8B95A5); font-size: 26px; cursor: pointer; }
+.hn-kont { display: flex; gap: 6px; flex-wrap: wrap; } .hn-kont span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--sunk, #1D2430); color: var(--muted, #8B95A5); }
+.hn-kont .hn-ini { color: var(--fg, #E8EBF0); font-weight: 700; }
+.hn-rad { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.hn-merk { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line, #2A3240); background: var(--sunk, #1D2430); color: var(--fg, #E8EBF0); font: 600 14px var(--font-body, sans-serif); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.hn-merk i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.hn-merk[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.hn-sp { min-width: 46px; min-height: 40px; border-radius: 10px; border: 1px solid var(--line, #2A3240); background: var(--sunk, #1D2430); color: var(--fg, #E8EBF0); font: 700 16px var(--font-display, sans-serif); cursor: pointer; }
+.hn-sp.dem { border-style: dashed; } .hn-sp[aria-pressed="true"] { background: var(--accent, #8FB3FF); border-color: var(--accent, #8FB3FF); color: var(--accent-fg, #0D1117); }
+.hn-etk { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted, #8B95A5); margin-right: 2px; }
+.hn-ark textarea, .hn-ark input { width: 100%; border-radius: 12px; border: 1px solid var(--line, #2A3240); background: var(--sunk, #1D2430); color: var(--fg, #E8EBF0); font: 16px/1.4 var(--font-body, sans-serif); padding: 10px 12px; }
+.hn-ark textarea { min-height: 84px; resize: vertical; } .hn-ark input { min-height: 44px; }
+.hn-lagre { min-height: 48px; padding: 0 22px; border-radius: 12px; border: 0; background: var(--accent, #8FB3FF); color: var(--accent-fg, #0D1117); font: 700 16px var(--font-body, sans-serif); cursor: pointer; }
+.hn-lagre:disabled { opacity: .45; cursor: default; }
+.hn-melding { font-size: 13px; color: var(--muted, #8B95A5); margin: 0; min-height: 18px; } .hn-melding.feil { color: var(--bad, #F07167); }
+.hn-skyv { flex: 1; }
+.hn-kvitt { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 9992; background: var(--surface, #161B24); color: var(--fg, #E8EBF0);
+  border: 1px solid var(--line, #2A3240); border-radius: 999px; padding: 10px 16px; font: 600 14px var(--font-body, sans-serif); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+`;
+  let åpent = null;
+  function lukk() { if (!åpent) return; åpent.bak.remove(); åpent.ark.remove(); document.removeEventListener('keydown', åpent.tast); const f = åpent.fokus; åpent = null; if (f && f.focus) try { f.focus(); } catch (e) { /* borte */ } }
+  function kvittering(t) { document.querySelectorAll('.hn-kvitt').forEach((x) => x.remove()); const k = document.createElement('div'); k.className = 'hn-kvitt'; k.setAttribute('role', 'status'); k.textContent = t; document.body.appendChild(k); setTimeout(() => k.remove(), 2600); }
+
+  // k = { slug, kamp (app-id), motstander, sett, stilling, rotasjon (1–6|null), deres: ['9', …], vare: [{nr, navn}] }
+  function apne(k) {
+    if (!document.getElementById('hn-css')) { const st = document.createElement('style'); st.id = 'hn-css'; st.textContent = CSS; document.head.appendChild(st); }
+    lukk();
+    const s = status[k.slug] || {};
+    let merk = 'motstander'; try { merk = localStorage.getItem('rv-obs-merk') || merk; } catch (e) { /* standard */ }
+    const st = { merk, sp: null, tekst: '' };
+    const bak = document.createElement('div'); bak.className = 'hn-bak'; bak.onclick = lukk;
+    const ark = document.createElement('section'); ark.className = 'hn-ark'; ark.setAttribute('role', 'dialog'); ark.setAttribute('aria-modal', 'true'); ark.setAttribute('aria-label', 'Nytt notat');
+    const tast = (e) => { if (e.key === 'Escape') lukk(); };
+    åpent = { bak, ark, tast, fokus: document.activeElement };
+    document.body.appendChild(bak); document.body.appendChild(ark); document.addEventListener('keydown', tast);
+    if (!s.klient) return innlogging(k);
+    tegn();
+    function tegn() {
+      const kont = [k.motstander, k.sett ? 'Sett ' + k.sett : '', k.stilling || '', k.rotasjon ? 'R' + k.rotasjon : ''].filter(Boolean);
+      const sp = (side, nr, navn) => '<button type="button" class="hn-sp' + (side === 'dem' ? ' dem' : '') + '" data-side="' + side + '" data-nr="' + esc(nr) + '" data-navn="' + esc(navn || '') + '" aria-pressed="' + (!!st.sp && st.sp.side === side && st.sp.nr === String(nr)) + '" title="' + esc(navn || '') + '">#' + esc(nr) + '</button>';
+      ark.innerHTML = '<h2>Nytt notat<button type="button" class="hn-x" aria-label="Lukk">×</button></h2>'
+        + '<div class="hn-kont">' + kont.map((x) => '<span>' + esc(x) + '</span>').join('') + (s.initialer ? '<span class="hn-ini" title="Notatet merkes med initialene dine">' + esc(s.initialer) + '</span>' : '') + '</div>'
+        + '<div class="hn-rad" role="group" aria-label="Merkelapp">' + MERK.map(([id, n, c]) => '<button type="button" class="hn-merk" data-merk="' + id + '" style="--c:' + c + '" aria-pressed="' + (st.merk === id) + '"><i style="background:' + c + '"></i>' + n + '</button>').join('') + '</div>'
+        + ((k.deres || []).length ? '<div class="hn-rad"><span class="hn-etk">Deres</span>' + k.deres.map((nr) => sp('dem', nr)).join('') + '</div>' : '')
+        + ((k.vare || []).length ? '<div class="hn-rad"><span class="hn-etk">Våre</span>' + k.vare.map((p) => sp('oss', p.nr, p.navn)).join('') + '</div>' : '')
+        + '<label class="hn-etk" for="hn-tekst">Notat</label><textarea id="hn-tekst" maxlength="600" placeholder="F.eks. slår diagonalt når mottaket er dårlig">' + esc(st.tekst) + '</textarea>'
+        + '<div class="hn-rad"><p class="hn-melding" id="hn-melding" role="status"></p><span class="hn-skyv"></span><button type="button" class="hn-lagre" id="hn-lagre"' + (st.tekst.trim() ? '' : ' disabled') + '>Lagre notat</button></div>';
+      ark.querySelector('.hn-x').onclick = lukk;
+      ark.querySelectorAll('[data-merk]').forEach((b) => { b.onclick = () => { st.merk = b.dataset.merk; tegn(); }; });
+      ark.querySelectorAll('.hn-sp').forEach((b) => { b.onclick = () => { st.sp = st.sp && st.sp.side === b.dataset.side && st.sp.nr === b.dataset.nr ? null : { side: b.dataset.side, nr: b.dataset.nr, navn: b.dataset.navn }; tegn(); }; });
+      const t = ark.querySelector('#hn-tekst'), l = ark.querySelector('#hn-lagre');
+      t.oninput = () => { st.tekst = t.value; l.disabled = !t.value.trim(); };
+      t.focus(); t.setSelectionRange(t.value.length, t.value.length);
+      l.onclick = lagre;
+    }
+    async function lagre() {
+      const tekst = st.tekst.trim(); if (!tekst) return;
+      try { localStorage.setItem('rv-obs-merk', st.merk); } catch (e) { /* ok */ }
+      const n = { id: uuid(), slug: k.slug, kamp: k.kamp || null, rad: { motstander: k.motstander || null, set_no: k.sett || null, stilling: k.stilling || null, rotasjon: k.rotasjon || null,
+        merkelapp: st.merk, spiller_side: st.sp ? st.sp.side : null, spiller_nr: st.sp ? st.sp.nr : null, spiller_navn: st.sp && st.sp.navn ? st.sp.navn : null, tekst: tekst.slice(0, 600) } };
+      const l = ark.querySelector('#hn-lagre'); l.disabled = true;
+      try { await send(n); lukk(); kvittering('Notat lagret'); }
+      catch (e) {
+        if (nettfeil(e)) { const ko = lesKo(); ko.push(n); skrivKo(ko); clearTimeout(timer); timer = setTimeout(tømKo, 20000); lukk(); kvittering('Notat lagres når nettet er tilbake'); }
+        else { const m = ark.querySelector('#hn-melding'); m.className = 'hn-melding feil'; m.textContent = 'Ikke lagret: ' + e.message; l.disabled = false; }
+      }
+    }
+  }
+  function innlogging(k) {
+    const { ark } = åpent;
+    ark.innerHTML = '<h2>Logg inn som trener<button type="button" class="hn-x" aria-label="Lukk">×</button></h2>'
+      + '<p class="hn-melding">Notater kan bare skrives av trenere med tilgang. Du logger inn én gang på denne enheten; føringen fortsetter som før.</p>'
+      + '<form id="hn-login" class="hn-rad" style="flex-direction:column;align-items:stretch"><label class="hn-etk" for="hn-e">E-post</label><input id="hn-e" type="email" autocomplete="username" required>'
+      + '<label class="hn-etk" for="hn-p">Passord</label><input id="hn-p" type="password" autocomplete="current-password" required>'
+      + '<button class="hn-lagre" type="submit">Logg inn</button><p class="hn-melding feil" id="hn-feil" role="alert"></p></form>';
+    ark.querySelector('.hn-x').onclick = lukk;
+    ark.querySelector('#hn-e').focus();
+    ark.querySelector('#hn-login').onsubmit = async (ev) => {
+      ev.preventDefault(); const f = ark.querySelector('#hn-feil'); f.textContent = '';
+      const kl = egenKlient(); if (!kl) { f.textContent = 'Innlogging er ikke tilgjengelig her.'; return; }
+      const r = await kl.auth.signInWithPassword({ email: ark.querySelector('#hn-e').value, password: ark.querySelector('#hn-p').value });
+      if (r.error) { f.textContent = 'Innlogging feilet: ' + r.error.message; return; }
+      await sjekk(k.slug);
+      if (!status[k.slug].klient) { f.textContent = 'Brukeren har ikke tilgang til notater i dette laget.'; await kl.auth.signOut(); return; }
+      apne(k); tømKo();
+    };
+  }
+
+  const eksport = { knapp, apne, lukk, tømKo, settRender: (f) => { gjengi = f || (() => {}); }, _status: status, MERK };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Hurtignotat = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 <style>
 #v2-login { position: fixed; inset: 0; z-index: 9999; background: var(--bg, #f4f2ee); display: flex; align-items: center; justify-content: center; padding: 16px; }
 #v2-login form { background: var(--surface, #fff); color: var(--fg, #16181D); border: 1px solid var(--line, transparent); border-radius: 14px; padding: 22px; width: min(380px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
@@ -3043,7 +3242,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   async function start(client, user, skrive) {
     const store = await StatsV2.SupabaseStore({ client, deviceId, userId: user.id, mainSlug: demo ? 'main' : (cfg.mainSlug || 'main'), pollMs: demo ? 0 : 4000, ko: StatsV2.Ko(StatsV2.lagLagring('rv-v2-ko' + (cfg.queue ? '-' + cfg.queue : ''))) }).start();
     window.addEventListener('online', () => store.tøm());
-    window.__v2 = { store, client };
+    window.__v2 = { store, client, cfg, demo };
     // Innstillinger for sidens eget lag (contexts.innstillinger), f.eks. nvbf_fyll = false for lag uten NVBF-utfylling
     if (!demo && window.PUBLIC_CTX) {
       try { const r = await client.schema('stats').from('contexts').select('innstillinger').eq('slug', cfg.mainSlug || 'main');
@@ -3222,6 +3421,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   let deviceId = null;
   try { deviceId = localStorage.getItem('rv-device'); } catch (e) {}
   if (!deviceId) { deviceId = 'd' + Math.random().toString(36).slice(2, 10); try { localStorage.setItem('rv-device', deviceId); } catch (e) {} }
+  // Når tilgangen til notater er sjekket: tegn topplinjen på nytt (live-visningen tegnes ellers bare delvis)
+  if (window.Hurtignotat) window.Hurtignotat.settRender(() => { const r = document.getElementById('live-root'); if (r) r.dataset.sig = ''; render(); });
   try { const v = localStorage.getItem('rv-view'); if (v) { const o = JSON.parse(v); S.filter = o.filter === 'vare' ? 'vare' : 'alle'; } } catch (e) {}
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3282,6 +3483,16 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const usName = (m) => (m && m.focus) || OUR;
   const canLive = (m) => isOurs(m) || !!(m && m.focus);
   const oppTeam = (m) => m.home === usName(m) ? m.away : m.home;
+  // Lagets slug i databasen (V2): hovedlaget på siden har slug fra config, andre lag har sin egen id
+  const ctxSlug = () => (CTX.id === 'main' ? ((window.V2_CONFIG && window.V2_CONFIG.mainSlug && !(window.__v2 && window.__v2.demo)) ? window.V2_CONFIG.mainSlug : 'main') : CTX.id);
+  // Hurtignotat (Observasjoner, V3): kamp, sett, stilling og rotasjon fylles inn
+  function notatKontekst(m) {
+    const c = m.current || { set: 1, home: 0, away: 0 }, hjemme = m.home === usName(m), t = poengPaa(m) ? poengTilstand(m) : null;
+    const oss = t ? t.oss : (hjemme ? c.home : c.away), dem = t ? t.dem : (hjemme ? c.away : c.home);
+    const rot = t && t.rot ? Number(String(t.rot).replace(/\D/g, '')) || null : null;
+    return { slug: ctxSlug(), kamp: m.id, motstander: oppTeam(m), sett: c.set || 1, stilling: (oss || dem) ? oss + '–' + dem : '', rotasjon: rot,
+      deres: (m.oppNumbers || []).map(String), vare: (m.onCourt || []).map((id) => player(id)).filter(Boolean).map((p) => ({ nr: String(p.nr || ''), navn: p.name || '' })).filter((p) => p.nr) };
+  }
   const rosterOf = (team) => ((S.opps[teamSlug(team)] || {}).players || []);
   const oppRoster = (m) => rosterOf(oppTeam(m));
   const teamRoster = (m) => m && m.focus ? rosterOf(m.focus).map((p) => ({ id: 'o:' + teamSlug(m.focus) + ':' + p.nr, nr: String(p.nr), name: p.name || '#' + p.nr, pos: p.pos || '' })) : S.roster;
@@ -3844,6 +4055,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
           + '<button class="barbtn win" type="submit">Lagre og start sett ' + (c.set + 1) + '</button><button class="barbtn" type="button" data-a="setcancel">Avbryt</button></form>'
         : '<button class="barbtn primary-bar" data-a="endset">Avslutt sett ' + c.set + '</button>'
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
+          + (window.Hurtignotat && m.status !== 'ferdig' ? window.Hurtignotat.knapp(ctxSlug()) : '')
           + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
           + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
@@ -5323,6 +5535,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'undo') { undo(); }
     else if (a === 'statset') { S.statSet = b.dataset.v; render(); }
     else if (a === 'kpiscope') { S.kpiScope = S.kpiScope === 'kamp' ? 'sett' : 'kamp'; render(); }
+    else if (a === 'notat' && m && window.Hurtignotat) { window.Hurtignotat.apne(notatKontekst(m)); }
     else if (a === 'bytte' && m) { if (opsBekreftet(m)) { S.bytte = { ut: null, inn: null }; render(); } else { S.view = 'squad'; render(); toTop(); } }
     else if (a === 'bytte-ut') { S.bytte = { ut: b.dataset.id, inn: null }; render(); }
     else if (a === 'bytte-inn') { S.bytte = Object.assign({}, S.bytte, { inn: b.dataset.id }); render(); }

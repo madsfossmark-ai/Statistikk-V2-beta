@@ -1614,7 +1614,9 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     }
     return { mot, neste, tidligere, mottak: lm ? { n: lm.n, feilPct: lm.feilPct, posPct: lm.positiv ? lm.positiv.pct : null } : null, angrep, retning: alleR ? Object.assign({ n: alleR.antall }, alleR.andel) : null,
       forslagForsvar: alleR ? (alleR.type.linje > alleR.type.diagonal ? 'linje' : 'dia') : null, serve, harServeplan: !!d.planer[mot], svakestMott: rader.find((r) => r.rang === 1) || null,
-      rot, naaRot, forsvarLagret: x.forsvarLagret || null, oppstillingFra: d.oppstillingFra };
+      rot, naaRot, forsvarLagret: x.forsvarLagret || null, oppstillingFra: d.oppstillingFra,
+      obs: (x.obs || []).filter((o) => o.motstander === mot && (o.merkelapp === 'motstander' || o.merkelapp === 'taktikk'))
+        .sort((a, b) => (b.stjerne - a.stjerne) || String(b.laget_at).localeCompare(String(a.laget_at))).slice(0, 8) };
   }
 
   // ---------- Demodata (oppdiktet) ----------
@@ -1627,13 +1629,16 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       mottak: { n: 160, feilPct: 7, posPct: 45 }, angrep: [{ nr: '9', navn: 'Kant Ni', n: 96, andel: 31, killPct: 41, retning: { n: 60, diagonal: 55, linje: 30, dip: 15 } }, { nr: '14', navn: 'Diagonal Fjorten', n: 74, andel: 24, killPct: 36, retning: { n: 44, diagonal: 40, linje: 45, dip: 15 } },
         { nr: '5', navn: 'Kant Fem', n: 56, andel: 18, killPct: 33, retning: { n: 30, diagonal: 60, linje: 20, dip: 20 } }, { nr: '2', navn: 'Midt To', n: 43, andel: 14, killPct: 48, retning: null }],
       retning: { n: 134, diagonal: 52, linje: 33, dip: 15 }, forslagForsvar: 'dia', serve, harServeplan: true, svakestMott: { nr: '7', navn: 'Kant Sju', feilPct: 12 },
-      rot: { per: r, tot: { so: 77, son: 142, bp: 51, bpn: 131 }, svak: 1, best: 4 }, naaRot: null, forsvarLagret: '2026-10-30T20:00:00Z', oppstillingFra: 'oppdiktet kamp, sett 1' };
+      rot: { per: r, tot: { so: 77, son: 142, bp: 51, bpn: 131 }, svak: 1, best: 4 }, naaRot: null, forsvarLagret: '2026-10-30T20:00:00Z', oppstillingFra: 'oppdiktet kamp, sett 1',
+      obs: [{ id: 'o1', tekst: 'Slår alltid diagonalt når mottaket er dårlig', initialer: 'DM', stjerne: true, spiller_nr: '9', merkelapp: 'motstander' }, { id: 'o2', tekst: 'Dipper over midten fra 2 når vi blokker linja', initialer: 'KH', stjerne: false, spiller_nr: '14', merkelapp: 'motstander' }, { id: 'o3', tekst: 'Kort serve på #11 ga to ess – fortsett i R5', initialer: 'DM', stjerne: true, spiller_nr: null, merkelapp: 'taktikk' }] };
   }
 
   // ---------- Henting ----------
   async function hent(klient, slug) {
     const SP = root.Serveplan, r = await SP.hent(klient, slug), d = SP.bygg(r), db = r.db, kast = (x) => { if (x.error) throw new Error(x.error.message); return x.data; };
-    const [kp, fp] = await Promise.all([db.from('kampplaner').select('motstander,data,versjon').eq('context_id', r.ctx.id), db.from('forsvar_planer').select('motstander,updated_at').eq('context_id', r.ctx.id)]);
+    const [kp, fp, ob] = await Promise.all([db.from('kampplaner').select('motstander,data,versjon').eq('context_id', r.ctx.id), db.from('forsvar_planer').select('motstander,updated_at').eq('context_id', r.ctx.id),
+      db.from('observasjoner').select('id,motstander,merkelapp,tekst,stjerne,initialer,spiller_nr,laget_at').eq('context_id', r.ctx.id).in('merkelapp', ['motstander', 'taktikk']).order('laget_at', { ascending: false }).limit(500)]);
+    d.obs = ob.error ? [] : ob.data;
     d.kampplaner = Object.fromEntries(kast(kp).map((p) => [p.motstander, { data: p.data, versjon: p.versjon }]));
     d.forsvar = Object.fromEntries(kast(fp).map((p) => [p.motstander, p.updated_at]));
     d.slag = async (mot) => { const rows = kast(await db.rpc('slaghistorikk', { p_lag: mot, p_person: null })); return rows.filter((x) => x.kontekst === slug).map(root.Analyse.fraRad); };
@@ -1710,7 +1715,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       if (opt.demo) { S.vm = demoVm(mot); const p = S.demoPlaner[mot]; S.plan = p ? kopi(p.data) : (mot === 'Motlag' ? { fokus: ['Serv på #7 – hun har 12 % feil i mottak. Unngå liberoen.', 'Linjeforsvar mot #9 i R1–R3; blokken tar diagonalen.', 'R1: rask ball på 4 når mottaket er bra.'], rot: { 1: { forsvar: 'linje', notat: 'Rask ball på 4 ved perfekt mottak.' }, 2: { forsvar: 'linje' }, 3: { forsvar: 'linje', notat: 'Midten dekker dip fra #9.' }, 4: { forsvar: 'dia' }, 5: { forsvar: 'dia' }, 6: { forsvar: 'dia', notat: 'Kort serve på #11 i sone 1.' } }, notat: '' } : null); S.versjon = p ? p.versjon : null; }
       else {
         let slag = []; try { slag = await S.d.slag(mot); } catch (e) { slag = []; }
-        S.vm = modell(S.d, mot, { slag, forsvarLagret: S.d.forsvar[mot] || null });
+        S.vm = modell(S.d, mot, { slag, forsvarLagret: S.d.forsvar[mot] || null, obs: S.d.obs });
         const p = S.d.kampplaner[mot]; S.plan = p ? kopi(p.data) : null; S.versjon = p ? p.versjon : null;
       }
       S.plan = S.plan || { fokus: [], rot: {}, notat: '' }; S.plan.rot = S.plan.rot || {}; S.plan.fokus = S.plan.fokus || [];
@@ -1761,6 +1766,8 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       h += '<section><h3>Våre rotasjoner</h3>' + (v.rot ? '<p>Sideout ' + pst(v.rot.tot.so, v.rot.tot.son) + ' %, breakpoint ' + pst(v.rot.tot.bp, v.rot.tot.bpn) + ' %.' + (v.rot.svak ? ' <b>R' + v.rot.svak + ' er svakest</b> (' + (v.rot.per[v.rot.svak].netto > 0 ? '+' : '') + v.rot.per[v.rot.svak].netto + ' netto, sideout ' + (pst(v.rot.per[v.rot.svak].so, v.rot.per[v.rot.svak].son) ?? '–') + ' %).' : '') + (v.rot.best ? ' Best: R' + v.rot.best + '.' : '') + '</p>'
         : '<p class="kp-tom">Ingen poengtelling ennå. Før kamper i Avansert for å få tall per rotasjon.</p>')
         + '<p class="kilde">Fra Serve/rotasjon, alle kamper med poengtelling.</p></section></div>';
+      const stj = (v.obs || []).filter((o) => o.stjerne);
+      if (stj.length) h += '<section><h3>Observasjoner</h3>' + stj.map((o) => '<p>' + esc(o.tekst) + ' <span class="kilde">– ' + esc(o.initialer || '') + (o.spiller_nr ? ', om #' + esc(o.spiller_nr) : '') + '</span></p>').join('') + '<p class="kilde">Stjernemerkede notater om ' + esc(v.mot) + ' fra Observasjoner.</p></section>';
       const notater = ROT.filter((r) => (S.plan.rot[r] || {}).notat);
       if (notater.length || S.plan.notat) h += '<section><h3>Notater</h3>' + (S.plan.notat ? '<p>' + esc(S.plan.notat) + '</p>' : '') + notater.map((r) => '<p><b>R' + r + ':</b> ' + esc(S.plan.rot[r].notat) + '</p>').join('') + '</section>';
       return h + '</article>';
@@ -1782,7 +1789,9 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 
     function redigering() {
       const v = S.vm, f = S.plan.fokus || [];
+      const obs = v.obs || [];
       let h = '<div class="kp-red kp-ikke-ark"><h3 class="etikett">Tre fokuspunkter</h3>' + [0, 1, 2].map((i) => '<input type="text" id="kp-f' + i + '" maxlength="140" value="' + esc(f[i] || '') + '" placeholder="Fokuspunkt ' + (i + 1) + '" aria-label="Fokuspunkt ' + (i + 1) + '">').join('')
+        + (obs.length ? '<h3 class="etikett">Observasjoner om ' + esc(v.mot) + '</h3>' + obs.map((o, i) => '<div class="rr" style="grid-template-columns:minmax(0,1fr) auto"><span>' + (o.stjerne ? '★ ' : '') + esc(o.tekst) + ' <span class="liten">– ' + esc(o.initialer || '') + '</span></span><button class="knapp" type="button" data-brukobs="' + i + '">Bruk som fokus</button></div>').join('') : '')
         + '<h3 class="etikett">Forsvar og notat per rotasjon</h3>' + (v.forslagForsvar ? '<p class="liten">' + esc(v.mot) + ' slår mest ' + (v.forslagForsvar === 'dia' ? 'diagonalt' : 'på linje') + ' (' + v.retning.n + ' slag). Forslag: ' + (v.forslagForsvar === 'dia' ? 'dia' : 'linje') + '.</p>' : '');
       ROT.forEach((r) => { const x = S.plan.rot[r] || {};
         h += '<div class="rr"><b>R' + r + '</b><div class="kp-seg" role="group" aria-label="Forsvar i R' + r + '">' + [['linje', 'Linje'], ['dia', 'Dia']].map(([k, t]) => '<button type="button" data-r="' + r + '" data-f="' + k + '" aria-pressed="' + (x.forsvar === k) + '">' + t + '</button>').join('') + '</div>'
@@ -1805,6 +1814,8 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         b.parentNode.querySelectorAll('button').forEach((y) => y.setAttribute('aria-pressed', String(y.dataset.f === x.forsvar))); merkEndret(); }; });
       el.querySelectorAll('.kp-red input[data-r]').forEach((n) => { n.oninput = () => { const x = S.plan.rot[n.dataset.r] || (S.plan.rot[n.dataset.r] = {}); if (n.value) x.notat = n.value; else delete x.notat; merkEndret(); }; });
       if ($('#kp-notat')) $('#kp-notat').oninput = (e) => { S.plan.notat = e.target.value; merkEndret(); };
+      el.querySelectorAll('[data-brukobs]').forEach((b) => { b.onclick = () => { const o = S.vm.obs[+b.dataset.brukobs], f = S.plan.fokus;
+        const i = [0, 1, 2].find((j) => !(f[j] || '').trim()); const pos = i === undefined ? 2 : i; f[pos] = o.tekst.slice(0, 140); const inp = $('#kp-f' + pos); if (inp) inp.value = f[pos]; merkEndret(); }; });
     }
     async function lagre() {
       const data = { fokus: (S.plan.fokus || []).slice(0, 3).map((x) => String(x || '').slice(0, 140)), rot: S.plan.rot, notat: String(S.plan.notat || '').slice(0, 600) };
@@ -1830,6 +1841,210 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </script>
 <script>
 /*
+ * Analysemodulen Observasjoner (V3, issue #23, variant A godkjent 01.11.2026): notatene gruppert per kamp.
+ *  * Alle trenere med V3-tilgang i laget ser alle notater; hvert notat har initialene til den som skrev det.
+ *  * Egne notater kan endres og slettes. Alle kan stjernemerke (stats.obs_stjerne).
+ *  * Nye notater kan skrives her etter kamp eller trening (uten kamp, eller knyttet til en motstander).
+ *  * Initialer: foreslått fra e-posten, kan endres (stats.sett_initialer).
+ * Notatene skrives under kamp med hurtignotatet i registreringen (moduler/observasjoner/hurtignotat.js).
+ */
+(function (root) {
+  'use strict';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const MERK = { motstander: ['Motstander', 'var(--obs-mot)'], eget: ['Eget lag', 'var(--obs-egen)'], taktikk: ['Taktikk', 'var(--obs-takt)'], trening: ['Trening', 'var(--obs-tren)'] };
+  const dato = (d) => { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' }); };
+  const uuid = () => (root.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
+
+  // ---------- Gruppering og filter (rene funksjoner) ----------
+  function filtrer(notater, f) {
+    f = f || {};
+    return notater.filter((n) => (!f.motstander || n.motstander === f.motstander) && (!f.merkelapp || n.merkelapp === f.merkelapp)
+      && (!f.initialer || n.initialer === f.initialer) && (!f.spiller || (n.spiller_side + '#' + n.spiller_nr) === f.spiller) && (!f.stjerne || n.stjerne));
+  }
+  // Grupper per kamp (nyeste først); notater uten kamp grupperes per dag
+  function grupper(notater, kamper) {
+    const g = new Map();
+    notater.slice().sort((a, b) => String(b.laget_at).localeCompare(String(a.laget_at))).forEach((n) => {
+      const k = kamper[n.match_id];
+      const key = k ? 'k:' + n.match_id : 'd:' + String(n.laget_at).slice(0, 10);
+      const tittel = k ? (k.motstander || 'Kamp') + ' ' + dato(k.dato) : (n.merkelapp === 'trening' ? 'Trening ' : (n.motstander ? n.motstander + ' · ' : 'Notater ')) + dato(n.laget_at);
+      const e = g.get(key) || { key, tittel, sortering: k ? String(k.dato) : String(n.laget_at), notater: [] };
+      e.notater.push(n); g.set(key, e);
+    });
+    return [...g.values()].sort((a, b) => b.sortering.localeCompare(a.sortering));
+  }
+
+  // ---------- Demo (oppdiktet) ----------
+  function demoData() {
+    const naa = Date.now(), t = (d) => new Date(naa - d * 864e5).toISOString();
+    const k1 = 'demo-k1', k2 = 'demo-k2';
+    return { meg: 'meg', initialer: 'DM', kamper: { [k1]: { motstander: 'Motlag', dato: t(1) }, [k2]: { motstander: 'Motlag', dato: t(15) } }, motstandere: ['Motlag', 'Naboland'],
+      notater: [
+        { id: 'n1', match_id: k1, motstander: 'Motlag', set_no: 2, stilling: '14–12', rotasjon: 3, merkelapp: 'motstander', spiller_side: 'dem', spiller_nr: '9', spiller_navn: 'Kant Ni', tekst: 'Slår alltid diagonalt når mottaket er dårlig', stjerne: true, initialer: 'DM', laget_av: 'meg', laget_at: t(1) },
+        { id: 'n2', match_id: k1, motstander: 'Motlag', set_no: 2, stilling: '16–15', rotasjon: 2, merkelapp: 'eget', spiller_side: 'oss', spiller_nr: '4', spiller_navn: 'Spiller Fire', tekst: 'Sen i blokk på midten når de spiller rask ball', stjerne: false, initialer: 'KH', laget_av: 'annen', laget_at: t(1) },
+        { id: 'n3', match_id: k1, motstander: 'Motlag', set_no: 3, stilling: '8–6', rotasjon: 5, merkelapp: 'taktikk', tekst: 'Kort serve på #11 ga to ess – fortsett i R5', stjerne: false, initialer: 'DM', laget_av: 'meg', laget_at: t(1) },
+        { id: 'n4', match_id: k2, motstander: 'Motlag', set_no: 1, stilling: '20–18', rotasjon: 6, merkelapp: 'motstander', spiller_side: 'dem', spiller_nr: '14', spiller_navn: 'Diagonal Fjorten', tekst: 'Dipper over midten fra 2 når vi blokker linja', stjerne: false, initialer: 'KH', laget_av: 'annen', laget_at: t(15) },
+        { id: 'n5', match_id: null, merkelapp: 'trening', spiller_side: 'oss', spiller_nr: '7', spiller_navn: 'Spiller Sju', tekst: 'Mottak av flytserve i sone 5 – egen drill tirsdag', stjerne: false, initialer: 'DM', laget_av: 'meg', laget_at: t(4) },
+      ] };
+  }
+
+  // ---------- Henting ----------
+  async function hent(klient, slug) {
+    const db = klient.schema('stats'), kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
+    const c = kast(await db.from('contexts').select('id,our_team').eq('slug', slug))[0]; if (!c) throw new Error('Fant ikke laget');
+    const [no, m, ini, u] = await Promise.all([
+      db.from('observasjoner').select('*').eq('context_id', c.id).order('laget_at', { ascending: false }).limit(1000),
+      db.from('matches').select('id,home,away,starts_at,focus_team').eq('context_id', c.id),
+      db.rpc('mine_initialer'), klient.auth.getUser()]);
+    const kamper = {}, mot = new Set();
+    kast(m).forEach((k) => { const vi = k.focus_team || c.our_team, motst = k.home === vi ? k.away : k.home; kamper[k.id] = { motstander: motst, dato: k.starts_at }; if (motst && !/^\d\. plass$/.test(motst)) mot.add(motst); });
+    const notater = kast(no); notater.forEach((n) => { if (n.motstander) mot.add(n.motstander); });
+    return { ctx: c, db, meg: u && u.data && u.data.user ? u.data.user.id : null, initialer: ini.data || '', kamper, motstandere: [...mot].sort((a, b) => a.localeCompare(b, 'nb')), notater };
+  }
+
+  // ---------- Visning ----------
+  const CSS = `
+.ob { display: flex; flex-direction: column; gap: 14px; --obs-mot: #E2A35F; --obs-egen: #8FB3FF; --obs-takt: #B07CC6; --obs-tren: #4FB3A0; }
+:root[data-theme="light"] .ob { --obs-mot: #9A5A12; --obs-egen: #1B4592; --obs-takt: #6B3A8A; --obs-tren: #1F6F62; }
+.ob-filtre { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ob-filtre select { min-height: 40px; font-size: 14px; }
+.ob-stjknapp { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); font: 600 14px var(--font-body); cursor: pointer; }
+.ob-stjknapp[aria-pressed="true"] { border-color: var(--warn); color: var(--warn); }
+.ob-gruppe { display: flex; flex-direction: column; gap: 8px; }
+.ob-ghode { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; padding-top: 6px; }
+.ob-n { background: var(--sunk); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 4px 10px; border-left: 4px solid var(--c, var(--line)); align-items: start; }
+.ob-ini { grid-row: span 2; width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font: 700 14px var(--font-display); }
+.ob-meta { display: flex; gap: 6px 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; min-width: 0; }
+.ob-meta .t { color: var(--c); font-weight: 600; }
+.ob-tekst { grid-column: 2 / -1; margin: 0; overflow-wrap: anywhere; }
+.ob-hand { display: flex; gap: 2px; grid-row: 1; grid-column: 3; }
+.ob-hand button { min-width: 40px; min-height: 36px; border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; border-radius: 8px; }
+.ob-hand button:hover { background: var(--surface); } .ob-hand .stj[aria-pressed="true"] { color: var(--warn); }
+.ob-skjema { display: flex; flex-direction: column; gap: 10px; background: var(--sunk); border-radius: 14px; padding: 12px; }
+.ob-skjema textarea { width: 100%; min-height: 72px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 16px/1.4 var(--font-body); padding: 8px 10px; resize: vertical; box-sizing: border-box; }
+.ob-skjema input[type=text] { min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 15px var(--font-body); padding: 0 10px; width: 6em; }
+.ob-merk { min-height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 13px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.ob-merk i { width: 8px; height: 8px; border-radius: 50%; } .ob-merk[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.ob-melding { font-size: 13px; color: var(--muted); margin: 0; } .ob-melding.feil { color: var(--bad); }
+.ob-ini-rad { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.ob-ini-rad input { width: 5em; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); font: 700 15px var(--font-display); padding: 0 8px; text-transform: uppercase; }
+`;
+  function vis(el, opt) {
+    if (!document.getElementById('ob-css')) { const s = document.createElement('style'); s.id = 'ob-css'; s.textContent = CSS; document.head.appendChild(s); }
+    const S = { d: null, f: {}, ny: null, red: null, slett: null, iniRed: false, melding: '', feil: false };
+    el.innerHTML = '<div class="kort ob"><p class="liten">Henter notater …</p></div>';
+    (opt.demo ? Promise.resolve(demoData()) : hent(opt.klient, opt.slug)).then((d) => { S.d = d; tegn(); })
+      .catch((e) => { el.innerHTML = '<div class="kort ob"><p class="liten">Kunne ikke hente notatene: ' + esc(e.message) + '</p></div>'; });
+
+    const merkKnapper = (valgt, attr) => Object.entries(MERK).map(([k, [n, c]]) => '<button type="button" class="ob-merk" ' + attr + '="' + k + '" style="--c:' + c + '" aria-pressed="' + (valgt === k) + '"><i style="background:' + c + '"></i>' + n + '</button>').join('');
+    function skjema(x, id) {
+      return '<div class="ob-skjema" id="' + id + '"><div class="ob-filtre" role="group" aria-label="Merkelapp">' + merkKnapper(x.merkelapp, 'data-sm') + '</div>'
+        + '<div class="ob-filtre"><label class="etikett" for="' + id + '-mot">Motstander</label><select id="' + id + '-mot"><option value="">Ingen</option>' + S.d.motstandere.map((m) => '<option' + (x.motstander === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select>'
+        + '<label class="etikett" for="' + id + '-side">Spiller</label><select id="' + id + '-side"><option value="">–</option><option value="dem"' + (x.spiller_side === 'dem' ? ' selected' : '') + '>Deres</option><option value="oss"' + (x.spiller_side === 'oss' ? ' selected' : '') + '>Vår</option></select>'
+        + '<input type="text" id="' + id + '-nr" inputmode="numeric" maxlength="4" placeholder="Nr." aria-label="Draktnummer" value="' + esc(x.spiller_nr || '') + '"></div>'
+        + '<textarea id="' + id + '-tekst" maxlength="600" aria-label="Notat" placeholder="Hva så du?">' + esc(x.tekst || '') + '</textarea>'
+        + '<div class="ob-filtre"><span class="skyv"></span><button class="knapp" type="button" data-avbryt="' + id + '">Avbryt</button><button class="knapp primar" type="button" data-lagre="' + id + '">Lagre</button></div></div>';
+    }
+    function notatHtml(n) {
+        const [mn, c] = MERK[n.merkelapp] || ['', 'var(--line)'], egen = n.laget_av && n.laget_av === S.d.meg;
+        if (S.red && S.red.id === n.id) return skjema(S.red, 'ob-red');
+        let h = '<div class="ob-n" style="--c:' + c + '" data-id="' + esc(n.id) + '"><span class="ob-ini" title="Skrevet av ' + esc(n.initialer) + '">' + esc(n.initialer || '?') + '</span>'
+          + '<div class="ob-meta"><span class="t">' + mn + '</span>' + (n.spiller_nr ? '<span>' + (n.spiller_side === 'oss' ? 'Vår ' : '') + '#' + esc(n.spiller_nr) + (n.spiller_navn ? ' ' + esc(n.spiller_navn) : '') + '</span>' : '')
+          + (n.set_no ? '<span>Sett ' + n.set_no + (n.stilling ? ' · ' + esc(n.stilling) : '') + (n.rotasjon ? ' · R' + n.rotasjon : '') + '</span>' : '') + (n.endret_at ? '<span>endret</span>' : '') + '</div>'
+          + '<div class="ob-hand"><button type="button" class="stj" data-stj="' + esc(n.id) + '" aria-pressed="' + !!n.stjerne + '" aria-label="' + (n.stjerne ? 'Fjern stjerne' : 'Stjernemerk') + '">' + (n.stjerne ? '★' : '☆') + '</button>'
+          + (egen ? '<button type="button" data-red="' + esc(n.id) + '" aria-label="Endre">✎</button><button type="button" data-slett="' + esc(n.id) + '" aria-label="Slett">🗑</button>' : '') + '</div>'
+          + '<p class="ob-tekst">' + esc(n.tekst) + '</p></div>';
+        if (S.slett === n.id) h += '<div class="ob-filtre" role="alert"><span class="ob-melding feil">Slette notatet for godt?</span><span class="skyv"></span><button class="knapp" type="button" data-nei>Nei</button><button class="knapp fare" type="button" data-ja="' + esc(n.id) + '">Slett</button></div>';
+        return h;
+    }
+    function tegn() {
+      const d = S.d, alle = d.notater, f = S.f;
+      const opt2 = (navn, verdier, valgt, tekst) => '<select id="ob-f-' + navn + '" aria-label="' + tekst + '"><option value="">' + tekst + '</option>' + verdier.map(([v, t]) => '<option value="' + esc(v) + '"' + (valgt === v ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>';
+      const spillere = [...new Map(alle.filter((n) => n.spiller_nr).map((n) => [n.spiller_side + '#' + n.spiller_nr, (n.spiller_side === 'oss' ? 'Vår ' : '') + '#' + n.spiller_nr + (n.spiller_navn ? ' ' + n.spiller_navn : '')])).entries()];
+      let h = '<div class="kort ob"><div class="rad"><h2 class="v3-tittel">Observasjoner</h2>' + (opt.demo ? '<span class="merke">Oppdiktede data</span>' : '') + '<span class="skyv"></span>'
+        + (S.ny ? '' : '<button class="knapp primar" type="button" id="ob-ny">+ Nytt notat</button>') + (opt.ut || '') + '</div>';
+      h += '<div class="ob-ini-rad">' + (S.iniRed ? '<label for="ob-ini">Dine initialer</label><input id="ob-ini" maxlength="4" value="' + esc(d.initialer) + '"><button class="knapp" type="button" id="ob-ini-lagre">Lagre</button><button class="knapp stille" type="button" id="ob-ini-avbryt">Avbryt</button>'
+        : 'Notatene dine merkes med <b style="color:var(--fg)">' + esc(d.initialer || '?') + '</b><button class="knapp stille" type="button" id="ob-ini-endre">Endre</button>') + '</div>';
+      if (S.melding) h += '<p class="ob-melding' + (S.feil ? ' feil' : '') + '" role="status">' + esc(S.melding) + '</p>';
+      if (S.ny) h += skjema(S.ny, 'ob-nytt');
+      h += '<div class="ob-filtre">' + opt2('mot', d.motstandere.map((m) => [m, m]), f.motstander, 'Alle motstandere') + opt2('merk', Object.entries(MERK).map(([k, [n]]) => [k, n]), f.merkelapp, 'Alle merkelapper')
+        + opt2('ini', [...new Set(alle.map((n) => n.initialer).filter(Boolean))].sort().map((i) => [i, i]), f.initialer, 'Alle trenere') + (spillere.length ? opt2('sp', spillere, f.spiller, 'Alle spillere') : '')
+        + '<button type="button" class="ob-stjknapp" id="ob-f-stj" aria-pressed="' + !!f.stjerne + '">★ Bare stjernemerkede</button></div>';
+      const utvalg = filtrer(alle, f);
+      if (!alle.length) h += '<p class="tom">Ingen notater ennå. Skriv det første med «+ Nytt notat», eller med «✎ Notat» i registreringen under kamp.</p>';
+      else if (!utvalg.length) h += '<p class="tom">Ingen notater passer filteret.</p>';
+      grupper(utvalg, d.kamper).forEach((g) => { h += '<section class="ob-gruppe"><div class="ob-ghode"><span>' + esc(g.tittel) + '</span><span class="liten">' + g.notater.length + (g.notater.length === 1 ? ' notat' : ' notater') + '</span></div>' + g.notater.map(notatHtml).join('') + '</section>'; });
+      el.innerHTML = h + '</div>';
+      bind(); if (opt.etter) opt.etter();
+    }
+    function lesSkjema(id, x) {
+      const $ = (s) => el.querySelector('#' + id + s);
+      return Object.assign({}, x, { motstander: $('-mot').value || null, spiller_side: $('-side').value || null, spiller_nr: $('-nr').value.trim() || null, tekst: $('-tekst').value });
+    }
+    function bind() {
+      const $ = (s) => el.querySelector(s);
+      const on = (s, f) => { const e = $(s); if (e) e.onclick = f; };
+      on('#ob-ny', () => { S.ny = { merkelapp: 'motstander', motstander: S.f.motstander || null }; S.melding = ''; tegn(); const t = $('#ob-nytt-tekst'); if (t) t.focus(); });
+      on('#ob-ini-endre', () => { S.iniRed = true; tegn(); $('#ob-ini').focus(); });
+      on('#ob-ini-avbryt', () => { S.iniRed = false; tegn(); });
+      on('#ob-ini-lagre', async () => {
+        const v = $('#ob-ini').value.trim().toUpperCase();
+        try {
+          if (opt.demo) { if (!/^[A-ZÆØÅ]{1,4}$/.test(v)) throw new Error('Initialer må være 1–4 bokstaver'); }
+          else { const r = await S.d.db.rpc('sett_initialer', { p_initialer: v }); if (r.error) throw new Error(r.error.message); }
+          S.d.notater.forEach((n) => { if (n.laget_av === S.d.meg) n.initialer = v; }); S.d.initialer = v; S.iniRed = false; S.melding = 'Initialene er endret på alle notatene dine.'; S.feil = false;
+        } catch (e) { S.melding = e.message; S.feil = true; }
+        tegn();
+      });
+      [['mot', 'motstander'], ['merk', 'merkelapp'], ['ini', 'initialer'], ['sp', 'spiller']].forEach(([id, k]) => { const s = $('#ob-f-' + id); if (s) s.onchange = () => { S.f[k] = s.value || null; tegn(); }; });
+      on('#ob-f-stj', () => { S.f.stjerne = !S.f.stjerne; tegn(); });
+      el.querySelectorAll('[data-sm]').forEach((b) => { b.onclick = () => { const x = b.closest('#ob-red') ? S.red : S.ny; const id = b.closest('.ob-skjema').id; Object.assign(x, lesSkjema(id, x), { merkelapp: b.dataset.sm }); tegn(); }; });
+      el.querySelectorAll('[data-avbryt]').forEach((b) => { b.onclick = () => { if (b.dataset.avbryt === 'ob-red') S.red = null; else S.ny = null; tegn(); }; });
+      el.querySelectorAll('[data-lagre]').forEach((b) => { b.onclick = () => lagre(b.dataset.lagre); });
+      el.querySelectorAll('[data-stj]').forEach((b) => { b.onclick = async () => {
+        const n = S.d.notater.find((x) => x.id === b.dataset.stj), ny = !n.stjerne;
+        try { if (!opt.demo) { const r = await S.d.db.rpc('obs_stjerne', { p_id: n.id, p_stjerne: ny }); if (r.error) throw new Error(r.error.message); } n.stjerne = ny; S.melding = ''; }
+        catch (e) { S.melding = 'Stjernen ble ikke lagret: ' + e.message; S.feil = true; }
+        tegn(); }; });
+      el.querySelectorAll('[data-red]').forEach((b) => { b.onclick = () => { S.red = Object.assign({}, S.d.notater.find((x) => x.id === b.dataset.red)); tegn(); const t = $('#ob-red-tekst'); if (t) t.focus(); }; });
+      el.querySelectorAll('[data-slett]').forEach((b) => { b.onclick = () => { S.slett = b.dataset.slett; tegn(); }; });
+      on('[data-nei]', () => { S.slett = null; tegn(); });
+      on('[data-ja]', async () => {
+        const id = S.slett;
+        try { if (!opt.demo) { const r = await S.d.db.from('observasjoner')['dele' + 'te']().eq('id', id); if (r.error) throw new Error(r.error.message); } S.d.notater = S.d.notater.filter((x) => x.id !== id); S.melding = 'Notatet er slettet.'; S.feil = false; }
+        catch (e) { S.melding = 'Ikke slettet: ' + e.message; S.feil = true; }
+        S.slett = null; tegn();
+      });
+    }
+    async function lagre(id) {
+      const x = lesSkjema(id, id === 'ob-red' ? S.red : S.ny), tekst = String(x.tekst || '').trim();
+      if (!tekst) { S.melding = 'Skriv noe i notatet først.'; S.feil = true; return tegn(); }
+      const felt = { merkelapp: x.merkelapp, motstander: x.motstander, spiller_side: x.spiller_nr ? (x.spiller_side || 'dem') : null, spiller_nr: x.spiller_nr, tekst: tekst.slice(0, 600) };
+      if (x.spiller_nr !== (S.red && S.red.spiller_nr)) felt.spiller_navn = null;
+      try {
+        if (id === 'ob-red') {
+          if (!opt.demo) { const r = await S.d.db.from('observasjoner').update(felt).eq('id', x.id).select('*'); if (r.error) throw new Error(r.error.message); if (!r.data.length) throw new Error('Du kan bare endre egne notater'); Object.assign(S.d.notater.find((n) => n.id === x.id), r.data[0]); }
+          else Object.assign(S.d.notater.find((n) => n.id === x.id), felt, { endret_at: new Date().toISOString() });
+          S.red = null; S.melding = 'Notatet er endret.';
+        } else {
+          const rad = Object.assign({ id: uuid() }, felt);
+          if (!opt.demo) { const r = await S.d.db.from('observasjoner').insert(Object.assign({ context_id: S.d.ctx.id }, rad)).select('*'); if (r.error) throw new Error(r.error.message); S.d.notater.unshift(r.data[0]); }
+          else S.d.notater.unshift(Object.assign(rad, { match_id: null, stjerne: false, initialer: S.d.initialer, laget_av: S.d.meg, laget_at: new Date().toISOString() }));
+          S.ny = null; S.melding = 'Notatet er lagret.';
+        }
+        S.feil = false;
+      } catch (e) { S.melding = 'Ikke lagret: ' + e.message; S.feil = true; }
+      tegn();
+    }
+  }
+
+  const eksport = { filtrer, grupper, demoData, vis, MERK };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Observasjoner = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
  * Moduler på Analyse-siden som krever tilgang (issue #23). Blokk/forsvar er åpen for alle lag; de andre modulene
  * (Serve/rotasjon, Videoanalyse, Kampplan, Serveplan, Observasjoner, Treningsprioriteringer) krever tilgang.
  *  * Uten tilgang: modulen er merket «Krever tilgang» og viser en beskrivelse av hva den inneholder.
@@ -1848,7 +2063,7 @@ window.V3Moduler = (function (root) {
     ['videoanalyse', 'Videoanalyse', 'Klipp fra kamp', 'Kampvideo koblet til registreringene, så hver aksjon kan ses med statistikken ved siden av – per spiller, rotasjon eller type aksjon.'],
     ['kampplan', 'Kampplan', 'Ark og benk', 'Plan mot neste motstander, bygget på statistikken fra tidligere kamper: hvem som bør serves på, mottaksformasjon, angrepsvalg og fokuspunkter.'],
     ['serveplan', 'Serveplan', 'Mål per rotasjon', 'Hvem som serves på i hver rotasjon, og hvor, basert på motstanderens mottakstall.'],
-    ['observasjoner', 'Observasjoner', 'Notater', 'Korte notater fra kamp og trening, knyttet til kamp, sett og spiller, så de kan brukes i neste kampplan.'],
+    ['observasjoner', 'Observasjoner', 'Notater fra kamp og trening', 'Korte notater fra kamp og trening, knyttet til kamp, sett og spiller, så de kan brukes i neste kampplan.'],
     ['treningsprioriteringer', 'Treningsprioriteringer', 'Hva vi bør trene', 'Hva statistikken peker på at laget bør trene mer på, med utviklingen gjennom sesongen.'],
   ];
   const BE_OM = 'Ta kontakt med Randaberg Volleyball for å få modulen slått på for laget ditt.';
@@ -1883,7 +2098,7 @@ window.V3Moduler = (function (root) {
   function visInnhold() {
     const el = $('modul-v3'), m = MODULER.find((x) => x[0] === S.modul);
     const ut = S.delt || !S.bruker ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut</button>';
-    const ferdig = { 'serve-rotasjon': root.ServeRotasjon, serveplan: root.Serveplan, kampplan: root.Kampplan }[S.modul];
+    const ferdig = { 'serve-rotasjon': root.ServeRotasjon, serveplan: root.Serveplan, kampplan: root.Kampplan, observasjoner: root.Observasjoner }[S.modul];
     if (S.tilgang && ferdig) {
       // Ferdige moduler (V3 fase 3): tegnes av egen fil med samme klient som tilgangen ble sjekket med
       ferdig.vis(el, { klient: S.klient, slug: S.slug, lagnavn: S.lagnavn, demo: S.demo, ut,
