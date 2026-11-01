@@ -5009,12 +5009,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + (ours ? '<div class="bar-actions">' + (!window.PUBLIC && alleEvs.some((e) => e.type === 'dir') ? '<button class="barbtn" data-a="dir">Slagretning</button>' : '') + '<button class="barbtn" data-a="sheet">Kampark</button>' + (alleEvs.length ? '<button class="barbtn" data-a="rapport">Kamprapport</button>' : '') + (!S.dash && !window.PUBLIC ? '<button class="barbtn" data-a="rett-res">' + (S.retting === m.id ? 'Lukk retting' : 'Rett resultat') + '</button>' : '') + '<button class="barbtn primary-bar" data-a="edit">Åpne for endring</button></div>' : '') + (ours && m.custom && !S.dash ? '<button class="barbtn" data-a="delmatch">Slett kamp</button>' : '') + '</header>';
     if (ours && S.retting === m.id && !S.dash && !window.PUBLIC) h += retteForm(m);
     if (!ours && !S.dash) h += othersPanel(m);
-    if (own && egen && settene.length > 1) h += '<div class="seg det-sett" role="group" aria-label="Sett"><button data-a="detsett" data-v="all" aria-pressed="' + helKamp + '">Hele kampen</button>'
-      + settene.map((x) => { const sc = scoreStr((m.setScores || [])[x - 1]); return '<button data-a="detsett" data-v="' + x + '" aria-pressed="' + (String(S.detSett) === String(x)) + '">Sett ' + x + (sc ? ' · ' + sc : '') + '</button>'; }).join('') + '</div>';
     // Lenken til kilden står ved siden av kildevalget (01.11.2026), ikke i toppfeltet
     const lk = m.nvbf && m.nvbf.url ? m.nvbf : n && n.url ? n : null;
     const lenke = lk ? '<a class="det-lenke" href="' + esc(lk.url) + '" target="_blank" rel="noopener">Åpne hos ' + srcName(lk) + ' ›</a>' : '';
     if (visKilde || lenke) h += '<div class="det-kilde">' + (visKilde ? '<div class="seg" role="group" aria-label="Kilde"><button data-a="dsrc" data-v="egen" aria-pressed="' + egen + '">Egen føring</button><button data-a="dsrc" data-v="nvbf" aria-pressed="' + !egen + '">' + srcName(m.nvbf) + '</button></div>' : '') + lenke + '</div>';
+    if (own && egen && settene.length > 1) h += '<div class="seg det-sett" role="group" aria-label="Sett"><button data-a="detsett" data-v="all" aria-pressed="' + helKamp + '">Hele kampen</button>'
+      + settene.map((x) => { const sc = scoreStr((m.setScores || [])[x - 1]); return '<button data-a="detsett" data-v="' + x + '" aria-pressed="' + (String(S.detSett) === String(x)) + '">Sett ' + x + (sc ? ' · ' + sc : '') + '</button>'; }).join('') + '</div>';
     if (visKilde && (!n || !n.teams || !n.teams.length)) return h + '<div class="panel"><div class="empty">' + (egen
       ? (ours && !S.dash && !window.PUBLIC ? 'Det er ikke ført egen statistikk i denne kampen. Trykk «Åpne for endring» for å føre statistikk.' : 'Det er ikke ført egen statistikk i denne kampen.')
       : 'Statistikken fra ' + srcName(m.nvbf) + ' er ikke hentet inn for denne kampen ennå.') + '</div></div>';
