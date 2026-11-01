@@ -4558,16 +4558,15 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return h;
   }
 
-  // Topplister for serien/turneringen: NVBF-statistikk der den finnes, ellers egen føring (også kamper der vi har ført for et annet lag)
+  // Topplister for serien/turneringen: bare NVBF-statistikk (01.11.2026), så utregningen er lik for alle lag. Egen føring brukes ikke her.
   // Kilden for offisiell statistikk: NVBF for serien, CEV for landslagsturneringer
   function srcName(n) { return (n && n.src) || 'NVBF'; }
   function topListsData() {
     const P = {}, pn = (v) => v == null ? null : parseFloat(String(v).replace('−', '-').replace('%', '').replace(',', '.'));
-    let src = 0;
+    let src = 0, kilde = 'NVBF';
     seasonMatches().filter((m) => m.status === 'ferdig').forEach((m) => {
       let n = m.nvbf && m.nvbf.teams && m.nvbf.teams.length && !m.nvbf.partial ? m.nvbf : null;
-      if (!n && canLive(m) && SEASON.logs[m.id] && SEASON.logs[m.id].length) n = ownStats(m, SEASON.logs[m.id]);
-      if (!n) return; src++; addRecAvg(n);
+      if (!n) return; src++; kilde = srcName(n); addRecAvg(n);
       n.teams.forEach((t) => (t.players || []).forEach((p) => {
         const key = t.name + '|' + (p.name ? String(p.name).replace(/ \(L\)$/, '') : '#' + p.nr);
         const r = (P[key] ||= { team: t.name, name: p.name ? String(p.name).replace(/ \(L\)$/, '') : '#' + p.nr, nr: p.nr, games: new Set(), rec: 0, recSum: 0, att: 0, kills: 0, attErr: 0, blocked: 0, srv: 0, aces: 0, srvErr: 0, srvKnown: 0, pts: 0 });
@@ -4578,11 +4577,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
         r.aces += p.aces || 0; r.srvErr += p.srvErr || 0; r.pts += p.pts || 0;
       }));
     });
-    return { players: Object.values(P), matches: src };
+    return { players: Object.values(P), matches: src, kilde };
   }
   function topListsView() {
-    const { players, matches } = topListsData(), mode = S.topMode || 'snitt';
-    if (!matches) return '<section class="panel"><div class="panel-head"><h2>Topplister</h2></div><div class="empty">Ingen spilte kamper med statistikk ennå.</div></section>';
+    const { players, matches, kilde } = topListsData(), mode = S.topMode || 'snitt';
+    if (!matches) return '<section class="panel"><div class="panel-head"><h2>Topplister</h2></div><div class="empty">Ingen spilte kamper med ' + srcName(null) + '-statistikk ennå. Topplistene bruker bare offisielle tall.</div></section>';
     const minOf = (f) => Math.max(10, Math.round(0.25 * Math.max(0, ...players.map(f))));
     const lists = [
       { t: 'Angrep', kind: 'att', n: (r) => r.att, v: (r) => 1 + (r.kills - r.attErr - r.blocked) / r.att, vol: (r) => r.kills, volL: 'poeng', unit: 'angrep' },
@@ -4601,7 +4600,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     };
     return '<section class="panel"><div class="panel-head"><h2>Topplister · topp 5</h2><div class="seg" role="group" aria-label="Rangering"><button data-a="topmode" data-v="snitt" aria-pressed="' + (mode === 'snitt') + '">Beste snitt</button><button data-a="topmode" data-v="volum" aria-pressed="' + (mode === 'volum') + '">Flest</button></div></div>'
       + '<div class="top-grid">' + lists.map(card).join('') + '</div>'
-      + '<div class="code-legend">Fra ' + matches + ' spilte kamper i ' + esc(CTX.name) + '. NVBF-statistikk der den finnes (mottakssnitt regnet ut fra NVBF-prosentene), ellers egen føring fra benken. Serve med snitt krever at serve i spill er ført. ' + legendLink() + '</div></section>';
+      + '<div class="code-legend">Fra ' + matches + ' spilte kamper i ' + esc(CTX.name) + ' med ' + kilde + '-statistikk. Bare offisielle tall, så alle lag regnes likt (mottakssnitt regnet ut fra prosentene: perfekt = 2, feil = 0, resten = 1). Egen føring fra benken er ikke med. ' + legendLink() + '</div></section>';
   }
 
   async function saveOpp(m, players, team) {
@@ -5000,7 +4999,10 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
         fill.cats.push('angrep, serve og poeng for ' + shortName(nOpp.name));
       }
     }
-    const egen = !!own && !(S.detailSrc === 'nvbf' && hasNvbf); const n = egen ? own : m.nvbf;
+    // Kildevalget (01.11.2026) vises på alle spilte kamper, også når en av kildene mangler tall. Standard: egen føring hvis den finnes, ellers NVBF.
+    const visKilde = m.status !== 'kommende' && !isSlot(m.home) && !isSlot(m.away);
+    const egen = S.detailSrc === 'egen' || S.detailSrc === 'nvbf' ? S.detailSrc === 'egen' : !!own || !hasNvbf;
+    const n = egen ? own : hasNvbf ? m.nvbf : null;
     addRecAvg(n);
     const oc = outcome(m);
     let h = '<header class="bar det-bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm" style="flex-wrap:wrap">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + ' ' + (m.setsHome != null && m.status !== 'kommende' ? m.setsHome + '–' + m.setsAway : '') + (oc ? ' <span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss" style="color:#F0A774;box-shadow:inset 0 0 0 1.5px #F0A774">Tap') + '</span>' : '') + '</span><span class="sub">' + esc(fmtDate(m.date)) + ((m.setScores || []).length ? ' · ' + m.setScores.map((s) => s[0] + '–' + s[1]).join(' · ') : '') + '</span></div><span class="spacer"></span>'
@@ -5012,7 +5014,10 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     // Lenken til kilden står ved siden av kildevalget (01.11.2026), ikke i toppfeltet
     const lk = m.nvbf && m.nvbf.url ? m.nvbf : n && n.url ? n : null;
     const lenke = lk ? '<a class="det-lenke" href="' + esc(lk.url) + '" target="_blank" rel="noopener">Åpne hos ' + srcName(lk) + ' ›</a>' : '';
-    if ((own && hasNvbf) || lenke) h += '<div class="det-kilde">' + (own && hasNvbf ? '<div class="seg" role="group" aria-label="Kilde"><button data-a="dsrc" data-v="egen" aria-pressed="' + egen + '">Egen føring</button><button data-a="dsrc" data-v="nvbf" aria-pressed="' + !egen + '">' + srcName(m.nvbf) + '</button></div>' : '') + lenke + '</div>';
+    if (visKilde || lenke) h += '<div class="det-kilde">' + (visKilde ? '<div class="seg" role="group" aria-label="Kilde"><button data-a="dsrc" data-v="egen" aria-pressed="' + egen + '">Egen føring</button><button data-a="dsrc" data-v="nvbf" aria-pressed="' + !egen + '">' + srcName(m.nvbf) + '</button></div>' : '') + lenke + '</div>';
+    if (visKilde && (!n || !n.teams || !n.teams.length)) return h + '<div class="panel"><div class="empty">' + (egen
+      ? (ours && !S.dash && !window.PUBLIC ? 'Det er ikke ført egen statistikk i denne kampen. Trykk «Åpne for endring» for å føre statistikk.' : 'Det er ikke ført egen statistikk i denne kampen.')
+      : 'Statistikken fra ' + srcName(m.nvbf) + ' er ikke hentet inn for denne kampen ennå.') + '</div></div>';
     if (!n || !n.teams || !n.teams.length) return h + '<div class="panel"><div class="empty">' + (ours ? (S.dash && !window.PUBLIC ? 'Det er ikke ført statistikk i denne kampen ennå.' : 'Ingen registreringer i denne kampen. Trykk «Åpne for endring» for å føre statistikk.') : CTX.id !== 'main' ? (m.status === 'ferdig' ? 'Resultatet er registrert. Det er ikke ført statistikk i denne kampen.' : 'Kampen er ikke spilt ennå.') : m.status === 'ferdig' ? 'Kampstatistikken fra NVBF er ikke hentet inn ennå. Be Claude hente den, så dukker den opp her.' : 'Kampen er ikke spilt ennå. Statistikken kan hentes fra NVBF når den er publisert.') + '</div></div>';
     h += '<div class="status">' + (egen ? 'Egen føring fra benken. Mottak og angrep på skala 0–2.' + (helKamp ? '' : ' <b>Viser bare sett ' + esc(S.detSett) + '.</b>') + (fill.cats.length ? ' Ikke ført, hentet fra ' + srcName(n) + ': ' + fill.cats.join(', ') + '.' : '') : 'Offisiell ' + srcName(n) + '-statistikk' + (n.coverage ? ' · <b>' + esc(n.coverage) + '</b>' : '') + ' · ' + (n.src ? '' : 'kontrollert ') + esc(n.checked || 'ukjent tid')) + ' ' + legendLink() + '</div>';
     h += '<div class="rounds">' + n.teams.map((t) => {
@@ -5633,7 +5638,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       const mm = S.matches.find((x) => x.id === b.dataset.id); if (!mm) return;
       closeSeasonLogs();
       S.matchId = mm.id; S.statSet = 'all'; S.detSett = 'all';
-      S.view = S.dash ? (canLive(mm) && mm.status === 'pågår' ? 'watch' : 'detail') : canLive(mm) && mm.status !== 'ferdig' && !(mm.source === 'annen' && mm.nvbf && mm.nvbf.src) ? 'live' : 'detail'; S.detailSrc = 'egen';
+      S.view = S.dash ? (canLive(mm) && mm.status === 'pågår' ? 'watch' : 'detail') : canLive(mm) && mm.status !== 'ferdig' && !(mm.source === 'annen' && mm.nvbf && mm.nvbf.src) ? 'live' : 'detail'; S.detailSrc = null;
       if (canLive(mm)) openLogs(mm.id);
       render(); toTop();
       // Kamp som ikke er startet: rett inn i oppstillingsvelgeren (sett 1 har ingen registreringer ennå)
