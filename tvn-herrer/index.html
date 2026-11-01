@@ -149,6 +149,8 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .code small { font-family: var(--font-body); font-size: 10px; font-weight: 500; margin-top: 2px; }
 .code:active { transform: scale(.94); }
 .c-bad { background: var(--bad); } .c-block { background: var(--block); } .c-mid { background: var(--neutral); } .c-good { background: var(--good); }
+/* Egen blokk (blokkpoeng): grønn B, skilt fra angrepskodene med avstand og ring */
+.c-blkp { background: var(--good); box-shadow: inset 0 0 0 3px rgba(255,255,255,.4); margin-left: 6px; }
 .code.flash { box-shadow: 0 0 0 4px var(--accent); }
 .code-legend { font-size: 12px; color: var(--muted); }
 .addopp { display: flex; gap: 6px; }
@@ -1047,7 +1049,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   // Hendelse fra appen → rad. Egne spillere slås opp fra legacy-id til uuid.
   function eventTilRad(ev, k) {
-    const type = ev.type, egen = type === 'rec' || type === 'att' || type === 'srv';
+    const type = ev.type, egen = type === 'rec' || type === 'att' || type === 'srv' || type === 'blk';   // blk = egen blokk (blokkpoeng)
     const rad = { id: k.id, match_id: k.matchId, context_id: k.ctxId, device_id: k.device, seq: k.seq, set_no: +ev.set || +k.set || 1,
       recorded_at: new Date(ev.t || Date.now()).toISOString(), recorded_by: k.userId, type, code: ev.c == null ? '' : String(ev.c),
       squad_player_id: egen ? (k.spillerUuid(ev.p) || null) : null, opp_jersey: egen ? null : String(ev.p == null ? '?' : ev.p),
@@ -3412,7 +3414,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const S = {
     db: null, dl: null, ready: false, offline: false,
     roster: [], matches: [], logs: {}, logUnsub: null, plogs: {}, plogUnsub: null, opps: {}, contexts: [MAIN_CTX], ctxReady: false, showNewCtx: false,
-    view: 'list', matchId: null, filter: 'alle', statSet: 'all',
+    view: 'list', matchId: null, filter: 'alle', statSet: 'all', detSett: 'all',
     showNew: false, flash: null, error: '',
     // Dashboard: lesetilgang uten registrering (den åpne siden, eller personer med «Kan se»-tilgang)
     dash: !!window.PUBLIC, user: null, myId: null, canAdmin: false, grants: null, noAccess: false, names: {}, accHits: [], accPick: null
@@ -3652,7 +3654,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // Avgjørende registreringer gir poeng automatisk; resten tas med +1 oss / +1 dem (valgfri grunn).
   // Slått på per kamp, og bare der siden tillater det (V2_CONFIG.poengmodus). Ellers føres det nøyaktig som før.
   // Poengene lagres som egne registreringer (stats.poeng): én liste per enhet og sett, angre blir en egen rad. Stillingen lagres også i current.
-  const POENG_AV = { 'att-2': ['oss', 'Kill'], 'srv-E': ['oss', 'Ess'], 'opp-0': ['oss', 'Motstander mottaksfeil'],
+  const POENG_AV = { 'att-2': ['oss', 'Kill'], 'srv-E': ['oss', 'Ess'], 'blk-P': ['oss', 'Blokk'], 'opp-0': ['oss', 'Motstander mottaksfeil'],
     'att-0': ['dem', 'Angrepsfeil'], 'att-B': ['dem', 'Blokkert'], 'srv-F': ['dem', 'Servefeil'], 'rec-0': ['dem', 'Mottaksfeil'] };
   const POENG_PAR = { 'srv-E': 'opp-0', 'opp-0': 'srv-E' };   // samme ballveksling sett fra begge sider: telles én gang
   const POENG_GRUNNER = { oss: ['Motstander servefeil', 'Motstander angrepsfeil', 'Blokk', 'Regelfeil hos dem'], dem: ['Motstander angrep', 'Regelfeil hos oss'] };
@@ -3778,7 +3780,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const key = deviceId + '-s' + set;
     const own = (S.logs[key] || []).slice();
     const ev = Object.assign({ t: Date.now(), set, type, p: who, c: code }, extra || {});
-    const nm = type === 'opp' || type === 'dir' ? ((oppP(m, who) || {}).name || '') : (((type === 'rec' || type === 'att' || type === 'srv') && player(who)) || {}).name;
+    const nm = type === 'opp' || type === 'dir' ? ((oppP(m, who) || {}).name || '') : (((type === 'rec' || type === 'att' || type === 'srv' || type === 'blk') && player(who)) || {}).name;
     if (nm && !String(nm).startsWith('#')) ev.n = nm;
     own.push(ev);
     S.logs[key] = own;
@@ -3805,16 +3807,17 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   // ---------- Statistikk ----------
   function computeStats(events) {
-    const rec = {}, att = {}, srv = {}, opp = {};
+    const rec = {}, att = {}, srv = {}, opp = {}, blk = {};
     const bump = (o, k) => (o[k] ||= { n: 0, s: 0, c0: 0, c1: 0, c2: 0, B: 0, F: 0, I: 0, E: 0 });
     events.forEach((e) => {
+      if (e.type === 'blk') blk[e.p] = (blk[e.p] || 0) + 1;   // egen blokk (blokkpoeng); egen type, påvirker ikke 0–2-snittene
       if (e.type === 'rec') { const r = bump(rec, e.p); r.n++; r['c' + e.c]++; r.s += Number(e.c); }
       if (e.type === 'opp') { const r = bump(opp, e.p); r.n++; r['c' + e.c]++; r.s += Number(e.c); }
       if (e.type === 'att') { const r = bump(att, e.p); r.n++; if (e.c === 'B') r.B++; else r['c' + e.c]++; }
       if (e.type === 'srv') { const r = bump(srv, e.p); r.n++; r[e.c]++; }
     });
     const sum = (o) => Object.values(o).reduce((a, r) => { Object.keys(r).forEach((k) => a[k] = (a[k] || 0) + r[k]); return a; }, { n: 0, s: 0, c0: 0, c1: 0, c2: 0, B: 0, F: 0, I: 0, E: 0 });
-    return { rec, att, srv, opp, tRec: sum(rec), tAtt: sum(att), tSrv: sum(srv), tOpp: sum(opp) };
+    return { rec, att, srv, opp, blk, tBlk: Object.values(blk).reduce((a, n) => a + n, 0), tRec: sum(rec), tAtt: sum(att), tSrv: sum(srv), tOpp: sum(opp) };
   }
 
   // ---------- Visninger ----------
@@ -4078,7 +4081,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function playerRows(ids, type, codes) {
     if (!ids.length) return '<div class="empty">Ingen valgt. Åpne Tropp og velg spillere.</div>';
-    return ids.map((id) => { const p = player(id); if (!p) return ''; return '<div class="row"><div class="who"><span class="nr">' + esc(p.nr || '–') + '</span><span class="nm">' + esc(p.name) + '</span><span class="mini" data-mini="' + type + '|' + esc(id) + '"></span></div><div class="codes">' + codes.map((c) => codeBtn(type, id, c[0], c[1], c[2], c[3])).join('') + '</div></div>'; }).join('');
+    return ids.map((id) => { const p = player(id); if (!p) return ''; return '<div class="row"><div class="who"><span class="nr">' + esc(p.nr || '–') + '</span><span class="nm">' + esc(p.name) + '</span><span class="mini" data-mini="' + type + '|' + esc(id) + '"></span></div><div class="codes">' + codes.map((c) => codeBtn(type, id, c[0], c[1], c[2], c[3])).join('')
+      + (type === 'att' ? codeBtn('blk', id, 'P', 'c-blkp', 'B', 'Blokkpoeng') : '') + '</div></div>'; }).join('');
   }
 
   const REC = [['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'Spillbart'], ['2', 'c-good', '2', 'Perfekt']];
@@ -4107,7 +4111,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const courtBtn = '<button class="textbtn" data-a="squad">' + onCourt.length + ' på banen · endre</button>';
     h += '<div class="live-grid">'
       + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
-      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng</div>' : noCourt) + '</section>'
+      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + '</span>' : '') + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
@@ -4320,6 +4324,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function evLabel(e, oppName) {
     if (e.type === 'dir') return oppName + ' #' + e.p + ' · slag ' + dirKind(e) + (e.c ? ' ' + (DRES[e.c] || '').toLowerCase() : '');
+    if (e.type === 'blk') return pname(e.p) + ' · blokkpoeng';
     const lbl = { rec: 'mottak', att: 'angrep', srv: 'serve', opp: 'mottak' }[e.type];
     const code = e.type === 'srv' ? ({ F: 'feil', I: 'i spill', E: 'ess' }[e.c]) : e.type === 'att' && e.c === 'B' ? 'blokkert' : e.c;
     const who = e.type === 'opp' ? oppName + ' ' + oppLabel(cur(), e.p) : pname(e.p);
@@ -4348,10 +4353,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const exAtt = extremes(st.att, attAvg, 5);
     h += '</div><div class="stat-block"><div class="label" style="color:var(--accent)">Angrep</div>';
     if (!attRows.length) h += '<div class="empty">Ingen angrep registrert.</div>';
-    else h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th>Blokk</th><th>Uttelling</th></tr></thead><tbody>'
+    else h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th>Blokkert</th><th>Uttelling</th></tr></thead><tbody>'
       + attRows.map(([id, r]) => '<tr' + loHi(id, exAtt)[0] + '><td class="key">' + esc(pname(id)) + loHi(id, exAtt)[1] + '</td><td>' + r.n + '</td><td class="key">' + avgBar(1 + (r.c2 - r.c0 - r.B) / r.n, null, 'att', posOf(id)) + '</td><td>' + r.c2 + '</td><td>' + r.c0 + '</td><td>' + r.B + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
       + '<tr class="total"><td>Lag</td><td>' + st.tAtt.n + '</td><td>' + avgBar(1 + (st.tAtt.c2 - st.tAtt.c0 - st.tAtt.B) / st.tAtt.n, null, 'att') + '</td><td>' + st.tAtt.c2 + '</td><td>' + st.tAtt.c0 + '</td><td>' + st.tAtt.B + '</td><td>' + pct(st.tAtt.c2, st.tAtt.n) + '</td></tr></tbody></table></div>';
 
+    const blkRows = Object.entries(st.blk).sort((a, b) => b[1] - a[1]);
+    h += '<div class="code-legend">Blokkpoeng: <b>' + st.tBlk + '</b>' + (blkRows.length ? ' · ' + blkRows.map(([id, n]) => esc(pname(id)) + ' ' + n).join(' · ') : '') + '</div>';
     const t = st.tSrv;
     h += '</div><div class="stat-block"><div class="label" style="color:var(--accent)">Serve</div><div class="kpis">'
       + '<div class="kpi"><div class="display num">' + t.n + '</div><div class="k">Server</div></div>'
@@ -4800,25 +4807,25 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   const withNvbf = (m, evs) => { const f = nvbfFill(m, evs); return f.extra.length ? evs.concat(f.extra) : evs; };
 
   function ownStats(m, evs) {
-    const E = evs.filter((e) => e.type === 'rec' || e.type === 'att' || e.type === 'srv' || e.type === 'opp');
+    const E = evs.filter((e) => e.type === 'rec' || e.type === 'att' || e.type === 'srv' || e.type === 'opp' || e.type === 'blk');
     if (!E.length) return null;
     const cnt = (a, v) => a.filter((x) => x === v).length;
     const avg = (a) => a.length ? dec(a.reduce((s, x) => s + (Number(x) || 0), 0) / a.length) : undefined;
-    const sp = {}; const get = (id) => (sp[id] ||= { id, rec: [], att: [], srv: [] });
+    const sp = {}; const get = (id) => (sp[id] ||= { id, rec: [], att: [], srv: [], blk: [] });
     E.forEach((e) => { if (e.type !== 'opp') get(e.p)[e.type].push(String(e.c)); });
     const inServe = E.some((e) => e.type === 'srv' && String(e.c) === 'I');
     const ord = teamRoster(m).map((p) => p.id); const ix = (id) => { const i = ord.indexOf(id); return i < 0 ? 999 : i; };
-    const T = { rec: [], att: [], srv: [] };
+    const T = { rec: [], att: [], srv: [], blk: [] };
     const players = Object.values(sp).sort((a, b) => ix(a.id) - ix(b.id)).map((p) => {
       const pl = player(p.id) || {}; const o = { nr: pl.nr || '', name: pl.name || pname(p.id) };
       if (p.rec.length) Object.assign(o, { rec: p.rec.length, recErr: cnt(p.rec, '0'), recAvg: avg(p.rec), recPlay: pct(cnt(p.rec, '1'), p.rec.length), recPerf: pct(cnt(p.rec, '2'), p.rec.length) });
       if (p.att.length) { const k = cnt(p.att, '2'); Object.assign(o, { att: p.att.length, kills: k, attErr: cnt(p.att, '0'), blocked: cnt(p.att, 'B'), kp: pct(k, p.att.length) }); }
-      if (p.srv.length || p.att.length) { Object.assign(o, { aces: cnt(p.srv, 'E'), srvErr: cnt(p.srv, 'F'), pts: cnt(p.att, '2') + cnt(p.srv, 'E') }); if (inServe) o.srv = p.srv.length; }
-      T.rec.push(...p.rec); T.att.push(...p.att); T.srv.push(...p.srv);
+      if (p.srv.length || p.att.length || p.blk.length) { Object.assign(o, { aces: cnt(p.srv, 'E'), srvErr: cnt(p.srv, 'F'), blocks: p.blk.length, pts: cnt(p.att, '2') + cnt(p.srv, 'E') + p.blk.length }); if (inServe) o.srv = p.srv.length; }
+      T.rec.push(...p.rec); T.att.push(...p.att); T.srv.push(...p.srv); T.blk.push(...p.blk);
       return o;
     });
     const k = cnt(T.att, '2'), f = cnt(T.att, '0'), b = cnt(T.att, 'B');
-    const totals = { recAvg: avg(T.rec), recPerf: T.rec.length ? pct(cnt(T.rec, '2'), T.rec.length) : undefined, aces: cnt(T.srv, 'E'), srvErr: cnt(T.srv, 'F'), pts: k + cnt(T.srv, 'E') };
+    const totals = { recAvg: avg(T.rec), recPerf: T.rec.length ? pct(cnt(T.rec, '2'), T.rec.length) : undefined, aces: cnt(T.srv, 'E'), srvErr: cnt(T.srv, 'F'), blocks: T.blk.length || undefined, pts: k + cnt(T.srv, 'E') + T.blk.length };
     if (T.att.length) Object.assign(totals, { kp: pct(k, T.att.length), eff: pct1(k - f - b, T.att.length) });
     if (inServe) totals.srv = T.srv.length;
     const oppTeamName = m.home === usName(m) ? m.away : m.home;
@@ -4836,10 +4843,14 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 
   function detailView() {
     const m = cur(); const ours = canLive(m);
-    const ownEvs = allEvents(), fill = ours && ownEvs.length ? nvbfFill(m, ownEvs) : { extra: [], cats: [] };
+    // Settvalg (01.11.2026): hele kampen eller ett sett. Tall hentet fra NVBF gjelder hele kampen og brukes bare for hele kampen.
+    const alleEvs = allEvents(), settene = [...new Set(alleEvs.filter((e) => e.type !== 'dir').map((e) => e.set))].sort((a, b) => a - b);
+    if (S.detSett !== 'all' && !settene.includes(Number(S.detSett))) S.detSett = 'all';
+    const helKamp = S.detSett === 'all', ownEvs = helKamp ? alleEvs : alleEvs.filter((e) => String(e.set) === String(S.detSett));
+    const fill = ours && ownEvs.length && helKamp ? nvbfFill(m, ownEvs) : { extra: [], cats: [] };
     const own = ours ? ownStats(m, ownEvs.concat(fill.extra)) : null; const hasNvbf = !!(m.nvbf && m.nvbf.teams && m.nvbf.teams.length);
     // Motstanderens angrep, serve og poeng føres aldri fra benken, så de hentes fra NVBF når statistikken finnes
-    if (own && hasNvbf && m.status === 'ferdig') {
+    if (own && hasNvbf && m.status === 'ferdig' && helKamp) {
       const nOpp = m.nvbf.teams.find((t) => t.name !== usName(m)), oOpp = own.teams[1], F = ['att', 'attErr', 'blocked', 'kills', 'kp', 'eff', 'srv', 'srvErr', 'aces', 'blocks', 'pts'];
       if (nOpp && oOpp && (nOpp.players || []).some((p) => F.some((f) => p[f] != null))) {
         (nOpp.players || []).forEach((p) => {
@@ -4859,9 +4870,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + (n && n.url ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener">Åpne hos ' + srcName(n) + ' ›</a>' : '') + (ours ? (!window.PUBLIC && ownEvs.some((e) => e.type === 'dir') ? '<button class="barbtn" data-a="dir">Slagretning</button>' : '') + '<div class="bar-actions"><button class="barbtn" data-a="sheet">Kampark</button>' + (!S.dash && !window.PUBLIC ? '<button class="barbtn" data-a="rett-res">' + (S.retting === m.id ? 'Lukk retting' : 'Rett resultat') + '</button>' : '') + '<button class="barbtn primary-bar" data-a="edit">Åpne for endring</button></div>' : '') + (ours && m.custom && !S.dash ? '<button class="barbtn" data-a="delmatch">Slett kamp</button>' : '') + '</header>';
     if (ours && S.retting === m.id && !S.dash && !window.PUBLIC) h += retteForm(m);
     if (!ours && !S.dash) h += othersPanel(m);
+    if (own && egen && settene.length > 1) h += '<div class="seg det-sett" role="group" aria-label="Sett"><button data-a="detsett" data-v="all" aria-pressed="' + helKamp + '">Hele kampen</button>'
+      + settene.map((x) => { const sc = scoreStr((m.setScores || [])[x - 1]); return '<button data-a="detsett" data-v="' + x + '" aria-pressed="' + (String(S.detSett) === String(x)) + '">Sett ' + x + (sc ? ' · ' + sc : '') + '</button>'; }).join('') + '</div>';
     if (own && hasNvbf) h += '<div class="seg" role="group" aria-label="Kilde"><button data-a="dsrc" data-v="egen" aria-pressed="' + egen + '">Egen føring</button><button data-a="dsrc" data-v="nvbf" aria-pressed="' + !egen + '">' + srcName(n) + '</button></div>';
     if (!n || !n.teams || !n.teams.length) return h + '<div class="panel"><div class="empty">' + (ours ? (S.dash && !window.PUBLIC ? 'Det er ikke ført statistikk i denne kampen ennå.' : 'Ingen registreringer i denne kampen. Trykk «Åpne for endring» for å føre statistikk.') : CTX.id !== 'main' ? (m.status === 'ferdig' ? 'Resultatet er registrert. Det er ikke ført statistikk i denne kampen.' : 'Kampen er ikke spilt ennå.') : m.status === 'ferdig' ? 'Kampstatistikken fra NVBF er ikke hentet inn ennå. Be Claude hente den, så dukker den opp her.' : 'Kampen er ikke spilt ennå. Statistikken kan hentes fra NVBF når den er publisert.') + '</div></div>';
-    h += '<div class="status">' + (egen ? 'Egen føring fra benken. Mottak og angrep på skala 0–2.' + (fill.cats.length ? ' Ikke ført, hentet fra ' + srcName(n) + ': ' + fill.cats.join(', ') + '.' : '') : 'Offisiell ' + srcName(n) + '-statistikk' + (n.coverage ? ' · <b>' + esc(n.coverage) + '</b>' : '') + ' · ' + (n.src ? '' : 'kontrollert ') + esc(n.checked || 'ukjent tid')) + ' ' + legendLink() + '</div>';
+    h += '<div class="status">' + (egen ? 'Egen føring fra benken. Mottak og angrep på skala 0–2.' + (helKamp ? '' : ' <b>Viser bare sett ' + esc(S.detSett) + '.</b>') + (fill.cats.length ? ' Ikke ført, hentet fra ' + srcName(n) + ': ' + fill.cats.join(', ') + '.' : '') : 'Offisiell ' + srcName(n) + '-statistikk' + (n.coverage ? ' · <b>' + esc(n.coverage) + '</b>' : '') + ' · ' + (n.src ? '' : 'kontrollert ') + esc(n.checked || 'ukjent tid')) + ' ' + legendLink() + '</div>';
     h += '<div class="rounds">' + n.teams.map((t) => {
       const T = t.totals || {};
       let s = '<section class="panel"><div class="panel-head"><h2>' + esc(t.name) + '</h2></div>';
@@ -4877,7 +4890,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       const pa = (t.players || []).filter((p) => p.att != null).sort((a, b) => b.att - a.att);
       const attTot = pa.reduce((a, p) => a + (p.att || 0), 0), minAtt = Math.max(5, Math.round(attTot * 0.1));
       const exA = pick(pa, (p) => p.att || 0, (p) => 1 + (p.kills - p.attErr - p.blocked) / p.att, minAtt);
-      if (pa.length) s += '<div class="tbl-wrap"><table class="tbl t-att"><thead><tr><th>Angrep</th><th>Fors.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th>Blokk.</th><th>Utt.</th></tr></thead><tbody>' + pa.map((p) => '<tr' + loHi(p, exA)[0] + '><td class="key">' + esc(p.nr ? '#' + p.nr + ' ' : '') + esc(p.name) + loHi(p, exA)[1] + '</td><td>' + p.att + '</td><td class="key">' + (p.att ? avgBar(1 + (p.kills - p.attErr - p.blocked) / p.att, null, 'att', t.name === OUR ? posByNr(p.nr) : '') : '–') + '</td><td>' + p.kills + '</td><td>' + p.attErr + '</td><td>' + p.blocked + '</td><td>' + esc(p.kp ?? pct(p.kills, p.att)) + '</td></tr>').join('') + '</tbody></table></div>';
+      if (pa.length) s += '<div class="tbl-wrap"><table class="tbl t-att"><thead><tr><th>Angrep</th><th>Fors.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th title="Angrepet ble blokkert">Blokkert</th><th>Utt.</th></tr></thead><tbody>' + pa.map((p) => '<tr' + loHi(p, exA)[0] + '><td class="key">' + esc(p.nr ? '#' + p.nr + ' ' : '') + esc(p.name) + loHi(p, exA)[1] + '</td><td>' + p.att + '</td><td class="key">' + (p.att ? avgBar(1 + (p.kills - p.attErr - p.blocked) / p.att, null, 'att', t.name === OUR ? posByNr(p.nr) : '') : '–') + '</td><td>' + p.kills + '</td><td>' + p.attErr + '</td><td>' + p.blocked + '</td><td>' + esc(p.kp ?? pct(p.kills, p.att)) + '</td></tr>').join('') + '</tbody></table></div>';
       if (!egen && pr.some((p) => p.recAvg != null)) s += '<div class="code-legend">Mottakssnitt (0–2) er regnet ut fra ' + srcName(n) + '-tallene: perfekt = 2, feil = 0, resten = 1. Ikke egen føring fra benken.</div>';
       if (exR.lo || exA.lo) s += '<div class="code-legend"><span class="weak-tag">Lav</span> <span class="weak-tag strong">Høy</span> lavest og høyest snitt blant spillere med minst ' + minRec + ' mottak eller ' + minAtt + ' angrep.</div>';
       const ps = (t.players || []).filter((p) => p.srv != null || p.pts != null || p.blocks != null);
@@ -5479,7 +5492,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'open') {
       const mm = S.matches.find((x) => x.id === b.dataset.id); if (!mm) return;
       closeSeasonLogs();
-      S.matchId = mm.id; S.statSet = 'all';
+      S.matchId = mm.id; S.statSet = 'all'; S.detSett = 'all';
       S.view = S.dash ? (canLive(mm) && mm.status === 'pågår' ? 'watch' : 'detail') : canLive(mm) && mm.status !== 'ferdig' && !(mm.source === 'annen' && mm.nvbf && mm.nvbf.src) ? 'live' : 'detail'; S.detailSrc = 'egen';
       if (canLive(mm)) openLogs(mm.id);
       render(); toTop();
@@ -5500,6 +5513,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     else if (a === 'edit' && m) { S.view = 'live'; S.endingSet = false; render(); toTop(); }
     else if (a === 'toview' && m) { S.view = 'detail'; render(); toTop(); }
     else if (a === 'dsrc') { S.detailSrc = b.dataset.v; render(); }
+    else if (a === 'detsett') { S.detSett = b.dataset.v === 'all' ? 'all' : Number(b.dataset.v); render(); }
     else if (a === 'ctx-cancel') { S.showNewCtx = false; render(); }
     else if (a === 'publish') { publishOpen('manuelt', true); }
     else if (a === 'share') { S.showShare = !S.showShare; S.copied = false; render(); }
@@ -5765,7 +5779,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const rows = [['sett', 'type', 'spiller', 'nr', 'kode', 'tid']];
     allEvents().forEach((e) => {
       const p = (e.type === 'opp' || e.type === 'dir') ? null : player(e.p);
-      rows.push([e.set,{ rec: 'Mottak', att: 'Angrep', srv: 'Serve', opp: oppName + ' mottak', dir: oppName + ' slagretning' }[e.type], p ? p.name : ((e.type === 'opp' || e.type === 'dir') ? oppName : ''), p ? (p.nr || '') : e.p, e.type === 'dir' ? dirKind(e) + ' sone ' + (dirZone(e) || '–') + (e.c ? ' ' + DRES[e.c] : '') : e.c, new Date(e.t).toLocaleTimeString('nb-NO')]);
+      rows.push([e.set,{ rec: 'Mottak', att: 'Angrep', srv: 'Serve', blk: 'Blokkpoeng', opp: oppName + ' mottak', dir: oppName + ' slagretning' }[e.type], p ? p.name : ((e.type === 'opp' || e.type === 'dir') ? oppName : ''), p ? (p.nr || '') : e.p, e.type === 'dir' ? dirKind(e) + ' sone ' + (dirZone(e) || '–') + (e.c ? ' ' + DRES[e.c] : '') : e.c, new Date(e.t).toLocaleTimeString('nb-NO')]);
     });
     const csv = rows.map((r) => r.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     try { await S.dl.save({ filename: ('kamp-' + m.home + '-' + m.away).replace(/[^\wæøåÆØÅ-]+/g, '-') + '.csv', data: '﻿' + csv }); }
