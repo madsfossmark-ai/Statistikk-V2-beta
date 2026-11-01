@@ -2302,11 +2302,12 @@ window.V3Moduler = (function (root) {
       const ønsket = cfg.locked ? cfg.mainSlug : (q.get('lag') || cfg.mainSlug);
       S.ktx = S.kontekster.find((c) => c.slug === ønsket) || S.kontekster[0];
       if (!S.ktx) return visFeil('Du har ikke tilgang til noe lag ennå.');
+      tilbakeLenke();
       if (!cfg.locked && S.kontekster.length > 1) {
         const v = $('kontekst'); v.hidden = false;
         v.innerHTML = S.kontekster.map((c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>').join('');
         v.value = S.ktx.slug;
-        v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); v3Lag(); });
+        v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); v3Lag(); tilbakeLenke(); });
       } else $('kontekst-navn').textContent = S.ktx.name + (erDemo ? ' · oppdiktede data' : '');
       v3Lag();
       await lastKontekst();
@@ -2479,7 +2480,9 @@ window.V3Moduler = (function (root) {
   });
   $('tabell').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('tr[data-nokkel]')) ev.target.click(); });
   $('b-skriv').addEventListener('click', () => window.print());
-  $('tilbake').href = demo ? '../?demo=1' : '../';
+  // «Til appen» tar med laget som er valgt her (01.11.2026)
+  function tilbakeLenke() { const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : ''; $('tilbake').href = '../' + (demo || l ? '?' + [demo ? 'demo=1' : '', l].filter(Boolean).join('&') : ''); }
+  tilbakeLenke();
 
   window.__analyse = { S, tegn, get fv() { return S.fv; } };
   start().catch((e) => visFeil('Noe gikk galt: ' + e.message));

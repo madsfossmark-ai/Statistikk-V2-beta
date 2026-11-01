@@ -671,7 +671,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .rp-to.en { grid-template-columns: minmax(0, 1fr); }
 .rp-fot { margin-top: auto; display: flex; justify-content: space-between; gap: 12px; font-size: 9.5px; color: var(--bs); border-top: 1px solid var(--pl); padding-top: 5px; }
 @media print {
-  html.rp-printing .rp-ikke-utskrift, html.rp-printing #v2-status, html.rp-printing #v2-demo, html.rp-printing #v2-loggut, html.rp-printing #v2-tilgang, html.rp-printing .hn-kvitt { display: none !important; }
+  html.rp-printing .rp-ikke-utskrift, html.rp-printing #v2-status, html.rp-printing #v2-demo, html.rp-printing #v2-loggut, html.rp-printing #v2-tilgang, html.rp-printing .hn-kvitt, html.rp-printing .pub-foot { display: none !important; }
   html.rp-printing, html.rp-printing body { background: #FFFFFF !important; height: auto !important; overflow: visible !important; }
   html.rp-printing .app { padding: 0 !important; margin: 0 !important; max-width: none !important; }
   html.rp-printing body { margin: 0 !important; padding: 0 !important; }
@@ -3596,6 +3596,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     document.documentElement.classList.toggle('dash', S.dash);
     if (!S.db) { S.offline = true; S.ready = true; render(); return; }
     let saved = null; try { saved = localStorage.getItem('rv-ctx'); } catch (e) {}
+    // Tilbake fra Analyse (?lag=<slug>): åpne samme lag. Hovedlaget har id 'main' i appen.
+    const lagQ = new URLSearchParams(location.search).get('lag');
+    if (lagQ) saved = (window.V2_CONFIG && lagQ === window.V2_CONFIG.mainSlug) ? 'main' : lagQ;
     // V2 (Supabase): tilgangen styres av medlemskap, og en lesebruker ser bare lagene den er medlem av.
     // Den gamle tilgangslisten (config/access) finnes ikke der, så lesebrukere velger lag som alle andre.
     const DASH_GRANTS = S.dash && !window.PUBLIC && !window.V2_CONFIG;
@@ -3659,7 +3662,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   // Felles toppmeny: lag/sesong, Kamper · Tabell · Dashboard · Analyse, og menyen med det som brukes sjeldnere
   // Bare i V2-bygget (der analysesiden ligger ved siden av lagsiden); slås av med config.analyse = false
-  function analyseHref() { return (window.ForsvarKamp && !(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? 'analyse/' + (location.search.indexOf('demo') >= 0 ? '?demo=1' : '') : null; }
+  function analyseHref() { return (window.ForsvarKamp && !(window.V2_CONFIG && window.V2_CONFIG.analyse === false) && !window.PUBLIC) ? 'analyse/?' + (location.search.indexOf('demo') >= 0 ? 'demo=1&' : '') + 'lag=' + encodeURIComponent(ctxSlug()) : null; }   // laget du står på følger med (01.11.2026)
   function navHtml(aktiv) {
     const tab = (k, a, l) => '<button class="navtab" data-a="' + a + '"' + (aktiv === k ? ' aria-current="page"' : '') + '>' + l + '</button>';
     const an = analyseHref();
