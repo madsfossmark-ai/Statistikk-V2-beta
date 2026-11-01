@@ -3596,13 +3596,16 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     document.documentElement.classList.toggle('dash', S.dash);
     if (!S.db) { S.offline = true; S.ready = true; render(); return; }
     let saved = null; try { saved = localStorage.getItem('rv-ctx'); } catch (e) {}
+    // V2 (Supabase): tilgangen styres av medlemskap, og en lesebruker ser bare lagene den er medlem av.
+    // Den gamle tilgangslisten (config/access) finnes ikke der, så lesebrukere velger lag som alle andre.
+    const DASH_GRANTS = S.dash && !window.PUBLIC && !window.V2_CONFIG;
     if (!window.PUBLIC) S.db.doc('config/access').onSnapshot((snap) => {
-      S.grants = snap.exists ? (snap.data().grants || {}) : {}; if (S.dash) resolveDashCtx(); else render();
-    }, () => { S.grants = {}; if (S.dash) resolveDashCtx(); });
+      S.grants = snap.exists ? (snap.data().grants || {}) : {}; if (DASH_GRANTS) resolveDashCtx(); else render();
+    }, () => { S.grants = {}; if (DASH_GRANTS) resolveDashCtx(); });
     S.db.doc('config/contexts').onSnapshot((snap) => {
       const list = snap.exists ? (snap.data().list || []) : [];
       S.contexts = [MAIN_CTX].concat(list.filter((c) => c && c.id && c.id !== 'main'));
-      if (S.dash && !window.PUBLIC) { S.ctxLoaded = true; resolveDashCtx(); return; }
+      if (DASH_GRANTS) { S.ctxLoaded = true; resolveDashCtx(); return; }
       if (!S.ctxReady) { S.ctxReady = true; applyCtx(saved || 'main'); }
       else if (!S.contexts.some((c) => c.id === CTX.id)) applyCtx('main');
       else { CTX = S.contexts.find((c) => c.id === CTX.id); render(); }
