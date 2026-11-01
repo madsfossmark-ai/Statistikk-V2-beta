@@ -802,6 +802,280 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </script>
 <script>
 /*
+ * Scouting & Serveplan V1 – analysemodell (ren JavaScript, ingen DOM).
+ * Brukes av moduler/scouting/scouting.html i nettleseren og av testene i Node.
+ *
+ * Inndata: samme form som den åpne sidens data.json (offentlig/bygg.py):
+ *   { roster: [...], matches: [{ id, data }], logs: { <kampId>: { <loggdok>: { events: [...] } } }, opponents: { <lag>: { players } } }
+ * Utdata: normaliserte observasjoner med kildesporing, nøkkeltall og en forklarbar serveprioritering.
+ * Ingenting her skriver data. Trenerens vurderinger holdes utenfor alle beregninger.
+ * Se docs/scouting.md for definisjoner.
+ */
+(function (root) {
+  'use strict';
+
+  const KILDENAVN = { egen: 'Egen føring', NVBF: 'NVBF', CEV: 'CEV' };
+  // Definisjonsfamilier: tall med ulik definisjon summeres aldri sammen
+  const DEF = { dv: 'datavolley', egen: 'egen-0-1-2' };
+  const MIN_MOTTAK = 5;      // under dette rangeres ikke en mottaker
+  const KRYMP = 10;          // antall «tenkte» mottak på lagsnittet (krymping mot snitt)
+
+  const norm = (s) => String(s == null ? '' : s).replace(/\s*\(L\)\s*$/, '').trim().toLowerCase();
+  const lagNokkel = (s) => norm(s).replace(/\s+(volleyball(klubb)?|vbk|il)$/, '');
+  const tall = (v) => { if (v == null || v === '' || v === '-' || v === '.') return 0; const x = Number(String(v).replace(',', '.')); return isNaN(x) ? 0 : x; };
+  const prosent = (v) => { if (v == null) return null; const x = parseFloat(String(v).replace('%', '').replace(',', '.').replace('−', '-')); return isNaN(x) ? null : x; };
+
+  // ---------- Innlesing ----------
+
+  function lesData(d) {
+    const matches = (d.matches || []).map((m) => (m.data ? Object.assign({ id: m.id }, m.data) : m));
+    const logs = {};
+    Object.entries(d.logs || {}).forEach(([id, docs]) => {
+      logs[id] = Array.isArray(docs) ? docs : [].concat(...Object.values(docs).map((x) => (x && x.events) || []));
+    });
+    return { __lest: true, matches, logs, roster: d.roster || [], opponents: d.opponents || {} };
+  }
+
+  // ---------- Normalisering ----------
+
+  /* Én observasjon = én spiller, én kamp, én kategori, fra én kilde.
+   * { kampId, dato, lag, motstander, nr, navn, kategori: 'mottak'|'angrep'|'serve', kilde, definisjon,
+   *   omfang: 'kamp'|'delvis', hentet, tall: {...}, flagg: [...] } */
+  function offisiellKilde(nv) { return nv && nv.src === 'CEV' ? 'CEV' : 'NVBF'; }
+
+  function offisielleObs(m) {
+    const nv = m.nvbf; if (!nv || !nv.teams || !nv.teams.length) return [];
+    const kilde = offisiellKilde(nv), out = [];
+    // Hele kampen som venter på kontroll regnes som hele kampen, men flagges. Settuttrekk og gamle delvise felt er delvise.
+    const omfang = nv.scope === 'match' ? 'kamp' : nv.partial || nv.scope === 'set' ? 'delvis' : 'kamp';
+    const forelopig = nv.scope === 'match' && nv.partial;
+    nv.teams.forEach((t) => {
+      const mot = nv.teams.find((x) => x !== t);
+      const lagFlagg = forelopig ? ['Foreløpige tall (ikke bekreftet som endelige)'] : [];
+      if (t.totals && t.totals.rec && prosent(t.totals.recPerf) === 0) lagFlagg.push('0 % perfekte mottak hos laget (mulig forenklet føring)');
+      (t.players || []).forEach((p) => {
+        const base = { kampId: m.id, dato: m.date || null, lag: t.name, motstander: mot ? mot.name : null, nr: String(p.nr || ''), navn: String(p.name || '').replace(/\s*\(L\)\s*$/, ''),
+          kilde, definisjon: DEF.dv, omfang, hentet: nv.statsFetchedAt || nv.checked || null, flagg: lagFlagg.slice() };
+        if (p.rec) out.push(Object.assign({}, base, { kategori: 'mottak', tall: { n: tall(p.rec), feil: tall(p.recErr), posPct: prosent(p.recPos), perfPct: prosent(p.recPerf) } }));
+        if (p.att) out.push(Object.assign({}, base, { kategori: 'angrep', tall: { n: tall(p.att), kill: tall(p.kills), feil: tall(p.attErr), blokkert: tall(p.blocked) } }));
+        if (p.srv || p.aces || p.srvErr) out.push(Object.assign({}, base, { kategori: 'serve', tall: { n: p.srv != null ? tall(p.srv) : null, ess: tall(p.aces), feil: tall(p.srvErr) } }));
+      });
+    });
+    return out;
+  }
+
+  function egneObs(m, events, data, our) {
+    if (!events || !events.length) return [];
+    const us = m.focus || our, them = m.home === us ? m.away : m.home;
+    const ros = m.focus ? null : data.roster;
+    const oppRos = ((data.opponents[them] || {}).players || []);
+    const fokusRos = m.focus ? ((data.opponents[m.focus] || {}).players || []) : [];
+    const spiller = (id) => {
+      if (ros) { const r = ros.find((x) => x.id === id); return r ? { nr: String(r.nr || ''), navn: r.name || '' } : { nr: '', navn: String(id) }; }
+      const nr = String(id).split(':').pop(); const r = fokusRos.find((x) => String(x.nr) === nr); return { nr, navn: (r && r.name) || '' };
+    };
+    const acc = {};
+    const add = (lag, mot, sp, kat, f) => {
+      const k = lag + '|' + (sp.nr || sp.navn) + '|' + kat;
+      const o = acc[k] || (acc[k] = { kampId: m.id, dato: m.date || null, lag, motstander: mot, nr: sp.nr, navn: sp.navn, kategori: kat, kilde: 'egen', definisjon: DEF.egen,
+        omfang: m.status === 'ferdig' ? 'kamp' : 'delvis', hentet: null, flagg: [], tall: kat === 'mottak' ? { n: 0, feil: 0, k1: 0, k2: 0 } : kat === 'angrep' ? { n: 0, kill: 0, feil: 0, blokkert: 0 } : { n: 0, ess: 0, feil: 0 } });
+      f(o.tall);
+    };
+    events.forEach((e) => {
+      if (e.type === 'rec') add(us, them, spiller(e.p), 'mottak', (t) => { t.n++; if (e.c === '0') t.feil++; if (e.c === '1') t.k1++; if (e.c === '2') t.k2++; });
+      else if (e.type === 'opp') { const r = oppRos.find((x) => String(x.nr) === String(e.p)); add(them, us, { nr: String(e.p), navn: (r && r.name) || '' }, 'mottak', (t) => { t.n++; if (e.c === '0') t.feil++; if (e.c === '1') t.k1++; if (e.c === '2') t.k2++; }); }
+      else if (e.type === 'att') add(us, them, spiller(e.p), 'angrep', (t) => { t.n++; if (e.c === '2') t.kill++; if (e.c === '0') t.feil++; if (e.c === 'B') t.blokkert++; });
+      else if (e.type === 'srv') add(us, them, spiller(e.p), 'serve', (t) => { t.n++; if (e.c === 'E') t.ess++; if (e.c === 'F') t.feil++; });
+    });
+    return Object.values(acc);
+  }
+
+  /* Velger én kilde per kamp, lag og kategori, og fjerner doble kampdokumenter.
+   * Rekkefølge: offisiell for hele kampen > egen føring > offisiell delvis (for eksempel bare sett 1).
+   * Settuttrekk og kamputtrekk summeres aldri: hver kamp har ett statistikkfelt, og et delvis uttrekk
+   * brukes bare når ingenting bedre finnes. Alle valg logges i `beslutninger`. */
+  function normaliser(raw, opts) {
+    const data = raw && raw.__lest ? raw : lesData(raw || {});
+    const our = (opts && opts.our) || 'Randaberg';
+    const beslutninger = [];
+    // Doble kampdokumenter: samme dato og lag
+    const sett = {}, kamper = [];
+    data.matches.filter((m) => m.round !== 'Test' && !m.test).forEach((m) => {
+      const k = String(m.date || '').slice(0, 10) + '|' + lagNokkel(m.home) + '|' + lagNokkel(m.away);
+      const mengde = (m.nvbf && m.nvbf.teams ? 2 : 0) + ((data.logs[m.id] || []).length ? 1 : 0);
+      if (sett[k]) {
+        const forrige = sett[k];
+        const pm = (forrige.nvbf && forrige.nvbf.teams ? 2 : 0) + ((data.logs[forrige.id] || []).length ? 1 : 0);
+        const behold = mengde > pm ? m : forrige, dropp = behold === m ? forrige : m;
+        beslutninger.push({ type: 'dobbel-kamp', tekst: `${dropp.id} er samme kamp som ${behold.id} (${k}); brukte ${behold.id}` });
+        if (behold === m) { kamper[kamper.indexOf(forrige)] = m; sett[k] = m; }
+        return;
+      }
+      sett[k] = m; kamper.push(m);
+    });
+    const obs = [];
+    kamper.forEach((m) => {
+      const off = offisielleObs(m), egen = egneObs(m, data.logs[m.id], data, our);
+      const grupper = {};
+      off.concat(egen).forEach((o) => { const k = lagNokkel(o.lag) + '|' + o.kategori; (grupper[k] || (grupper[k] = [])).push(o); });
+      Object.entries(grupper).forEach(([k, liste]) => {
+        const har = (f) => liste.some(f);
+        const valg = har((o) => o.kilde !== 'egen' && o.omfang === 'kamp') ? (o) => o.kilde !== 'egen' && o.omfang === 'kamp'
+          : har((o) => o.kilde === 'egen') ? (o) => o.kilde === 'egen' : (o) => o.kilde !== 'egen';
+        const brukt = liste.filter(valg), forkastet = liste.filter((o) => !valg(o));
+        if (forkastet.length) {
+          const kb = brukt[0], kf = forkastet[0];
+          beslutninger.push({ type: 'kildevalg', kampId: m.id, tekst: `${m.id}, ${kb.lag} ${kb.kategori}: brukte ${KILDENAVN[kb.kilde]} (${kb.omfang}), ikke ${KILDENAVN[kf.kilde]} (${kf.omfang}, ${forkastet.reduce((a, o) => a + (o.tall.n || 0), 0)} forsøk)` });
+        }
+        brukt.forEach((o) => obs.push(o));
+      });
+    });
+    return { kamper, obs, beslutninger, our };
+  }
+
+  // ---------- Nøkkeltall ----------
+
+  /* Positiv mottaksprosent fra avrundede prosenter: hver kamp gir et heltall p (avrundet) av n mottak.
+   * Riktig antall ligger i [ceil((p-0.5)·n/100), floor((p+0.5)·n/100)]. Vi summerer intervallene
+   * og et punktanslag (round(p·n/100)). Nevneren er bare mottak med denne definisjonen. */
+  function andelFraProsent(liste, felt) {
+    let n = 0, pkt = 0, lo = 0, hi = 0, avrundet = false;
+    liste.forEach((o) => {
+      const p = o.tall[felt]; if (p == null || !o.tall.n) return;
+      const x = o.tall.n;
+      n += x; pkt += Math.round(p * x / 100);
+      const a = Math.max(0, Math.ceil(((p - 0.5) * x / 100) - 1e-9)), b = Math.min(x, Math.floor(((p + 0.5) * x / 100) + 1e-9));
+      lo += Math.min(a, b); hi += Math.max(a, b);
+      if (a !== b) avrundet = true;  // antallet kan ikke bestemmes entydig fra den avrundede prosenten
+    });
+    return n ? { n, antall: pkt, lo, hi, pct: 100 * pkt / n, loPct: 100 * lo / n, hiPct: 100 * hi / n, avrundet } : null;
+  }
+
+  function mottak(liste) {
+    const n = liste.reduce((a, o) => a + o.tall.n, 0), feil = liste.reduce((a, o) => a + o.tall.feil, 0);
+    const dv = liste.filter((o) => o.definisjon === DEF.dv), eg = liste.filter((o) => o.definisjon === DEF.egen);
+    const egN = eg.reduce((a, o) => a + o.tall.n, 0);
+    return {
+      n, feil, feilPct: n ? 100 * feil / n : null,
+      positiv: andelFraProsent(dv, 'posPct'),          // DataVolley Pos% (CEV/NVBF)
+      perfekt: andelFraProsent(dv, 'perfPct'),          // DataVolley Exc.%
+      egen: egN ? { n: egN, k2: eg.reduce((a, o) => a + o.tall.k2, 0), k1: eg.reduce((a, o) => a + o.tall.k1, 0), snitt: eg.reduce((a, o) => a + o.tall.k1 + 2 * o.tall.k2, 0) / egN } : null,
+      kamper: new Set(liste.map((o) => o.kampId)).size,
+      kilder: [...new Set(liste.map((o) => o.kilde))],
+    };
+  }
+
+  function angrep(liste, lagN) {
+    const s = (f) => liste.reduce((a, o) => a + (o.tall[f] || 0), 0);
+    const n = s('n'), kill = s('kill'), feil = s('feil'), blokkert = s('blokkert');
+    return { n, kill, feil, blokkert, killPct: n ? 100 * kill / n : null, feilPct: n ? 100 * feil / n : null, blokkertPct: n ? 100 * blokkert / n : null,
+      eff: n ? 100 * (kill - feil - blokkert) / n : null, andel: lagN ? 100 * n / lagN : null, kamper: new Set(liste.map((o) => o.kampId)).size, kilder: [...new Set(liste.map((o) => o.kilde))] };
+  }
+
+  function serve(liste) {
+    const kjent = liste.filter((o) => o.tall.n != null), n = kjent.reduce((a, o) => a + o.tall.n, 0);
+    const ess = liste.reduce((a, o) => a + o.tall.ess, 0), feil = liste.reduce((a, o) => a + o.tall.feil, 0);
+    return { n: kjent.length ? n : null, ess, feil, essPct: n ? 100 * kjent.reduce((a, o) => a + o.tall.ess, 0) / n : null, feilPct: n ? 100 * kjent.reduce((a, o) => a + o.tall.feil, 0) / n : null,
+      kamper: new Set(liste.map((o) => o.kampId)).size, kilder: [...new Set(liste.map((o) => o.kilde))] };
+  }
+
+  // ---------- Lagprofil ----------
+
+  function spillerNokkel(o) { return o.nr ? '#' + o.nr : 'n:' + norm(o.navn); }
+
+  function lagprofil(modell, lag, opts) {
+    const ferOm = (opts && opts.foer) || null;      // bare kamper før denne datoen (plan før kamp)
+    const unntak = (opts && opts.utenKamp) || null; // og aldri kampen som analyseres
+    const mine = modell.obs.filter((o) => lagNokkel(o.lag) === lagNokkel(lag) && (!ferOm || (o.dato && o.dato < ferOm)) && o.kampId !== unntak);
+    const spillere = {};
+    mine.forEach((o) => {
+      const k = spillerNokkel(o);
+      const s = spillere[k] || (spillere[k] = { nr: o.nr, navn: [], obs: [] });
+      if (o.navn && !s.navn.includes(o.navn)) s.navn.push(o.navn);
+      s.obs.push(o);
+    });
+    const lagAngrep = mine.filter((o) => o.kategori === 'angrep').reduce((a, o) => a + o.tall.n, 0);
+    const ut = Object.values(spillere).map((s) => {
+      const m = s.obs.filter((o) => o.kategori === 'mottak'), a = s.obs.filter((o) => o.kategori === 'angrep'), v = s.obs.filter((o) => o.kategori === 'serve');
+      const flagg = [...new Set(s.obs.flatMap((o) => o.flagg))];
+      if (s.navn.length > 1) flagg.push('Ulike navn på samme nummer: ' + s.navn.join(' / '));
+      if (s.navn.some((n) => /ukjent spiller|player unknown/i.test(n))) flagg.push('Navnet mangler i kilden');
+      return { nr: s.nr, navn: s.navn[0] || '', navn_alle: s.navn, mottak: m.length ? mottak(m) : null, angrep: a.length ? angrep(a, lagAngrep) : null, serve: v.length ? serve(v) : null, flagg };
+    }).sort((x, y) => (Number(x.nr) || 999) - (Number(y.nr) || 999));
+    const kamper = [...new Set(mine.map((o) => o.kampId))];
+    const kilder = {};
+    mine.forEach((o) => { (kilder[o.kilde] || (kilder[o.kilde] = new Set())).add(o.kampId); });
+    return { lag, kamper, kilder: Object.fromEntries(Object.entries(kilder).map(([k, v]) => [k, [...v]])), spillere: ut,
+      lagMottak: mine.some((o) => o.kategori === 'mottak') ? mottak(mine.filter((o) => o.kategori === 'mottak')) : null, lagAngrep };
+  }
+
+  // ---------- Serveprioritering ----------
+
+  function kvalitet(m) {
+    if (!m || m.n < MIN_MOTTAK) return { nivaa: 'for lite', tekst: `under ${MIN_MOTTAK} mottak – rangeres ikke` };
+    if (m.n >= 20 && m.kamper >= 2) return { nivaa: 'god', tekst: `${m.n} mottak i ${m.kamper} kamper` };
+    if (m.n >= 10) return { nivaa: 'middels', tekst: `${m.n} mottak i ${m.kamper} kamp${m.kamper > 1 ? 'er' : ''}` };
+    return { nivaa: 'svak', tekst: `bare ${m.n} mottak` };
+  }
+
+  const pct = (x, d) => x == null ? '–' : (Math.round(x * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toString().replace('.', ',').replace('-', '−') + '\u00a0%';
+
+  /* Forklarbar prioritering. For hver mottaker:
+   *   feil* = (feil + K·lagsnittFeil) / (n + K)           krympet mot lagets feilrate
+   *   pos*  = (positive + K·lagsnittPos) / (nPos + K)      bare der CEV/NVBF har Pos%
+   *   score = (feil* − lagsnittFeil) + ½·(lagsnittPos − pos*)   i prosentpoeng
+   * Høyere score = svakere mottak enn lagsnittet = høyere prioritet. Under 5 mottak rangeres ikke.
+   * Ingen rotasjon eller soner: grunnlaget har ikke det. Trenerens vurderinger påvirker ikke scoren. */
+  function serveplan(profil) {
+    const lm = profil.lagMottak; if (!lm || !lm.n) return { rader: [], grunnlag: 'Ingen mottaksdata for laget' };
+    const e0 = lm.feil / lm.n, p0 = lm.positiv ? lm.positiv.antall / lm.positiv.n : null;
+    const rader = profil.spillere.filter((s) => s.mottak && s.mottak.n).map((s) => {
+      const m = s.mottak, q = kvalitet(m);
+      const ek = (m.feil + KRYMP * e0) / (m.n + KRYMP);
+      let pk = null;
+      if (p0 != null && m.positiv) pk = (m.positiv.antall + KRYMP * p0) / (m.positiv.n + KRYMP);
+      const score = 100 * (ek - e0) + (pk != null ? 50 * (p0 - pk) : 0);
+      const grunner = [`${m.feil} feil på ${m.n} mottak (${pct(m.feilPct)}), lagsnitt ${pct(100 * e0)}`];
+      if (m.positiv) grunner.push(`positivt ${m.positiv.avrundet ? '≈ ' : ''}${pct(m.positiv.pct)} av ${m.positiv.n} mottak hos ${m.kilder.filter((k) => k !== 'egen').join('/')}` + (m.positiv.avrundet ? ` (${pct(m.positiv.loPct)}–${pct(m.positiv.hiPct)} pga. avrunding)` : '') + (p0 != null ? `, lagsnitt ${pct(100 * p0)}` : ''));
+      if (m.egen) grunner.push(`egen føring: snitt ${m.egen.snitt.toFixed(2).replace('.', ',')} på ${m.egen.n} mottak (0–2-skala, ikke sammenlignbar med Pos%)`);
+      return { nr: s.nr, navn: s.navn, n: m.n, kamper: m.kamper, kilder: m.kilder, feilPct: m.feilPct, positiv: m.positiv, egen: m.egen, score: q.nivaa === 'for lite' ? null : score,
+        kvalitet: q, flagg: s.flagg, grunner };
+    });
+    rader.sort((a, b) => (a.score == null) - (b.score == null) || (b.score || 0) - (a.score || 0) || b.n - a.n);
+    let rang = 0; rader.forEach((r) => { r.rang = r.score == null ? null : ++rang; });
+    return { rader, lagsnitt: { feilPct: 100 * e0, posPct: p0 != null ? 100 * p0 : null, n: lm.n },
+      grunnlag: `Krympet mot lagsnittet med ${KRYMP} mottak. Minst ${MIN_MOTTAK} mottak for rangering. Ingen rotasjons- eller sonedata.` };
+  }
+
+  // ---------- Under og etter kamp ----------
+
+  function kampObs(modell, kampId, lag) {
+    return modell.obs.filter((o) => o.kampId === kampId && (!lag || lagNokkel(o.lag) === lagNokkel(lag)));
+  }
+
+  /* Plan (bare kamper før denne) mot det som ble observert i kampen. Ingen årsakspåstander. */
+  function etterKamp(modell, kamp, motstander, eget) {
+    const plan = serveplan(lagprofil(modell, motstander, { foer: kamp.date, utenKamp: kamp.id }));
+    const idag = lagprofil(modell, motstander, {}).spillere; // brukes bare til navn
+    const iKamp = kampObs(modell, kamp.id, motstander).filter((o) => o.kategori === 'mottak');
+    const perSpiller = {};
+    iKamp.forEach((o) => { const k = spillerNokkel(o); (perSpiller[k] || (perSpiller[k] = [])).push(o); });
+    const sammenligning = plan.rader.filter((r) => r.rang != null).slice(0, 6).map((r) => {
+      const o = perSpiller['#' + r.nr] || [];
+      const m = o.length ? mottak(o) : null;
+      return { nr: r.nr, navn: r.navn, rang: r.rang, foerFeilPct: r.feilPct, foerN: r.n, iKamp: m, kilde: o.length ? KILDENAVN[o[0].kilde] : null };
+    });
+    const vaar = kampObs(modell, kamp.id, eget).filter((o) => o.kategori === 'serve');
+    return { plan, sammenligning, vaarServe: vaar.length ? serve(vaar) : null, navn: idag };
+  }
+
+  const api = { KILDENAVN, DEF, MIN_MOTTAK, KRYMP, lesData, normaliser, lagprofil, serveplan, etterKamp, kampObs, mottak, angrep, serve, andelFraProsent, kvalitet, lagNokkel, pct };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Scouting = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
  * Analysemodulen Serve/rotasjon (V3, issue #23). Bygger på poengtellingen i Avansert (stats.poeng) og oppstillingen per sett
  * (kampens lineups.sets[n].start: rotasjon og hvem som server først).
  *  * Sideout = vi vinner poenget når motstanderen server. Breakpoint = vi vinner poenget når vi server.
@@ -1032,6 +1306,263 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </script>
 <script>
 /*
+ * Analysemodulen Serveplan (V3, issue #23). Variant A (godkjent 01.11.2026): plantabell per rotasjon.
+ *  * Motstanderens mottakere rangeres med den eksisterende scouting-modellen (moduler/scouting/analyse.js, window.Scouting):
+ *    NVBF/CEV-tall og egen 0–2-føring, svakest først, krympet mot lagsnitt. Ingenting nytt i beregningen.
+ *  * Serveren i hver rotasjon hentes fra siste bekreftede oppstilling (kampens lineups.sets[n].start.positions).
+ *  * Serve-tall per server: egen føring (srv: E = ess, F = feil). Breakpoint per rotasjon: poengtellingen i Avansert (ServeRotasjon).
+ *  * Planen (mål, sone, reserve per rotasjon + notat) lagres i stats.serveplaner, én per lag og motstander, med versjonskontroll.
+ *    Sonen er trenerens valg: vi fører ikke hvor serven lander.
+ */
+(function (root) {
+  'use strict';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pst = (a, n) => (n ? Math.round(100 * a / n) : 0);
+  const kopi = (x) => JSON.parse(JSON.stringify(x));
+
+  // ---------- Rotasjon (samme regler som Oppstilling: R1 → R6, spilleren i 2 går til 1) ----------
+  const rNr = (r) => { const m = String(r || '').match(/^R?([1-6])$/i); return m ? +m[1] : null; };
+  function roter(pos, steg) {
+    let ut = Object.assign({}, pos); const n = ((steg || 0) % 6 + 6) % 6;
+    for (let i = 0; i < n; i++) { const f = ut; ut = {}; [1, 2, 3, 4, 5, 6].forEach((p) => { ut[p] = f[(p % 6) + 1]; }); }
+    return ut;
+  }
+  // Server (spilleren på plass 1) i hver rotasjon, fra én bekreftet startoppstilling
+  function servereFra(start) {
+    const r0 = start && rNr(start.rotation); if (!r0 || !start.positions) return null;
+    const ut = {};
+    for (let r = 1; r <= 6; r++) { const p = roter(start.positions, (r0 - r + 6) % 6); ut[r] = p[1] != null ? String(p[1]) : null; }
+    return ut;
+  }
+  // Siste bekreftede oppstilling i laget: nyeste kamp, høyeste sett med posisjoner
+  function sisteOppstilling(kamper) {
+    const sortert = kamper.filter((k) => k.lineups && k.lineups.sets).sort((a, b) => String(b.dato || '').localeCompare(String(a.dato || '')));
+    for (const k of sortert) {
+      const s = Object.keys(k.lineups.sets).map(Number).sort((a, b) => b - a).find((n) => { const st = k.lineups.sets[n].start; return st && st.positions && rNr(st.rotation); });
+      if (s) return { kamp: k, sett: s, start: k.lineups.sets[s].start };
+    }
+    return null;
+  }
+  // Ess og feil per egen spiller (legacy-id) fra registreringene
+  function serveTall(hendelser) {
+    const ut = {}; hendelser.filter((e) => e.type === 'srv').forEach((e) => { const x = ut[e.p] || (ut[e.p] = { n: 0, ess: 0, feil: 0 }); x.n++; if (e.c === 'E') x.ess++; if (e.c === 'F') x.feil++; });
+    return ut;
+  }
+  // Forslag: tomme rotasjoner får rangeringens nr. 1 som mål og nr. 2 som reserve. Sone settes ikke.
+  function fyllForslag(plan, rader) {
+    const r = rader.filter((x) => x.rang != null); if (!r.length) return plan;
+    const ut = kopi(plan); ut.rot = ut.rot || {};
+    for (let i = 1; i <= 6; i++) { const x = ut.rot[i] || (ut.rot[i] = {}); if (!x.mal) { x.mal = String(r[0].nr); if (!x.reserve && r[1]) x.reserve = String(r[1].nr); } }
+    return ut;
+  }
+
+  // ---------- Demodata (oppdiktet) ----------
+  function demo() {
+    const rader = [['7', 'Kant Sju', 34, 12, 35, 1], ['11', 'Kant Elleve', 29, 10, 41, 2], ['14', 'Diagonal Fjorten', 9, 11, 44, 3], ['5', 'Kant Fem', 21, 5, 50, 4], ['3', 'Libero Tre', 48, 4, 52, 5], ['9', 'Midt Ni', 3, 33, null, null]]
+      .map(([nr, navn, n, feilPct, pos, rang]) => ({ nr, navn, n, feilPct, positiv: pos == null ? null : { pct: pos }, rang, kamper: n > 20 ? 3 : 1, kvalitet: { nivaa: rang == null ? 'for lite' : n >= 20 ? 'god' : n >= 10 ? 'middels' : 'svak' } }));
+    const tropp = { 'd-04': ['4', 'Spiller Fire'], 'd-07': ['7', 'Spiller Sju'], 'd-02': ['2', 'Spiller To'], 'd-10': ['10', 'Spiller Ti'], 'd-08': ['8', 'Spiller Åtte'], 'd-06': ['6', 'Spiller Seks'] };
+    return { motstandere: ['Motlag', 'Naboland'], valgt: 'Motlag', neste: { motstander: 'Motlag', dato: '2026-11-07' }, rader: () => rader, lagsnitt: { feilPct: 7, posPct: 45 },
+      servere: { 1: 'd-04', 2: 'd-07', 3: 'd-02', 4: 'd-10', 5: 'd-08', 6: 'd-06' }, oppstillingFra: 'oppdiktet kamp, sett 1',
+      tropp: (id) => tropp[id] ? { nr: tropp[id][0], navn: tropp[id][1] } : null,
+      serve: { 'd-04': { n: 31, ess: 2, feil: 4 }, 'd-07': { n: 28, ess: 3, feil: 6 }, 'd-02': { n: 30, ess: 1, feil: 3 }, 'd-10': { n: 25, ess: 2, feil: 2 }, 'd-08': { n: 27, ess: 1, feil: 5 }, 'd-06': { n: 24, ess: 0, feil: 4 } },
+      bp: { 1: [9, 21], 2: [9, 23], 3: [10, 23], 4: [10, 20], 5: [8, 21], 6: [7, 23] }, motstanderTropp: () => rader.map((r) => ({ nr: r.nr, navn: r.navn })) };
+  }
+
+  // ---------- Henting fra Supabase ----------
+  async function alle(q) {   // PostgREST gir maks 1000 rader per kall
+    const ut = []; for (let fra = 0; ; fra += 1000) { const r = await q().range(fra, fra + 999); if (r.error) throw new Error(r.error.message); ut.push(...r.data); if (r.data.length < 1000) return ut; }
+  }
+  async function hent(klient, slug) {
+    const db = klient.schema('stats'), kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
+    const c = kast(await db.from('contexts').select('id,our_team').eq('slug', slug))[0]; if (!c) throw new Error('Fant ikke laget');
+    const [m, sp, op, ev, po] = await Promise.all([
+      alle(() => db.from('matches').select('id,legacy_id,home,away,starts_at,status,focus_team,round,is_test,legacy').eq('context_id', c.id).order('id')),
+      alle(() => db.from('squad_players').select('id,legacy_id,jersey,name').eq('context_id', c.id).order('id')),
+      alle(() => db.from('opponents').select('id,name').eq('context_id', c.id).order('id')),
+      alle(() => db.from('events').select('id,match_id,type,code,squad_player_id,opp_jersey,undoes').eq('context_id', c.id).in('type', ['opp', 'srv', 'rec', 'undo']).order('id')),
+      alle(() => db.from('poeng').select('id,match_id,set_no,type,vinner,kilde,start_oss,start_dem,start_server,angrer,recorded_at').eq('context_id', c.id).order('id')),
+    ]);
+    const opl = op.length ? await alle(() => db.from('opponent_players').select('opponent_id,jersey,name,position').in('opponent_id', op.map((x) => x.id)).order('jersey')) : [];
+    const planer = kast(await db.from('serveplaner').select('motstander,data,versjon').eq('context_id', c.id));
+    return { ctx: c, matches: m, tropp: sp, motstandere: op, motstPl: opl, hendelser: ev, poeng: po, planer, db };
+  }
+  // Rådata → det scouting-modellen og planen trenger
+  function bygg(r) {
+    const legacy = Object.fromEntries(r.tropp.map((p) => [p.id, p.legacy_id || p.id]));
+    const angret = new Set(r.hendelser.filter((e) => e.type === 'undo').map((e) => e.undoes));
+    const ev = r.hendelser.filter((e) => e.type !== 'undo' && !angret.has(e.id)).map((e) => ({ m: e.match_id, type: e.type, c: e.code, p: e.squad_player_id ? legacy[e.squad_player_id] : e.opp_jersey }));
+    const kampId = (k) => k.legacy_id || k.id, our = r.ctx.our_team;
+    const matches = r.matches.map((k) => Object.assign({}, k.legacy || {}, { id: kampId(k), date: k.starts_at ? String(k.starts_at).slice(0, 16) : null, home: k.home, away: k.away,
+      status: k.status, focus: k.focus_team || undefined, round: k.is_test ? 'Test' : (k.round || (k.legacy || {}).round) }));
+    const logs = {}; const uuidTilId = Object.fromEntries(r.matches.map((k) => [k.id, kampId(k)]));
+    ev.forEach((e) => { (logs[uuidTilId[e.m]] || (logs[uuidTilId[e.m]] = [])).push(e); });
+    const opponents = {}; r.motstandere.forEach((o) => { opponents[o.name] = { players: r.motstPl.filter((p) => p.opponent_id === o.id).map((p) => ({ nr: p.jersey, name: p.name || undefined, pos: p.position || undefined })) }; });
+    const roster = r.tropp.map((p) => ({ id: p.legacy_id || p.id, nr: p.jersey || '', name: p.name }));
+    const lagnavn = new Set(r.motstandere.map((o) => o.name));
+    r.matches.forEach((k) => { const vi = k.focus_team || our; [k.home, k.away].forEach((t) => { if (t && t !== vi && !/^\d\. plass$/.test(t)) lagnavn.add(t); }); });
+    const naa = Date.now(), kommende = r.matches.filter((k) => k.status === 'kommende' && k.starts_at && Date.parse(k.starts_at) >= naa - 864e5).sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))[0];
+    const neste = kommende ? { motstander: kommende.home === (kommende.focus_team || our) ? kommende.away : kommende.home, dato: kommende.starts_at } : null;
+    const kamper = r.matches.map((k) => ({ id: k.id, dato: k.starts_at, lineups: (k.legacy || {}).lineups || null }));
+    const oppst = sisteOppstilling(kamper);
+    let bp = {};
+    if (root.ServeRotasjon) { const s = root.ServeRotasjon.stat(root.ServeRotasjon.ballvekslinger(kamper, r.poeng)).r; for (let i = 1; i <= 6; i++) bp[i] = [s[i].bp, s[i].bpn]; }
+    let modell = null; const scout = root.Scouting;
+    if (scout) modell = scout.normaliser({ matches, logs, roster, opponents }, { our });
+    const navnTropp = Object.fromEntries(r.tropp.map((p) => [p.legacy_id || p.id, { nr: p.jersey || '', navn: p.name || '' }]));
+    const kampNavn = (k) => k ? new Date(k.dato).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' }) : '';
+    return {
+      motstandere: [...lagnavn].sort((a, b) => a.localeCompare(b, 'nb')), valgt: neste ? neste.motstander : null, neste,
+      rader: (mot) => (modell ? scout.serveplan(scout.lagprofil(modell, mot, {})).rader : []),
+      lagsnitt: null,
+      servere: oppst ? servereFra(oppst.start) : null, oppstillingFra: oppst ? 'oppstillingen ' + kampNavn(oppst.kamp) + ', sett ' + oppst.sett : null,
+      tropp: (id) => navnTropp[id] || null, serve: serveTall(ev), bp,
+      motstanderTropp: (mot) => ((opponents[mot] || {}).players || []).map((p) => ({ nr: String(p.nr), navn: p.name || '' })),
+      planer: Object.fromEntries(r.planer.map((p) => [p.motstander, { data: p.data, versjon: p.versjon }])),
+      lagre: async (mot, data, versjon) => {
+        if (versjon) {
+          const u = await r.db.from('serveplaner').update({ data }).eq('context_id', r.ctx.id).eq('motstander', mot).eq('versjon', versjon).select('versjon');
+          if (u.error) throw new Error(u.error.message);
+          if (!u.data.length) throw Object.assign(new Error('konflikt'), { konflikt: true });
+          return u.data[0].versjon;
+        }
+        const i = await r.db.from('serveplaner').insert({ context_id: r.ctx.id, motstander: mot, data }).select('versjon');
+        if (i.error) { if (/duplicate key/i.test(i.error.message)) throw Object.assign(new Error('konflikt'), { konflikt: true }); throw new Error(i.error.message); }
+        return i.data[0].versjon;
+      },
+      hentPlan: async (mot) => { const x = await r.db.from('serveplaner').select('data,versjon').eq('context_id', r.ctx.id).eq('motstander', mot); if (x.error) throw new Error(x.error.message); return x.data[0] || null; },
+    };
+  }
+
+  // ---------- Visning ----------
+  const CSS = `
+.sp { display: flex; flex-direction: column; gap: 14px; }
+.sp-to { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1040px) { .sp-to { grid-template-columns: minmax(0, 1fr); } }
+.sp-tab { overflow-x: auto; }
+.sp table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 640px; }
+.sp th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sp td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.sp td.rot { font: 700 22px/1 var(--font-display); width: 48px; }
+.sp-srv b { display: block; white-space: nowrap; } .sp-srv span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.sp-mal { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sp-chip { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); font: 700 18px/1 var(--font-display); cursor: pointer; }
+.sp-chip[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: #FFFFFF; }
+.sp select.sp-liten { min-height: 40px; font-size: 14px; padding-right: 28px; max-width: 120px; }
+.sp-soner { display: inline-grid; grid-template-columns: repeat(3, 30px); gap: 3px; }
+.sp-soner button { width: 30px; height: 28px; border-radius: 6px; border: 1px solid var(--line); background: var(--sunk); color: var(--muted); font: 600 12px var(--font-body); cursor: pointer; padding: 0; }
+.sp-soner button[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: #FFFFFF; }
+.sp-rang { display: flex; flex-direction: column; gap: 8px; }
+.sp-mott { background: var(--sunk); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.sp-mott .pl { font: 700 22px/1 var(--font-display); color: var(--muted); }
+.sp-mott .nv { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.sp-mott .tl { grid-column: 2 / -1; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sp-mott .mt { grid-column: 2 / -1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; } .sp-mott .mt i { display: block; height: 100%; background: var(--bad); }
+.sp-kv { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); white-space: nowrap; }
+.sp-kv.god { color: var(--ok); } .sp-kv.svak, .sp-kv.middels { color: var(--warn); }
+.sp textarea { width: 100%; min-height: 64px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); font: 15px/1.4 var(--font-body); padding: 8px 10px; resize: vertical; }
+@media (max-width: 640px) {
+  .sp table, .sp tbody, .sp td { display: block; min-width: 0; } .sp thead { display: none; }
+  .sp tr { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .sp td { padding: 0; border: 0; } .sp td.rot { grid-row: 1 / span 4; }
+  .sp td[data-l]::before { content: attr(data-l); display: block; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .sp-srv span { white-space: normal; }
+}
+.sp-status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.sp-status.ulagret { background: var(--warn-bg); color: var(--warn); } .sp-status.lagret { color: var(--ok); } .sp-status.feil { color: var(--bad); }
+`;
+  function vis(el, opt) {
+    if (!document.getElementById('sp-css')) { const s = document.createElement('style'); s.id = 'sp-css'; s.textContent = CSS; document.head.appendChild(s); }
+    const S = { d: null, mot: null, plan: { rot: {}, notat: '' }, versjon: null, endret: false, status: '', demoPlaner: {}, utkast: {} };
+    el.innerHTML = '<div class="kort sp"><p class="liten">Henter tall og plan …</p></div>';
+    (opt.demo ? Promise.resolve(demo()) : hent(opt.klient, opt.slug).then(bygg)).then((d) => { S.d = d; velg(d.valgt || d.motstandere[0] || null); })
+      .catch((e) => { el.innerHTML = '<div class="kort sp"><p class="liten">Kunne ikke hente data: ' + esc(e.message) + '</p></div>'; });
+
+    function velg(mot) {
+      // Ulagrede endringer tas vare på per motstander mens siden er åpen
+      if (S.mot && S.endret) S.utkast[S.mot] = { plan: kopi(S.plan), versjon: S.versjon };
+      S.mot = mot; S.endret = false; S.status = ''; S.statusTekst = '';
+      if (S.utkast[mot]) { const u = S.utkast[mot]; delete S.utkast[mot]; S.plan = u.plan; S.versjon = u.versjon; S.endret = true; return tegn(); }
+      const p = mot && (opt.demo ? S.demoPlaner[mot] : S.d.planer[mot]);
+      S.plan = p ? kopi(p.data) : { rot: {}, notat: '' }; S.plan.rot = S.plan.rot || {}; S.versjon = p ? p.versjon : null;
+      tegn();
+    }
+    const topp = () => '<div class="rad"><h2 class="v3-tittel">Serveplan</h2>' + (opt.demo ? '<span class="merke">Oppdiktede data</span>' : '') + '<span class="skyv"></span>' + (opt.ut || '') + '</div>';
+
+    function tegn() {
+      const d = S.d;
+      if (!S.mot) { el.innerHTML = '<div class="kort sp">' + topp() + '<p>Ingen motstandere i ' + esc(opt.lagnavn || 'laget') + ' ennå.</p></div>'; return opt.etter && opt.etter(); }
+      const rader = d.rader(S.mot), rangert = rader.filter((r) => r.rang != null);
+      const alleNr = [...new Map(rader.map((r) => [String(r.nr), r.navn])).entries()].concat(d.motstanderTropp(S.mot).filter((p) => !rader.some((r) => String(r.nr) === p.nr)).map((p) => [p.nr, p.navn]))
+        .sort((a, b) => (Number(a[0]) || 999) - (Number(b[0]) || 999));
+      const navnFor = (nr) => (alleNr.find((x) => x[0] === String(nr)) || [])[1] || '';
+      let h = '<div class="kort sp">' + topp()
+        + '<div class="rad"><label class="etikett" for="sp-mot">Motstander</label><select id="sp-mot">' + d.motstandere.map((m) => '<option' + (m === S.mot ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select>'
+        + (d.neste && d.neste.motstander === S.mot ? '<span class="liten">neste kamp ' + esc(new Date(d.neste.dato).toLocaleDateString('nb-NO', { weekday: 'short', day: 'numeric', month: 'short' })) + '</span>' : '')
+        + '<span class="skyv"></span><span class="sp-status ' + (S.status === 'feil' ? 'feil' : S.endret ? 'ulagret' : S.versjon ? 'lagret' : '') + '" role="status" aria-live="polite">' + esc(S.statusTekst || (S.endret ? 'Ikke lagret' : S.versjon ? 'Lagret' : 'Ingen plan ennå')) + '</span>'
+        + '<button class="knapp" type="button" id="sp-forslag"' + (rangert.length ? '' : ' disabled') + '>Fyll ut med forslag</button><button class="knapp primar" type="button" id="sp-lagre"' + (S.endret ? '' : ' disabled') + '>Lagre plan</button></div>';
+      h += '<div class="sp-to"><div class="sp-tab"><table><thead><tr><th>Rot.</th><th>Server</th><th>Serv på</th><th>Sone</th><th>Reserve</th></tr></thead><tbody>';
+      for (let r = 1; r <= 6; r++) {
+        const x = S.plan.rot[r] || {}, id = d.servere && d.servere[r], sp = id ? d.tropp(id) : null, st = id ? d.serve[id] : null, bp = d.bp[r];
+        const srv = '<b>' + (sp ? '#' + esc(sp.nr) + ' ' + esc(sp.navn) : (d.servere ? 'Ukjent' : '–')) + '</b><span>' + (st ? st.ess + ' ess · ' + st.feil + ' feil på ' + st.n : 'ingen serve ført') + (bp && bp[1] ? ' · BP ' + pst(bp[0], bp[1]) + ' %' : '') + '</span>';
+        const topp3 = rangert.slice(0, 3).map((m) => String(m.nr));
+        const ekstra = x.mal && !topp3.includes(String(x.mal)) ? x.mal : '';
+        const mal = topp3.map((nr) => '<button type="button" class="sp-chip" data-r="' + r + '" data-mal="' + esc(nr) + '" aria-pressed="' + (String(x.mal) === nr) + '" title="' + esc(navnFor(nr)) + '">#' + esc(nr) + '</button>').join('')
+          + '<select class="sp-liten" data-r="' + r + '" data-felt="mal" aria-label="Annen mottaker i R' + r + '"><option value="">' + (ekstra ? '' : 'Annen') + '</option>' + alleNr.filter(([nr]) => !topp3.includes(nr)).map(([nr, nv]) => '<option value="' + esc(nr) + '"' + (ekstra === nr ? ' selected' : '') + '>#' + esc(nr) + (nv ? ' ' + esc(nv) : '') + '</option>').join('') + '</select>';
+        const soner = [4, 3, 2, 5, 6, 1].map((z) => '<button type="button" data-r="' + r + '" data-sone="' + z + '" aria-pressed="' + (+x.sone === z) + '" aria-label="Sone ' + z + '">' + z + '</button>').join('');
+        const res = '<select class="sp-liten" data-r="' + r + '" data-felt="reserve" aria-label="Reserve i R' + r + '"><option value="">–</option>' + alleNr.map(([nr, nv]) => '<option value="' + esc(nr) + '"' + (String(x.reserve || '') === nr ? ' selected' : '') + '>#' + esc(nr) + (nv ? ' ' + esc(nv) : '') + '</option>').join('') + '</select>';
+        h += '<tr><td class="rot">R' + r + '</td><td class="sp-srv">' + srv + '</td><td data-l="Serv på"><div class="sp-mal">' + mal + '</div></td><td data-l="Sone"><div class="sp-soner">' + soner + '</div></td><td data-l="Reserve">' + res + '</td></tr>';
+      }
+      h += '</tbody></table></div><div class="sp-rang"><h3 class="etikett">Mottakere å serve på</h3>';
+      if (!rader.length) h += '<p class="tom">Ingen mottakstall for ' + esc(S.mot) + ' ennå. Rangeringen kommer når laget har NVBF/CEV-statistikk eller egen føring av motstanderens mottak.</p>';
+      const maks = Math.max(1, ...rangert.map((m) => m.feilPct || 0));
+      rader.forEach((m) => {
+        const q = m.kvalitet || {}, kv = q.nivaa === 'god' ? 'Godt grunnlag' : q.nivaa === 'middels' ? 'Middels' : q.nivaa === 'svak' ? 'Lite grunnlag' : 'For få mottak';
+        h += '<div class="sp-mott"><span class="pl">' + (m.rang || '–') + '</span><span class="nv">#' + esc(m.nr) + ' ' + esc(m.navn) + '</span><span class="sp-kv ' + esc(q.nivaa || '') + '">' + kv + '</span>'
+          + (m.rang ? '<div class="mt"><i style="width:' + Math.max(6, Math.round(100 * (m.feilPct || 0) / maks)) + '%"></i></div>' : '')
+          + '<span class="tl">' + (m.feilPct != null ? Math.round(m.feilPct) + ' % feil' : '') + (m.positiv ? ' · ' + Math.round(m.positiv.pct) + ' % positivt' : '') + ' · ' + m.n + ' mottak' + (m.egen ? ' · egen 0–2: ' + m.egen.snitt.toFixed(2).replace('.', ',') : '') + '</span></div>';
+      });
+      h += '<p class="liten">Rangert etter feil og positive mottak mot lagsnittet, krympet mot snitt ved få mottak. Under 5 mottak rangeres ikke. Samme beregning som serveplanen i appen.</p></div></div>'
+        + '<label class="etikett" for="sp-notat">Notat til planen</label><textarea id="sp-notat" maxlength="600" placeholder="F.eks. unngå liberoen, kort serve mot #11 når hun står i 6.">' + esc(S.plan.notat || '') + '</textarea>'
+        + '<p class="liten">Serveren i hver rotasjon er hentet fra ' + esc(d.oppstillingFra || 'oppstillingen – ingen bekreftet oppstilling ennå, så serverne er ukjente') + '. Sonen er trenerens valg; vi fører ikke hvor serven lander. BP = breakpoint i rotasjonen fra poengtellingen.</p></div>';
+      el.innerHTML = h;
+      bind();
+      if (opt.etter) opt.etter();
+    }
+    function endre(r, felt, v) { const x = S.plan.rot[r] || (S.plan.rot[r] = {}); if (v === '' || v == null) delete x[felt]; else x[felt] = v; S.endret = true; S.statusTekst = ''; S.status = ''; tegn(); }
+    function bind() {
+      const $ = (s) => el.querySelector(s);
+      $('#sp-mot').onchange = (e) => velg(e.target.value);
+      el.querySelectorAll('[data-mal]').forEach((b) => { b.onclick = () => endre(b.dataset.r, 'mal', String((S.plan.rot[b.dataset.r] || {}).mal) === b.dataset.mal ? '' : b.dataset.mal); });
+      el.querySelectorAll('[data-sone]').forEach((b) => { b.onclick = () => endre(b.dataset.r, 'sone', +((S.plan.rot[b.dataset.r] || {}).sone) === +b.dataset.sone ? '' : +b.dataset.sone); });
+      el.querySelectorAll('select[data-felt]').forEach((s) => { s.onchange = () => endre(s.dataset.r, s.dataset.felt, s.value); });
+      const n = $('#sp-notat'); n.oninput = () => { S.plan.notat = n.value; if (!S.endret) { S.endret = true; S.statusTekst = ''; const st = el.querySelector('.sp-status'); st.className = 'sp-status ulagret'; st.textContent = 'Ikke lagret'; $('#sp-lagre').disabled = false; } };
+      $('#sp-forslag').onclick = () => { S.plan = fyllForslag(S.plan, S.d.rader(S.mot)); S.endret = true; S.statusTekst = ''; tegn(); };
+      $('#sp-lagre').onclick = lagre;
+    }
+    async function lagre() {
+      const data = { rot: S.plan.rot, notat: (S.plan.notat || '').slice(0, 600) };
+      try {
+        if (opt.demo) { S.versjon = (S.versjon || 0) + 1; S.demoPlaner[S.mot] = { data: kopi(data), versjon: S.versjon }; }
+        else { S.versjon = await S.d.lagre(S.mot, data, S.versjon); S.d.planer[S.mot] = { data: kopi(data), versjon: S.versjon }; }
+        S.endret = false; S.status = ''; S.statusTekst = 'Lagret';
+      } catch (e) {
+        if (e.konflikt) {
+          const p = await S.d.hentPlan(S.mot).catch(() => null);
+          if (p) { S.d.planer[S.mot] = p; S.plan = kopi(p.data); S.plan.rot = S.plan.rot || {}; S.versjon = p.versjon; S.endret = false; }
+          S.status = 'feil'; S.statusTekst = 'Noen andre lagret planen i mellomtiden. Du ser nå deres versjon – gjør endringen på nytt.';
+        } else { S.status = 'feil'; S.statusTekst = 'Ikke lagret: ' + e.message; }
+      }
+      tegn();
+    }
+  }
+
+  const eksport = { roter, servereFra, sisteOppstilling, serveTall, fyllForslag, bygg, demo, vis };
+  if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.Serveplan = eksport;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/*
  * Moduler på Analyse-siden som krever tilgang (issue #23). Blokk/forsvar er åpen for alle lag; de andre modulene
  * (Serve/rotasjon, Videoanalyse, Kampplan, Serveplan, Observasjoner, Treningsprioriteringer) krever tilgang.
  *  * Uten tilgang: modulen er merket «Krever tilgang» og viser en beskrivelse av hva den inneholder.
@@ -1049,7 +1580,7 @@ window.V3Moduler = (function (root) {
     ['serve-rotasjon', 'Serve/rotasjon', 'Sideout og breakpoint', 'Serve og mottak fordelt på rotasjon: hvor laget vinner og taper poeng, hvilke rotasjoner som sliter i mottak, og hvordan serven virker mot hver motstander.'],
     ['videoanalyse', 'Videoanalyse', 'Klipp fra kamp', 'Kampvideo koblet til registreringene, så hver aksjon kan ses med statistikken ved siden av – per spiller, rotasjon eller type aksjon.'],
     ['kampplan', 'Kampplan', 'Mot neste kamp', 'Plan mot neste motstander, bygget på statistikken fra tidligere kamper: hvem som bør serves på, mottaksformasjon, angrepsvalg og fokuspunkter.'],
-    ['serveplan', 'Serveplan', 'Per rotasjon', 'Hvem som serves på i hver rotasjon, og hvor, basert på motstanderens mottakstall.'],
+    ['serveplan', 'Serveplan', 'Mål per rotasjon', 'Hvem som serves på i hver rotasjon, og hvor, basert på motstanderens mottakstall.'],
     ['observasjoner', 'Observasjoner', 'Notater', 'Korte notater fra kamp og trening, knyttet til kamp, sett og spiller, så de kan brukes i neste kampplan.'],
     ['treningsprioriteringer', 'Treningsprioriteringer', 'Hva vi bør trene', 'Hva statistikken peker på at laget bør trene mer på, med utviklingen gjennom sesongen.'],
   ];
@@ -1085,9 +1616,10 @@ window.V3Moduler = (function (root) {
   function visInnhold() {
     const el = $('modul-v3'), m = MODULER.find((x) => x[0] === S.modul);
     const ut = S.delt || !S.bruker ? '' : '<button class="knapp stille" type="button" id="v3-ut">Logg ut</button>';
-    if (S.tilgang && S.modul === 'serve-rotasjon' && root.ServeRotasjon) {
-      // Ferdig modul (V3 fase 3): tegnes av serverotasjon.js med samme klient som tilgangen ble sjekket med
-      root.ServeRotasjon.vis(el, { klient: S.klient, slug: S.slug, lagnavn: S.lagnavn, demo: S.demo, ut,
+    const ferdig = { 'serve-rotasjon': root.ServeRotasjon, serveplan: root.Serveplan }[S.modul];
+    if (S.tilgang && ferdig) {
+      // Ferdige moduler (V3 fase 3): tegnes av egen fil med samme klient som tilgangen ble sjekket med
+      ferdig.vis(el, { klient: S.klient, slug: S.slug, lagnavn: S.lagnavn, demo: S.demo, ut,
         etter: () => { if ($('v3-ut')) $('v3-ut').onclick = loggUt; } });
       return;
     }
