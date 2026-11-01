@@ -4077,7 +4077,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const items = (!S.dash ? '<button class="menu-item" role="menuitem" data-a="new-toggle">Ny kamp</button>' : '')
       + (S.canAdmin && !S.dash ? '<button class="menu-item" role="menuitem" data-a="access">Tilgang</button>' : '')
       + (hasSite() ? '<button class="menu-item" role="menuitem" data-a="publish">Publiser åpen side</button>' : '')
-      + (siteUrl() ? '<button class="menu-item" role="menuitem" data-a="share">Del lenke til åpen side</button>' : '')
+      + (siteUrl() ? '<a class="menu-item" role="menuitem" href="' + esc(siteUrl()) + '" target="_blank" rel="noopener">Åpen side ↗</a><button class="menu-item" role="menuitem" data-a="share">Del lenke til åpen side</button>' : '')
       + (!S.dash && !window.PUBLIC ? '<button class="menu-item" role="menuitem" data-a="logos">Lagmerker</button>' : '')
       + '<button class="menu-item" role="menuitem" data-a="legend">Fargeforklaring</button>'
       + (fsOk() ? fsBtn('menu-item') : '');
@@ -4350,13 +4350,16 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Den åpne statistikksiden bygges av den planlagte oppgaven «Publiser åpen statistikk», som appen starter
   const PUBLISH = { trigger: 'trig_018cBdJrHuYyuvMHWzXJ3ni4', sites: { main: 'Randaberg-siden', 'u20-nevza-2026': 'U20-siden' } };
   let lastPub = 0;
-  const hasSite = () => !window.PUBLIC && !S.dash && !!PUBLISH.sites[CTX.id];
+  const hasSite = () => !window.PUBLIC && !S.dash && !window.V2_CONFIG && !!PUBLISH.sites[CTX.id];   // V2: de åpne sidene leser rett fra databasen, ingen publisering
   // Lenker til de åpne statistikksidene på GitHub Pages
-  const SITE_URLS = { main: 'https://madsfossmark-ai.github.io/Randaberg-statistikk/', 'u20-nevza-2026': 'https://madsfossmark-ai.github.io/U20-Landslaget/' };
-  const siteUrl = () => window.PUBLIC ? null : SITE_URLS[CTX.id] || null;
+  // Åpne sider per lag (01.11.2026). I V2 heter hovedlaget 'main' i appen, så adressen slås opp på lagets slug.
+  const SITE_BASE = 'https://madsfossmark-ai.github.io/Randaberg-statistikk/';
+  const SITE_URLS = { randaberg: SITE_BASE, 'randaberg-herrer': SITE_BASE + 'herrer/', 'toppvolley-damer': SITE_BASE + 'toppvolley-damer/',
+    'toppvolley-herrer': SITE_BASE + 'toppvolley-herrer/', 'u20-nevza-2026': SITE_BASE + 'u20/' };
+  const siteUrl = () => window.PUBLIC ? null : SITE_URLS[ctxSlug()] || (!window.V2_CONFIG && CTX.id === 'main' ? SITE_BASE : null);
   function sharePanel() {
     const u = siteUrl();
-    return '<section class="panel" aria-label="Del den åpne siden"><div class="panel-head"><h2>Del åpen statistikk</h2><span class="status">Alle med lenken kan se statistikken, uten innlogging. Den oppdateres når du publiserer.</span></div>'
+    return '<section class="panel" aria-label="Del den åpne siden"><div class="panel-head"><h2>Del åpen statistikk</h2><span class="status">Alle med lenken kan se statistikken, uten innlogging. ' + (window.V2_CONFIG ? 'Den viser alltid siste stand.' : 'Den oppdateres når du publiserer.') + '</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><label class="sr" for="share-url">Lenke</label><input id="share-url" type="text" readonly value="' + esc(u) + '" style="flex:1 1 280px;min-width:0;height:46px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:0 12px;font-size:15px">'
       + '<button class="primary" data-a="share-copy">' + (S.copied ? 'Kopiert ✓' : 'Kopier lenke') + '</button>'
       + (navigator.share ? '<button class="secondary" data-a="share-native">Del …</button>' : '')
