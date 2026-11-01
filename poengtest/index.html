@@ -25,6 +25,7 @@
   --amber: #FFB547; --amber-fg: #1A1203;
   --bad: #C2362D; --block: #7E2520; --neutral: #4A5464; --good: #1E8A57;
   --lvl-lo: #F07167; --lvl-mid: #FFC94A; --lvl-hi: #4CD08A;
+  --av: #D98A92; --av-soft: #1F161A; --av-kant: #4A2C33;
   --win-bg: #16402C; --loss-bg: #4A1F1D; --live-bg: #3A2A10;
   --bar: #161B24; --bar-fg: #FFFFFF; --bar-muted: #8B95A5;
   --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
@@ -39,6 +40,7 @@
   --amber: #C27C0E; --amber-fg: #FFFFFF;
   --bad: #B3261E; --block: #7A1A14; --neutral: #5C6270; --good: #1F7A4D;
   --lvl-lo: #B3261E; --lvl-mid: #B07D0B; --lvl-hi: #1F7A4D;
+  --av: #9B3B47; --av-soft: #F7E4E6; --av-kant: #E2B8BD;
   --win-bg: #DDEFE4; --loss-bg: #F7DCD9; --live-bg: #FBEBCC;
   --bar: #16181D; --bar-fg: #FFFFFF; --bar-muted: #B8BCC6; color-scheme: light;
 }
@@ -161,7 +163,30 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .kpi2 .v span { font-size: 11px; color: var(--muted); }
 .kpi2.scope { border: 1px solid var(--line); background: var(--sunk); color: var(--fg); text-align: left; justify-content: center; }
 .kpi2.scope b { font-size: 14px; } .kpi2.scope span { font-size: 10px; color: var(--muted); }
-/* Poengmodus (V3 fase 3, test) */
+/* Registreringsmodus: Enkel (som før) og Avansert (dempet rødtone: tynn ramme, lavt bånd, modusrad nederst) */
+#live-root.modus-av { border: 1px solid var(--av-kant); border-radius: 20px; padding: 8px; }
+.modusband { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-radius: 10px; padding: 6px 12px; background: var(--av-soft); }
+.modusband b { font-family: var(--font-display); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--av); }
+.modusband span { font-size: 12px; color: var(--muted); }
+#live-root.modus-av .panel:not(.opp) > .panel-head h2 { color: var(--av); }
+.modusrad { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+.modusrad .mstatus { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.modusrad.av .mstatus { color: var(--av); }
+.mbytt { min-height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.mbytt.av { border-color: var(--av-kant); color: var(--av); } .mbytt.en { border-color: var(--accent); color: var(--accent); }
+.mbekreft.av { border-top: 3px solid var(--av-kant); }
+.mvelger { gap: 12px; }
+.mvalg-rad { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .mvalg-rad { grid-template-columns: 1fr; } }
+.mvalg { text-align: left; background: var(--sunk); border: 2px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; color: var(--fg); }
+.mvalg[aria-pressed="true"].en { border-color: var(--accent); background: var(--accent-soft); }
+.mvalg[aria-pressed="true"].av { border-color: var(--av-kant); background: var(--av-soft); }
+.mvalg .mhode { font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1; text-transform: uppercase; letter-spacing: .03em; color: var(--accent); }
+.mvalg.av .mhode { color: var(--av); }
+.mvalg ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.msist { align-self: flex-start; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.primary.mstart-av { background: var(--av-soft); color: var(--av); border: 1px solid var(--av-kant); }
+/* Poengmodus (V3 fase 3) */
 .poengrad { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--surface); border-radius: 14px; padding: 8px 10px; }
 .poengrad.av { justify-content: space-between; }
 .liten-p { font-size: 13px; color: var(--muted); }
@@ -1553,11 +1578,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     opponent_players: [{ opponent_id: '40000000-0000-0000-0000-000000000001', jersey: '9', name: 'Motspiller Ni' }, { opponent_id: '40000000-0000-0000-0000-000000000001', jersey: '11', name: 'Motspiller Elleve' }],
     matches: [{ id: '50000000-0000-0000-0000-000000000001', context_id: '20000000-0000-0000-0000-000000000001', legacy_id: 'demo-1', home: 'Randaberg', away: 'Motlag',
       starts_at: '2026-10-30T17:00:00Z', status: 'kommende', source: 'egen', version: 1, current_set: 1, current_home: 0, current_away: 0, sets_home: 0, sets_away: 0,
-      publish: true, is_test: false, legacy: { round: '1', receivers: ['d-01', 'd-02', 'd-03'], onCourt: ['d-01', 'd-02', 'd-03', 'd-04'], oppNumbers: ['9', '11'] } }],
+      publish: true, is_test: false, legacy: { round: '1', modus: 'avansert', receivers: ['d-01', 'd-02', 'd-03'], onCourt: ['d-01', 'd-02', 'd-03', 'd-04'], oppNumbers: ['9', '11'] } }],
   };
 
   // Større demolag for testsider (f.eks. poengmodus): ti spillere, så en hel oppstilling med libero kan bekreftes.
-  // Oppdiktede navn. Tre kamper: én kommende og to ferdige uten føring.
+  // Oppdiktede navn. Kampen har ikke valgt modus, så valget Enkel/Avansert vises før start.
   const C = '20000000-0000-0000-0000-000000000001';
   const navn = [['1', 'Spiller En', 'Kant'], ['2', 'Spiller To', 'Midt'], ['3', 'Spiller Tre', 'Libero'], ['4', 'Spiller Fire', 'Opplegger'], ['5', 'Spiller Fem', 'Kant'],
     ['6', 'Spiller Seks', 'Midt'], ['7', 'Spiller Sju', 'Diagonal'], ['8', 'Spiller Åtte', 'Kant'], ['9', 'Spiller Ni', 'Midt'], ['10', 'Spiller Ti', 'Opplegger']];
@@ -3313,13 +3338,51 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     'att-0': ['dem', 'Angrepsfeil'], 'att-B': ['dem', 'Blokkert'], 'srv-F': ['dem', 'Servefeil'], 'rec-0': ['dem', 'Mottaksfeil'] };
   const POENG_PAR = { 'srv-E': 'opp-0', 'opp-0': 'srv-E' };   // samme ballveksling sett fra begge sider: telles én gang
   const POENG_GRUNNER = { oss: ['Motstander servefeil', 'Motstander angrepsfeil', 'Blokk', 'Regelfeil hos dem'], dem: ['Motstander angrep', 'Regelfeil hos oss'] };
-  function poengTillatt() { return !!(window.V2_CONFIG && window.V2_CONFIG.poengmodus) && !S.dash && !window.PUBLIC; }
-  function poengPaa(m) { return poengTillatt() && !!m && m.poengmodus === true; }
+  // Registreringsmodus (01.11.2026): Enkel = som før (mottak, angrep, serve). Avansert = oppstilling, bytter, rotasjon og poengtelling.
+  // Velges før registreringen starter, kan byttes nederst under live statistikk. Lagres på kampen (legacy «modus»).
+  // Kamper uten valg men med bekreftet oppstilling regnes som Avansert; pågående kamper uten noe av dette som Enkel.
+  function modus(m) {
+    if (!m) return 'enkel';
+    if (m.modus === 'enkel' || m.modus === 'avansert') return m.modus;
+    if (m.lineups && m.lineups.sets && Object.values(m.lineups.sets).some((x) => x && x.confirmed)) return 'avansert';
+    if (m.status === 'pågår' || m.status === 'ferdig' || (m.setScores || []).length) return 'enkel';
+    return null;   // ikke valgt ennå: velges før start
+  }
+  function erAv(m) { return modus(m) === 'avansert'; }
+  function sistModus() { try { return localStorage.getItem('rv-modus-' + CTX.id) || 'enkel'; } catch (e) { return 'enkel'; } }
+  function modusVelger(m) {
+    const valgt = S.modusValg || sistModus(), sist = sistModus();
+    const kort = (v, tittel, punkt) => '<button class="mvalg ' + (v === 'avansert' ? 'av' : 'en') + '" data-a="modus-valg" data-v="' + v + '" aria-pressed="' + (valgt === v) + '"><span class="mhode">' + (v === 'avansert' ? '★ ' : '○ ') + tittel + '</span><ul>' + punkt.map((x) => '<li>' + x + '</li>').join('') + '</ul>' + (sist === v ? '<span class="msist">Sist brukt</span>' : '') + '</button>';
+    return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + '</span><span class="sub">' + esc(fmtDate(m.date)) + '</span></div></header>'
+      + '<section class="panel mvelger"><div class="panel-head"><h2>Hvordan vil du føre denne kampen?</h2></div><div class="mvalg-rad">'
+      + kort('enkel', 'Enkel', ['Mottak, angrep og serve', 'Ingen oppstilling', 'Settresultat ved settslutt'])
+      + kort('avansert', 'Avansert', ['Alt i Enkel', 'Oppstilling, bytter og rotasjon', 'Poengtelling: sideout og breakpoint'])
+      + '</div><div><button class="primary' + (valgt === 'avansert' ? ' mstart-av' : '') + '" data-a="modus-start" data-v="' + valgt + '">Start registrering · ' + (valgt === 'avansert' ? 'Avansert' : 'Enkel') + '</button></div>'
+      + '<div class="code-legend">Modusen kan byttes nederst i registreringen, under live statistikk.</div></section>';
+  }
+  function modusRad(m) {
+    if (S.dash || window.PUBLIC) return '';
+    const av = erAv(m), hjemme = m.home === usName(m), c = m.current || {};
+    let h = '<section class="modusrad' + (av ? ' av' : '') + '" aria-label="Registreringsmodus"><span class="mstatus">' + (av ? '★ Avansert' : '○ Enkel') + '</span><span class="spacer"></span>';
+    if (!S.modusBytt) h += av ? '<button class="mbytt en" data-a="modus-bytt" data-v="enkel">○ Bytt til Enkel</button>' : '<button class="mbytt av" data-a="modus-bytt" data-v="avansert">★ Bytt til Avansert</button>';
+    h += '</section>';
+    if (S.modusBytt === 'avansert') h += '<section class="panel mbekreft av"><div class="panel-head"><h2>Bytt til Avansert?</h2></div><div class="status">Poengtellingen starter fra stillingen nå. Rett den hvis den ikke stemmer, og velg hvem som server. Deretter bekrefter du oppstillingen.</div>'
+      + '<form id="modusform" class="setform" style="flex-wrap:wrap"><label class="setin"><span>' + esc(shortName(usName(m))) + '</span><input id="mb-oss" type="text" inputmode="numeric" maxlength="2" value="' + (hjemme ? (c.home || 0) : (c.away || 0)) + '"></label><span class="dash">–</span>'
+      + '<label class="setin"><span>' + esc(shortName(oppTeam(m))) + '</span><input id="mb-dem" type="text" inputmode="numeric" maxlength="2" value="' + (hjemme ? (c.away || 0) : (c.home || 0)) + '"></label>'
+      + '<div class="seg" role="group" aria-label="Hvem server nå"><button type="button" data-a="mb-serve" data-v="oss" aria-pressed="' + (S.mbServe !== 'dem') + '">Vi server</button><button type="button" data-a="mb-serve" data-v="dem" aria-pressed="' + (S.mbServe === 'dem') + '">De server</button></div>'
+      + '<button class="primary mstart-av" type="submit">Bytt og åpne oppstilling</button><button class="secondary" type="button" data-a="modus-avbryt">Avbryt</button></form></section>';
+    if (S.modusBytt === 'enkel') h += '<section class="panel mbekreft"><div class="panel-head"><h2>Bytt til Enkel?</h2></div><div class="status">Poengtellingen stopper, og oppstilling og bytter skjules. Poeng og oppstilling som er ført, beholdes.</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" data-a="modus-til" data-v="enkel">Bytt til Enkel</button><button class="secondary" data-a="modus-avbryt">Avbryt</button></div></section>';
+    return h;
+  }
+  function poengTillatt() { return !S.dash && !window.PUBLIC; }
+  function poengPaa(m) { return poengTillatt() && !!m && erAv(m); }
   function poengSett(m) { return (m.current && m.current.set) || 1; }
   function poengListe(m, set) { return ((m.poeng || {})[String(set)] || []); }
   function poengTilstand(m) {
     const set = poengSett(m), st = (m.lineups && m.lineups.sets && m.lineups.sets[String(set)] && m.lineups.sets[String(set)].start) || null;
-    const t = { set, oss: 0, dem: 0, server: st && st.firstServe === 'motstander' ? 'dem' : 'oss', rot: (st && st.rotation) || null, auto: 0, n: 0, kjentStart: !!st };
+    const base = (m.poengStart || {})[String(set)] || null;
+    const t = { set, oss: base ? base.oss : 0, dem: base ? base.dem : 0, server: base ? base.server : (st && st.firstServe === 'motstander' ? 'dem' : 'oss'), rot: (st && st.rotation) || null, auto: 0, n: 0, kjentStart: !!st };
     poengListe(m, set).forEach((x) => {
       t.n++; if (x.k === 'auto') t.auto++;
       if (x.v === 'oss') { t.oss++; if (t.server === 'dem' && t.rot && window.Oppstilling) t.rot = Oppstilling.rotasjonEtter(t.rot, 1); t.server = 'oss'; }
@@ -3360,14 +3423,13 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     S.poengKv = null; S.poengSiste = null;
   }
   function poengRad(m) {
-    if (!poengTillatt()) return '';
-    if (!poengPaa(m)) return '<div class="poengrad av"><span class="liten-p">Poengmodus er av. Med den på gir kill, ess, servefeil, angrepsfeil og mottaksfeil poeng av seg selv, og stillingen følges løpende.</span><button class="barbtn" data-a="poeng-paa">Slå på poengmodus</button></div>';
+    if (!poengPaa(m)) return '';
     const t = poengTilstand(m), hjemme = m.home === usName(m);
     const venstre = hjemme ? t.oss : t.dem, hoyre = hjemme ? t.dem : t.oss, sv = (hjemme ? t.server === 'oss' : t.server === 'dem');
     let h = '<div class="poengrad"><div class="pstill"><span class="sdot' + (sv ? '' : ' skjult') + '" title="Server"></span><b>' + venstre + '</b><span>–</span><b>' + hoyre + '</b><span class="sdot' + (sv ? ' skjult' : '') + '" title="Server"></span></div>'
       + '<span class="prot">' + (t.rot ? 'Rotasjon <b>' + esc(t.rot) + '</b> · ' : '') + (t.server === 'oss' ? 'vi server' : 'vi mottar') + (t.kjentStart ? '' : ' · <span title="Bekreft oppstilling for å følge rotasjonen">uten oppstilling</span>') + '</span>'
       + '<span class="spacer"></span><button class="pknapp oss" data-a="poeng" data-v="oss">+1 ' + esc(shortName(usName(m))) + '</button><button class="pknapp dem" data-a="poeng" data-v="dem">+1 ' + esc(shortName(oppTeam(m))) + '</button>'
-      + '<button class="barbtn" data-a="poeng-angre"' + (t.n ? '' : ' disabled') + '>Angre poeng</button><button class="barbtn" data-a="poeng-av" title="Slå av poengmodus">Av</button></div>';
+      + '<button class="barbtn" data-a="poeng-angre"' + (t.n ? '' : ' disabled') + '>Angre poeng</button></div>';
     if (S.poengKv && S.poengKv.lik) h += '<div class="pkvitt lik" role="status">' + esc(S.poengKv.tekst) + '</div>';
     else if (S.poengKv) h += '<div class="pkvitt' + (S.poengKv.v === 'dem' ? ' dem' : '') + '" role="status"><b>+1 ' + esc(shortName(S.poengKv.v === 'oss' ? usName(m) : oppTeam(m))) + '</b><span>' + esc(S.poengKv.tekst) + ' · telt automatisk</span><span class="spacer"></span><button class="barbtn" data-a="poeng-angre">Angre</button></div>';
     else if (S.poengGrunn) h += '<div class="pgrunner" role="group" aria-label="Grunn for poenget"><span class="liten-p">Poeng til ' + esc(shortName(S.poengGrunn === 'oss' ? usName(m) : oppTeam(m))) + '. Grunn (valgfritt):</span>'
@@ -3444,6 +3506,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (S.offline) html = offlineView();
     else if (S.dash && S.noAccess) html = noAccessView();
     else if (!S.ready) html = '<div class="panel"><div class="empty">Laster kamper …</div></div>';
+    else if (S.view === 'live' && cur() && modus(cur()) === null && !S.dash && !window.PUBLIC) html = modusVelger(cur());
     else if (S.view === 'live' && cur()) html = liveView();
     else if (S.view === 'scout' && cur()) html = scoutView();
     else if (S.view === 'squad' && cur()) html = squadView();
@@ -3694,8 +3757,9 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const oppNums = m.oppNumbers || [];
     const evs = allEvents();
 
-    let h = '<div id="live-root" data-sig="' + esc(liveSig(m)) + '" style="display:flex;flex-direction:column;gap:10px">' + scoreBar(m, opsO);
-    if (poengTillatt()) h += '<div id="poeng-root">' + poengRad(m) + '</div>';
+    let h = '<div id="live-root" class="' + (erAv(m) ? 'modus-av' : 'modus-en') + '" data-sig="' + esc(liveSig(m)) + '" style="display:flex;flex-direction:column;gap:10px">'
+      + (erAv(m) ? '<div class="modusband"><b>★ Avansert</b><span>Oppstilling, bytter, rotasjon og poengtelling er på</span></div>' : '') + scoreBar(m, erAv(m) ? opsO : null);
+    if (poengPaa(m)) h += '<div id="poeng-root">' + poengRad(m) + '</div>';
     h += '<div class="kpis2" id="live-kpis">' + kpiRow(m, evs, oppName) + '</div>';
     if (S.bytte && opsO) h += bytteHtml(m);
     if (opsOk() && !opsBekreftet(m) && !(m.lineups && m.lineups.uten) && m.status !== 'ferdig' && opsHarHendelser(m, (m.current && m.current.set) || 1)) h += '<div class="notice">Oppstillingen for sett ' + ((m.current && m.current.set) || 1) + ' er ikke bekreftet. <button class="textbtn" data-a="lineup">Sett opp oppstilling</button></div>';
@@ -3710,7 +3774,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + '</span>' : '') + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
       + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
-      + '<div class="col stats" id="stats">' + statsPanel(m, evs, oppName) + '</div></div></div>';
+      + '<div class="col stats" id="stats">' + statsPanel(m, evs, oppName) + '</div></div>' + modusRad(m) + '</div>';
     return h;
   }
 
@@ -3769,7 +3833,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
   }
   function liveSig(m) {
-    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, !!m.poengmodus, m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -4714,7 +4778,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   // Én bekreftelse lagrer oppstillingen (lineups) og oppdaterer onCourt og receivers i samme kampoppdatering.
   // Registreringene (0–2) røres ikke. Modulen (moduler/oppstilling) bygges inn i V2-sidene; uten den er appen som før.
   const OPS = { el: null, avvist: {} };
-  function opsOk() { return !!window.Oppstilling && !window.PUBLIC && !S.dash; }
+  function opsOk() { return !!window.Oppstilling && !window.PUBLIC && !S.dash && erAv(cur()); }
   function opsBekreftet(m) { const st = window.Oppstilling && m ? Oppstilling.settFor(m, (m.current && m.current.set) || 1) : null; return !!(st && st.confirmed); }
   function opsKnapp(m) { const O = window.Oppstilling, st = O && m ? O.settFor(m, (m.current && m.current.set) || 1) : null, o = st && st.confirmed ? O.aktuelt(st) : null;
     return o ? 'Oppstilling ' + (O.rotasjonAv(o.positions, o.roles) || '') : 'Oppstilling'; }
@@ -4747,7 +4811,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     const m = cur();
     if (!opsOk() || OPS.el || S.view !== 'live' || !m || !canLive(m) || m.status === 'ferdig' || S.endingSet || S.logsFor !== m.id || DIR.open) return;
     const nr = (m.current && m.current.set) || 1;
-    if (opsBekreftet(m) || OPS.avvist[m.id + '|' + nr] || (m.lineups && m.lineups.uten)) return;
+    if (!erAv(m) || opsBekreftet(m) || OPS.avvist[m.id + '|' + nr] || (m.lineups && m.lineups.uten)) return;
     // Settet er allerede i gang uten oppstilling (f.eks. før denne funksjonen fantes): ikke tving velgeren fram
     if (opsHarHendelser(m, nr)) return;
     opsAapne(m);
@@ -5080,6 +5144,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       render(); toTop();
       // Kamp som ikke er startet: rett inn i oppstillingsvelgeren (sett 1 har ingen registreringer ennå)
       if (S.view === 'live' && mm.status === 'kommende' && opsOk() && !opsBekreftet(mm) && !(mm.lineups && mm.lineups.uten)) opsAapne(mm);
+      S.modusValg = null; S.modusBytt = null;
     }
     else if (a === 'back') { S.view = 'list'; S.matchId = null; openLogs(null); closeSeasonLogs(); render(); }
     else if (a === 'season') { S.view = 'season'; S.matchId = null; openLogs(null); openSeasonLogs(); render(); toTop(); }
@@ -5152,6 +5217,17 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       saveMatch(m.id, { setScores, setsHome, setsAway, current: nc });
     }
     else if (a === 'endmatch' && m) { m.status = 'ferdig'; S.view = 'detail'; S.endingSet = false; render(); toTop(); saveMatch(m.id, { status: 'ferdig' }).then(() => setTimeout(() => publishOpen('kampen ferdig', true), 1500)); }
+    else if (a === 'modus-valg') { S.modusValg = b.dataset.v; render(); }
+    else if (a === 'modus-start' && m) {
+      const v = b.dataset.v === 'avansert' ? 'avansert' : 'enkel'; m.modus = v; S.modusValg = null;
+      try { localStorage.setItem('rv-modus-' + CTX.id, v); } catch (e) {}
+      saveMatch(m.id, { modus: v }); render(); toTop();
+      if (v === 'avansert' && opsOk() && !opsBekreftet(m) && !(m.lineups && m.lineups.uten)) opsAapne(m);
+    }
+    else if (a === 'modus-bytt') { S.modusBytt = b.dataset.v; S.mbServe = 'oss'; render(); }
+    else if (a === 'modus-avbryt') { S.modusBytt = null; render(); }
+    else if (a === 'mb-serve') { S.mbServe = b.dataset.v; const o = document.getElementById('mb-oss'), d = document.getElementById('mb-dem'); S.mbUtkast = o && d ? [o.value, d.value] : null; render(); if (S.mbUtkast) { const o2 = document.getElementById('mb-oss'), d2 = document.getElementById('mb-dem'); if (o2) o2.value = S.mbUtkast[0]; if (d2) d2.value = S.mbUtkast[1]; } }
+    else if (a === 'modus-til' && m) { m.modus = b.dataset.v; S.modusBytt = null; try { localStorage.setItem('rv-modus-' + CTX.id, m.modus); } catch (e) {} saveMatch(m.id, { modus: m.modus }); render(); }
     else if (a === 'poeng-paa' && m) { m.poengmodus = true; S.poengKv = null; S.poengGrunn = null; S.poengSiste = null; saveMatch(m.id, { poengmodus: true }); poengLagre(m); render(); }
     else if (a === 'poeng-av' && m) { m.poengmodus = false; S.poengKv = null; S.poengGrunn = null; saveMatch(m.id, { poengmodus: false }); render(); }
     else if (a === 'poeng' && m && poengPaa(m)) { poengLegg(m, b.dataset.v, 'manuell', null); S.poengKv = null; S.poengSiste = null; S.poengGrunn = b.dataset.v; render(); }
@@ -5270,6 +5346,18 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       if (p) { if (nm) p.name = nm; } else ros.push(nm ? { nr: v, name: nm } : { nr: v });
       saveOpp(m, ros, tm); if (tm === oppTeam(m)) setOppNumbers(m, (m.oppNumbers || []).concat([v]));
       const inp = document.getElementById('opp-add-nr-' + sl); if (inp) { inp.value = ''; inp.focus(); }
+      return;
+    }
+    if (f.id === 'modusform' && m) {
+      const o = parseInt(document.getElementById('mb-oss').value, 10), d = parseInt(document.getElementById('mb-dem').value, 10);
+      if (isNaN(o) || isNaN(d) || o < 0 || d < 0) { S.error = 'Skriv inn stillingen med tall.'; render(); return; }
+      const set = poengSett(m);
+      m.modus = 'avansert'; S.modusBytt = null; S.error = '';
+      m.poengStart = Object.assign({}, m.poengStart || {}); m.poengStart[String(set)] = { oss: o, dem: d, server: S.mbServe === 'dem' ? 'dem' : 'oss' };
+      m.poeng = Object.assign({}, m.poeng || {}); m.poeng[String(set)] = [];
+      try { localStorage.setItem('rv-modus-' + CTX.id, 'avansert'); } catch (e) {}
+      saveMatch(m.id, { modus: 'avansert', poengStart: m.poengStart, poeng: m.poeng }); poengLagre(m); render();
+      if (opsOk() && !opsBekreftet(m)) opsAapne(m);
       return;
     }
     if (f.id === 'retteform' && m) {
