@@ -5179,7 +5179,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<div class="title"><span class="display">Dashboard</span><span class="sub">' + esc(CTX.name) + ' · ' + done.length + ' av ' + rows.length + ' kamper spilt</span></div><span class="spacer"></span>'
       + '<div class="bar-actions">' + (hasTest ? '<button class="barbtn' + (SEASON.inclTest ? ' primary-bar' : '') + '" data-a="incltest" aria-pressed="' + SEASON.inclTest + '">' + (SEASON.inclTest ? 'Testkampen er med' : 'Vis testkampen') + '</button>' : '') + '</div></header>';
 
-    if (next) h += nextHero(next.m, next.live);
+    // Neste kamp vises på Kamper, ikke på Dashboard (02.11.2026)
 
     if (!reg.length) h += '<div class="notice">Ingen kamper er ført i appen ennå. Tallene fylles inn automatisk fra første kamp dere fører fra benken.' + (hasTest && !SEASON.inclTest ? ' Trykk «Vis testkampen» for å se hvordan det ser ut.' : '') + '</div>';
 
