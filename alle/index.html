@@ -630,6 +630,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .rp-kontroll .chk { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-weight: 600; }
 .rp-kontroll .chk input { width: 20px; height: 20px; }
 .rp-wrap { background: var(--surface); border-radius: 14px; padding: 12px; overflow: hidden; }
+#rp-flate { margin: 0 auto; overflow: hidden; }
+#rp-flate .rp-ark { margin: 0; transform-origin: 0 0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .rp-ark { --p: #FFFFFF; --b: #16181D; --bs: #5A6070; --pl: #DAD7CF; --blaa: #1B4592; --band: #DCE6F5; --sum: #FFF3CF; --k0: #C0392B; --kB: #7A1A14; --k2: #1F7A4D; --spor: #ECEAE4;
   background: var(--p); color: var(--b); width: 1123px; min-height: 794px; margin: 0 auto; padding: 24px 30px; display: flex; flex-direction: column; gap: 9px; font: 11.5px/1.35 var(--font-body); box-shadow: 0 6px 28px rgba(0,0,0,.35);
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -671,9 +673,13 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 @media print {
   html.rp-printing .rp-ikke-utskrift, html.rp-printing #v2-status, html.rp-printing #v2-demo, html.rp-printing #v2-loggut, html.rp-printing #v2-tilgang, html.rp-printing .hn-kvitt { display: none !important; }
   html.rp-printing, html.rp-printing body { background: #FFFFFF !important; height: auto !important; overflow: visible !important; }
-  html.rp-printing .app { padding: 0 !important; max-width: none !important; }
+  html.rp-printing .app { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  html.rp-printing body { margin: 0 !important; padding: 0 !important; }
+  html.rp-printing .rp-wrap { margin: 0 !important; }
+  html.rp-printing .rp-ark { break-inside: avoid; page-break-inside: avoid; }
   html.rp-printing .rp-wrap { padding: 0; background: none; border-radius: 0; overflow: visible; }
-  html.rp-printing .rp-ark { box-shadow: none; margin: 0; }
+  html.rp-printing .rp-ark { box-shadow: none; margin: 0; transform: none !important; }
+  html.rp-printing #rp-flate { width: auto !important; height: auto !important; overflow: visible; }
 }
 .dir-print { display: none; }
 @media print {
@@ -4767,9 +4773,14 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Arket er 1123 × 794 px (A4 liggende). På skjermen skaleres det ned til bredden; ved utskrift til sidens skrivbare flate.
   function rapportTilpass(utskrift) {
     const ark = document.getElementById('rp-ark'); if (!ark) return;
-    ark.style.zoom = 1;
-    const z = utskrift === true ? Math.min(1062 / ark.offsetWidth, 733 / ark.offsetHeight) : Math.min(1, (ark.parentElement.parentElement.clientWidth - 24) / ark.offsetWidth);
-    ark.style.zoom = String(Math.max(0.3, z));
+    const flate = ark.parentElement;
+    ark.style.zoom = 1; ark.style.transform = ''; flate.style.width = ''; flate.style.height = '';
+    if (utskrift === true) { ark.style.zoom = String(Math.min(1062 / ark.offsetWidth, 718 / ark.offsetHeight)); return; } // litt luft under 733 px, så bunnteksten ikke glir over på side 2
+    // Forhåndsvisning (01.11.2026): hele det liggende A4-arket skalert ned med transform, så det ser ut som utskriften.
+    // CSS-zoom brukes ikke her, fordi Safari på iPhone da forstørrer teksten igjen og tabellene sprekker.
+    const z = Math.min(1, (flate.parentElement.clientWidth - 24) / ark.offsetWidth);
+    ark.style.transform = 'scale(' + z + ')';
+    flate.style.width = Math.floor(ark.offsetWidth * z) + 'px'; flate.style.height = Math.ceil(ark.offsetHeight * z) + 'px';
   }
   window.addEventListener('resize', () => { if (S.view === 'rapport') rapportTilpass(); });
   function rapportSkriv() {
