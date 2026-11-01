@@ -33,6 +33,36 @@ h1 { margin: 0; font: 700 30px/1.05 var(--font-display); }
 h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .topp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; background: var(--surface); border-radius: 16px; padding: 8px 14px; }
 .topp a { color: var(--accent); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+/* Toppmenyen er kopiert fra appen (app/index.html), så overgangen mellom appen og Analyse er sømløs */
+.topnav { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; background: var(--surface); border-radius: 16px; padding: 8px 10px; }
+.topnav .tn-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ctx-pick select { appearance: none; -webkit-appearance: none; height: 44px; border-radius: 12px; background: var(--sunk) var(--pil) no-repeat right 10px center; color: var(--fg); border: 1px solid var(--line); padding: 0 30px 0 10px; font: 600 14px var(--font-body); max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.label:empty { display: none; }
+/* Ett lag: navnet i samme felt som lagvelgeren i appen, bare uten pil */
+.topnav .tn-id > .label { display: inline-flex; align-items: center; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--sunk); border: 1px solid var(--line); color: var(--fg); font: 600 14px var(--font-body); letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.topnav .tn-id > .label:empty { display: none; }
+.tn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.navtabs { display: flex; gap: 4px; background: var(--bg); border-radius: 12px; padding: 4px; flex-wrap: wrap; }
+.navtab { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
+.navtab[aria-current="page"] { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.crest { flex: none; display: inline-flex; align-items: center; justify-content: center; color: #FFFFFF; font-family: var(--font-display); font-weight: 700; line-height: 1; box-shadow: inset 0 0 0 2px rgba(255,255,255,.3); background: #2E4A86; }
+.crest.sh { border-radius: 22% 22% 50% 50% / 18% 18% 42% 42%; }
+.crest.md { width: 34px; height: 40px; font-size: 15px; }
+.crest.img { background: #FFFFFF; border-radius: 50%; box-shadow: 0 0 0 1px rgba(22,24,29,.14); width: 42px; height: 42px; }
+.crest.img img { width: 76%; height: 76%; object-fit: contain; display: block; border-radius: 3px; }
+@media (max-width: 640px) {
+  .topnav .tn-id { flex: 1 1 0; min-width: 0; }
+  .topnav .tn-id .crest:not(.img) { width: 30px; height: 35px; font-size: 13px; }
+  .topnav .tn-id .crest.img { width: 36px; height: 36px; }
+  .topnav .ctx-pick { flex: 1 1 0; min-width: 0; display: block; }
+  .topnav .ctx-pick select { width: 100%; font-size: 16px; }
+  .topnav .tn-id > .label { flex: 1 1 0; display: block; line-height: 42px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navtabs { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .navtabs::-webkit-scrollbar { display: none; }
+  .navtab { flex: 1 0 auto; justify-content: center; padding: 0 8px; min-width: 0; white-space: nowrap; }
+}
+@media (max-width: 420px) { .navtabs { gap: 2px; } .navtab { padding: 0 6px; font-size: 13px; } }
 .merke { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); background: var(--warn-bg); padding: 3px 9px; border-radius: 999px; }
 .moduler { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .modul { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 6px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 700 19px/1.1 var(--font-display); text-decoration: none; }
@@ -111,7 +141,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     --sunk: #F2F1EC; }
   body { background: #FFFFFF; color: #16181D; }
   .topp, .verktoy { background: none; }
-  .verktoy, .topp, .moduler, .ikke-utskrift { display: none !important; }
+  .verktoy, .topp, .topnav, .moduler, .ikke-utskrift { display: none !important; }
   .utskrift-tittel { display: block; font: 700 22px var(--font-display); margin: 0 0 6px; }
   .utskrift-tittel small { display: block; font: 400 13px var(--font-body); color: #4A4F5A; }
   .innhold { display: block; } .panel, .bane { padding: 0; background: none; }
@@ -130,12 +160,15 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 </head>
 <body>
 <main id="app">
-  <div class="topp">
-    <h1>Analyse</h1><span class="merke">Beta</span><span class="kontekst" id="kontekst-navn"></span>
-    <select id="kontekst" hidden aria-label="Lag og sesong"></select>
-    <span class="skyv"></span>
-    <a href="../" id="tilbake">‹ Til appen</a>
-  </div>
+  <!-- Samme toppmeny som appen (01.11.2026): lagmerke, lagvelger og fanene Kamper, Tabell, Dashboard og Analyse -->
+  <nav class="topnav" aria-label="Hovedmeny">
+    <div class="tn-id"><span class="crest sh md" id="tn-merke" aria-hidden="true"></span>
+      <label class="ctx-pick" for="kontekst"><span class="tn-sr">Lag og sesong</span><select id="kontekst" hidden></select></label>
+      <span class="label" id="kontekst-navn"></span></div>
+    <div class="navtabs">
+      <a class="navtab" id="tilbake" href="../">Kamper</a><a class="navtab" id="til-tabell" href="../?vis=tabell">Tabell</a><a class="navtab" id="til-dashboard" href="../?vis=dashboard">Dashboard</a><a class="navtab" aria-current="page" href="#">Analyse</a>
+    </div>
+  </nav>
 
   <nav class="moduler" aria-label="Analysemoduler">
     <a class="modul" href="#blokk-forsvar" aria-current="page">Blokk/forsvar<small>Slagretninger og forsvarsplan</small></a>
@@ -2238,6 +2271,7 @@ window.V3Moduler = (function (root) {
     const kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
     return {
       async kontekster() { return kast(await db.from('contexts').select('id,slug,name,our_team').order('name')); },
+      async logo(ktx) { const r = kast(await db.from('logos').select('team,data_url').eq('context_id', ktx.id).eq('team', ktx.our_team)); return r && r[0] ? r[0].data_url : null; },
       async motstandere(ktx) {
         const o = kast(await db.from('opponents').select('id,slug,name').eq('context_id', ktx.id).order('name'));
         // Lag som finnes i kampene, men ikke som motstander med tropp, tas også med
@@ -2481,7 +2515,21 @@ window.V3Moduler = (function (root) {
   $('tabell').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('tr[data-nokkel]')) ev.target.click(); });
   $('b-skriv').addEventListener('click', () => window.print());
   // «Til appen» tar med laget som er valgt her (01.11.2026)
-  function tilbakeLenke() { const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : ''; $('tilbake').href = '../' + (demo || l ? '?' + [demo ? 'demo=1' : '', l].filter(Boolean).join('&') : ''); }
+  function tilbakeLenke() {
+    const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
+    const url = (vis) => { const d = [demo ? 'demo=1' : '', l, vis ? 'vis=' + vis : ''].filter(Boolean); return '../' + (d.length ? '?' + d.join('&') : ''); };
+    $('tilbake').href = url(''); $('til-tabell').href = url('tabell'); $('til-dashboard').href = url('dashboard');
+    merke();
+  }
+  // Lagmerket som i appen: lagets logo fra databasen, ellers forbokstaver
+  const logoer = {};
+  function merke() {
+    const el = $('tn-merke'); if (!el || !S.ktx) return;
+    const lag = S.ktx.our_team || '', logo = logoer[S.ktx.slug];
+    if (logo) { el.className = 'crest img md'; el.innerHTML = '<img src="' + esc(logo) + '" alt="">'; return; }
+    el.className = 'crest sh md'; el.textContent = lag === 'Randaberg' ? 'RB' : lag === 'Norge' ? 'NO' : lag.split(/\s+/).filter(Boolean).slice(0, 2).map((o) => o[0]).join('').toUpperCase();
+    if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) merke(); } }).catch(() => {}); }
+  }
   tilbakeLenke();
 
   window.__analyse = { S, tegn, get fv() { return S.fv; } };

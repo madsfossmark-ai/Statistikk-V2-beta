@@ -3628,6 +3628,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
 
   let ctxUnsubs = [];
+  // Fanene Tabell/Dashboard på Analyse lenker hit med ?vis=; gjelder bare første lag som lastes
+  let startVis = ({ tabell: 'table', dashboard: 'season' })[new URLSearchParams(location.search).get('vis')] || null;
   function applyCtx(id) {
     CTX = S.contexts.find((c) => c.id === id) || MAIN_CTX;
     PFX = CTX.prefix || ''; OUR = CTX.our || 'Randaberg';
@@ -3635,7 +3637,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     ctxUnsubs.forEach((u) => { try { u(); } catch (e) {} }); ctxUnsubs = [];
     closeSeasonLogs(); openLogs(null);
     applyTheme(); S.logos = {};
-    S.roster = []; S.matches = []; S.opps = {}; S.ready = false; S.view = 'list'; S.matchId = null; S.showNew = false; S.showNewCtx = false; S.showShare = false;
+    S.roster = []; S.matches = []; S.opps = {}; S.ready = false; S.view = startVis || 'list'; startVis = null; S.matchId = null; S.showNew = false; S.showNewCtx = false; S.showShare = false;
     SEASON.player = 'team';
     render(); toTop();
     subscribeCtx();
@@ -3656,7 +3658,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     keep(S.db.collection(PFX + 'matches').onSnapshot((snap) => {
       S.matches = snap.docs.map((d) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }));
       S.matches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      S.ready = true; if (S.view === 'season') openSeasonLogs(); render();
+      S.ready = true; if (S.view === 'season' || S.view === 'table') openSeasonLogs(); render();
     }, (e) => { S.error = 'Kunne ikke laste kamper (' + e.code + ').'; render(); }));
   }
 
