@@ -1227,7 +1227,32 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       const neste = (kampKø[k] || Promise.resolve()).catch(() => {}).then(() => oppdaterKampNå(ctxId, id, patch));
       kampKø[k] = neste; return neste;
     }
+    // Settresultat (V3 fase 2): settlista, settresultat, poengstilling og status lagres samlet i databasen (stats.korriger_sett),
+    // så sett som fjernes («Tilbake til sett», «Rett resultat») også forsvinner der. Versjonskontroll, historikk og trygg gjentakelse.
+    const SETTFELT = ['setScores', 'setsHome', 'setsAway', 'current', 'status'];
+    async function korrigerSett(ctxId, id, patch, nyttForsøk) {
+      const u = await kampUuid(ctxId, id);
+      if (kampVersjon[u] == null) await hentKamper(ctxId);
+      const sett = (patch.setScores || []).map((x) => { const a = Array.isArray(x) ? x : [x.home, x.away]; return [+a[0] || 0, +a[1] || 0]; });
+      const c = patch.current ? { set: patch.current.set || 1, home: patch.current.home || 0, away: patch.current.away || 0 } : null;
+      const r = await db.rpc('korriger_sett', { p_match: u, p_versjon: kampVersjon[u], p_sett: sett, p_current: c, p_status: patch.status || null, p_enhet: device, p_grunn: patch._grunn || null });
+      if (r && r.error && r.error.code === '40001' && !nyttForsøk) {
+        status.konflikter++; varsle();
+        await hentKamper(ctxId);
+        return korrigerSett(ctxId, id, patch, true);
+      }
+      if (r && r.error && r.error.code === '40001') throw Object.assign(new Error('Kampen ble endret på en annen enhet samtidig. Prøv igjen.'), { code: 'versjonskonflikt' });
+      const svar = kast(r);
+      if (svar && svar.versjon != null) kampVersjon[u] = svar.versjon;
+      return svar;
+    }
     async function oppdaterKampNå(ctxId, id, patch, nyttForsøk) {
+      if (patch && patch.setScores !== undefined && db.rpc) {
+        const rest = {}; Object.keys(patch).forEach((k) => { if (!SETTFELT.includes(k) && k !== '_grunn') rest[k] = patch[k]; });
+        const svar = await korrigerSett(ctxId, id, patch);
+        if (Object.keys(rest).length) await oppdaterKampNå(ctxId, id, rest);
+        return svar;
+      }
       const u = await kampUuid(ctxId, id);
       if (kampVersjon[u] == null) await hentKamper(ctxId);
       const { rad, sett } = patchTilKamp(patch, kampLegacy[u]);
@@ -1448,9 +1473,37 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       }
       return b;
     }
+    // Etterligner stats.korriger_sett (V3 fase 2): hele settlista, versjonskontroll, idempotent
+    async function rpc(navn, a) {
+      db.kall++;
+      if (db.offline) return { data: null, error: { message: 'TypeError: Failed to fetch' } };
+      if (navn !== 'korriger_sett') return { data: null, error: { message: 'ukjent funksjon ' + navn, code: '42883' } };
+      const m = db.t.matches.find((x) => x.id === a.p_match); if (!m) return { data: null, error: { message: 'Ukjent kamp', code: 'P0002' } };
+      if (db.nekt && db.nekt('match_sets', 'update')) return { data: null, error: { message: 'Du har ikke skriverett i dette laget', code: '42501' } };
+      const sett = a.p_sett || [];
+      if (sett.length > 5) return { data: null, error: { message: 'Ugyldige sett (0–5 sett)' } };
+      for (let i = 0; i < sett.length; i++) if (+sett[i][0] === +sett[i][1]) return { data: null, error: { message: 'Sett ' + (i + 1) + ' kan ikke ende likt' } };
+      const sh = sett.filter((x) => +x[0] > +x[1]).length, sa = sett.length - sh;
+      const gamle = db.t.match_sets.filter((x) => x.match_id === m.id).sort((x, y) => x.set_no - y.set_no);
+      const c = a.p_current || { set: m.current_set, home: m.current_home, away: m.current_away };
+      const st = a.p_status || m.status;
+      const lik = JSON.stringify(gamle.map((x) => [x.home, x.away])) === JSON.stringify(sett.map((x) => [+x[0], +x[1]]))
+        && m.current_set === c.set && m.current_home === (c.home || 0) && m.current_away === (c.away || 0) && m.status === st && m.sets_home === sh && m.sets_away === sa;
+      if (lik) return { data: { versjon: m.version, endret: false, sets_home: sh, sets_away: sa, registreringer_i_fjernede_sett: 0 }, error: null };
+      if (m.version !== a.p_versjon) return { data: null, error: { message: 'versjonskonflikt', code: '40001' } };
+      const fjernet = db.t.events.filter((e) => e.match_id === m.id && e.set_no > sett.length && e.type !== 'undo').length;
+      db.t.match_sets = db.t.match_sets.filter((x) => x.match_id !== m.id || x.set_no <= sett.length);
+      sett.forEach((x, i) => { const r = db.t.match_sets.find((y) => y.match_id === m.id && y.set_no === i + 1);
+        if (r) Object.assign(r, { home: +x[0], away: +x[1] }); else db.t.match_sets.push({ match_id: m.id, set_no: i + 1, home: +x[0], away: +x[1] }); });
+      Object.assign(m, { sets_home: sh, sets_away: sa, current_set: c.set, current_home: c.home || 0, current_away: c.away || 0, status: st, version: (m.version || 1) + 1 });
+      (db.t.match_set_endringer || (db.t.match_set_endringer = [])).push({ match_id: m.id, foer: gamle.map((x) => [x.home, x.away]), etter: sett, enhet: a.p_enhet });
+      db.varsle('matches', m); db.varsle('match_sets', { match_id: m.id });
+      return { data: { versjon: m.version, endret: true, sets_home: sh, sets_away: sa, registreringer_i_fjernede_sett: fjernet }, error: null };
+    }
     return {
       db,
-      schema() { return { from }; },
+      schema() { return { from, rpc }; },
+      rpc,
       from,
       channel() {
         const ls = [];
@@ -3741,7 +3794,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     if (!hasSite()) return;
     if (!force && Date.now() - lastPub < 120000) return;
     let mcp = null; try { mcp = await window.claude?.use?.('mcp'); } catch (e) { mcp = null; }
-    if (!mcp) { if (force) { S.info = 'Publisering er ikke tilgjengelig i denne visningen. Åpne appen på claude.ai eller i Claude-appen.'; render(); } return; }
+    if (!mcp) { if (force && !window.V2_CONFIG) { S.info = 'Publisering er ikke tilgjengelig i denne visningen. Åpne appen på claude.ai eller i Claude-appen.'; render(); } return; }
     lastPub = Date.now(); const site = PUBLISH.sites[CTX.id];
     S.info = site + ' oppdateres …'; render();
     try {
@@ -3858,6 +3911,22 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" data-a="to-live">Ferdig</button>' + (Object.keys(S.logs).some((k) => (S.logs[k] || []).length) ? '' : '<button class="secondary" data-a="unfocus">Ikke før statistikk i denne kampen</button>') + '</div></section>';
     h += oppSquadPanel(m, m.focus, false);
     h += oppSquadPanel(m);
+    return h;
+  }
+
+  // Settkorrigering (V3 fase 2): rett poeng per sett i egen kamp. Lagres samlet i databasen (stats.korriger_sett) med historikk.
+  // Registreringene endres ikke. Fjernes et sett som har registreringer, må det bekreftes.
+  function regIUtovSett(m, n) {
+    if (S.logsFor !== m.id) return 0;
+    return Object.entries(S.logs || {}).reduce((a, [k, evs]) => { const sn = parseInt((String(k).match(/-s(\d+)$/) || [])[1], 10); return a + (sn > n ? (evs || []).filter((e) => e.type !== 'undo').length : 0); }, 0);
+  }
+  function retteForm(m) {
+    const sc = S.retteUtkast || m.setScores || [];
+    let h = '<section class="panel" id="rettepanel"><div class="panel-head"><h2>Rett resultat</h2><span class="status">Poeng per sett. Tomme sett telles ikke. Registreringene endres ikke.</span></div><form id="retteform" class="resform">'
+      + '<div class="res-set res-head"><span></span><span class="label">' + esc(shortName(m.home)) + '</span><span></span><span class="label">' + esc(shortName(m.away)) + '</span></div>';
+    for (let i = 0; i < 5; i++) h += '<div class="res-set"><span class="label">Sett ' + (i + 1) + '</span><input id="rt-h-' + i + '" type="text" inputmode="numeric" maxlength="2" value="' + (sc[i] ? sc[i][0] : '') + '" aria-label="' + esc(m.home) + ' sett ' + (i + 1) + '"><span>–</span><input id="rt-a-' + i + '" type="text" inputmode="numeric" maxlength="2" value="' + (sc[i] ? sc[i][1] : '') + '" aria-label="' + esc(m.away) + ' sett ' + (i + 1) + '"></div>';
+    if (S.retteVarsel) h += '<div class="status" id="rette-varsel" style="color:var(--amber)">' + esc(S.retteVarsel) + '</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" type="submit">' + (S.retteVarsel ? 'Lagre likevel' : 'Lagre rettet resultat') + '</button><button class="secondary" type="button" data-a="rett-res">Avbryt</button></div></form></section>';
     return h;
   }
 
@@ -4277,7 +4346,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
     addRecAvg(n);
     const oc = outcome(m);
     let h = '<header class="bar det-bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm" style="flex-wrap:wrap">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + ' ' + (m.setsHome != null && m.status !== 'kommende' ? m.setsHome + '–' + m.setsAway : '') + (oc ? ' <span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss" style="color:#F0A774;box-shadow:inset 0 0 0 1.5px #F0A774">Tap') + '</span>' : '') + '</span><span class="sub">' + esc(fmtDate(m.date)) + ((m.setScores || []).length ? ' · ' + m.setScores.map((s) => s[0] + '–' + s[1]).join(' · ') : '') + '</span></div><span class="spacer"></span>'
-      + (n && n.url ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener">Åpne hos ' + srcName(n) + ' ›</a>' : '') + (ours ? (!window.PUBLIC && ownEvs.some((e) => e.type === 'dir') ? '<button class="barbtn" data-a="dir">Slagretning</button>' : '') + '<div class="bar-actions"><button class="barbtn" data-a="sheet">Kampark</button><button class="barbtn primary-bar" data-a="edit">Åpne for endring</button></div>' : '') + (ours && m.custom && !S.dash ? '<button class="barbtn" data-a="delmatch">Slett kamp</button>' : '') + '</header>';
+      + (n && n.url ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener">Åpne hos ' + srcName(n) + ' ›</a>' : '') + (ours ? (!window.PUBLIC && ownEvs.some((e) => e.type === 'dir') ? '<button class="barbtn" data-a="dir">Slagretning</button>' : '') + '<div class="bar-actions"><button class="barbtn" data-a="sheet">Kampark</button>' + (!S.dash && !window.PUBLIC ? '<button class="barbtn" data-a="rett-res">' + (S.retting === m.id ? 'Lukk retting' : 'Rett resultat') + '</button>' : '') + '<button class="barbtn primary-bar" data-a="edit">Åpne for endring</button></div>' : '') + (ours && m.custom && !S.dash ? '<button class="barbtn" data-a="delmatch">Slett kamp</button>' : '') + '</header>';
+    if (ours && S.retting === m.id && !S.dash && !window.PUBLIC) h += retteForm(m);
     if (!ours && !S.dash) h += othersPanel(m);
     if (own && hasNvbf) h += '<div class="seg" role="group" aria-label="Kilde"><button data-a="dsrc" data-v="egen" aria-pressed="' + egen + '">Egen føring</button><button data-a="dsrc" data-v="nvbf" aria-pressed="' + !egen + '">' + srcName(n) + '</button></div>';
     if (!n || !n.teams || !n.teams.length) return h + '<div class="panel"><div class="empty">' + (ours ? (S.dash && !window.PUBLIC ? 'Det er ikke ført statistikk i denne kampen ennå.' : 'Ingen registreringer i denne kampen. Trykk «Åpne for endring» for å føre statistikk.') : CTX.id !== 'main' ? (m.status === 'ferdig' ? 'Resultatet er registrert. Det er ikke ført statistikk i denne kampen.' : 'Kampen er ikke spilt ennå.') : m.status === 'ferdig' ? 'Kampstatistikken fra NVBF er ikke hentet inn ennå. Be Claude hente den, så dukker den opp her.' : 'Kampen er ikke spilt ennå. Statistikken kan hentes fra NVBF når den er publisert.') + '</div></div>';
@@ -4977,6 +5047,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       saveMatch(m.id, { setScores, setsHome, setsAway, current: nc });
     }
     else if (a === 'endmatch' && m) { m.status = 'ferdig'; S.view = 'detail'; S.endingSet = false; render(); toTop(); saveMatch(m.id, { status: 'ferdig' }).then(() => setTimeout(() => publishOpen('kampen ferdig', true), 1500)); }
+    else if (a === 'rett-res' && m) { S.retting = S.retting === m.id ? null : m.id; S.retteVarsel = null; S.retteBekreftet = null; S.retteUtkast = null; render(); }
     else if (a === 'reopen' && m) { m.status = 'pågår'; render(); saveMatch(m.id, { status: 'pågår' }); }
     else if ((a === 'court' || a === 'recv') && m) {
       const key = a === 'court' ? 'onCourt' : 'receivers';
@@ -5089,6 +5160,30 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
       if (p) { if (nm) p.name = nm; } else ros.push(nm ? { nr: v, name: nm } : { nr: v });
       saveOpp(m, ros, tm); if (tm === oppTeam(m)) setOppNumbers(m, (m.oppNumbers || []).concat([v]));
       const inp = document.getElementById('opp-add-nr-' + sl); if (inp) { inp.value = ''; inp.focus(); }
+      return;
+    }
+    if (f.id === 'retteform' && m) {
+      const sc = [];
+      for (let i = 0; i < 5; i++) {
+        const h = document.getElementById('rt-h-' + i).value.trim(), a = document.getElementById('rt-a-' + i).value.trim();
+        if (h === '' && a === '') continue;
+        const hn = parseInt(h, 10), an = parseInt(a, 10);
+        if (isNaN(hn) || isNaN(an) || hn === an || hn < 0 || an < 0) { S.error = 'Sett ' + (i + 1) + ': skriv inn poeng for begge lag, og ikke likt.'; render(); return; }
+        sc.push([hn, an]);
+      }
+      const før = (m.setScores || []).length, reg = sc.length < før ? regIUtovSett(m, sc.length) : 0;
+      const nøkkel = JSON.stringify(sc);
+      if (reg && S.retteBekreftet !== nøkkel) {
+        S.retteVarsel = 'Sett ' + (sc.length + 1) + (før > sc.length + 1 ? '–' + før : '') + ' har ' + reg + ' registreringer. De blir liggende, men settet forsvinner fra resultatet. Trykk «Lagre likevel» for å bekrefte.';
+        S.retteBekreftet = nøkkel; S.retteUtkast = sc; render(); return;
+      }
+      const sh = sc.filter((x) => x[0] > x[1]).length, sa = sc.length - sh;
+      const status = m.status === 'pågår' ? 'pågår' : sc.length ? 'ferdig' : 'kommende';
+      const patch = { setScores: sc, setsHome: sh, setsAway: sa, status, _grunn: 'rett resultat' };
+      if (status === 'pågår') { const c = m.current || {}; if ((c.set || 1) <= sc.length) patch.current = { set: Math.min(5, sc.length + 1), home: 0, away: 0 }; }
+      Object.assign(m, { setScores: sc, setsHome: sh, setsAway: sa, status }, patch.current ? { current: patch.current } : {});
+      S.retting = null; S.retteVarsel = null; S.retteBekreftet = null; S.retteUtkast = null; S.error = ''; S.info = 'Resultatet er rettet. Registreringene er uendret.'; render();
+      saveMatch(m.id, patch).then(() => setTimeout(() => publishOpen('resultat rettet'), 1500));
       return;
     }
     if (f.id === 'resform' && m) {
