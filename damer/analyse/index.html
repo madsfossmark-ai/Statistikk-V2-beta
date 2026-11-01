@@ -109,6 +109,14 @@ select option { background: var(--surface); color: var(--fg); }
 .felt select { min-width: 0; }
 @media (max-width: 600px) { .felt { flex: 1 1 100%; } .felt select { flex: 1; } .felt .etikett { width: 62px; } .plan .felt .etikett { width: auto; } }
 .verktoy { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border-radius: 18px; padding: 10px 14px; }
+/* iPad og større: de seks nedtrekksmenyene på én linje med fast bredde, så de ikke hopper når innholdet endres (02.11.2026) */
+@media (min-width: 760px) {
+  .rad.utvalg { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; align-items: end; }
+  .rad.utvalg .felt { display: flex; flex-direction: column; align-items: stretch; gap: 3px; width: 100%; }
+  .rad.utvalg .felt .etikett { font-size: 11px; padding-left: 4px; }
+  .rad.utvalg .felt select { width: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+}
+.test-merke { color: var(--warn); font-weight: 600; }
 .plan { background: var(--sunk); border-radius: 12px; padding: 8px 10px; }
 .status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); }
 .status.ulagret { background: var(--warn-bg); color: var(--warn); } .status.lagret { color: var(--ok); } .status.feil { background: var(--bad); color: #FFFFFF; }
@@ -176,7 +184,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 
   <div id="modul-blokk">
   <div class="verktoy">
-    <div class="rad" role="toolbar" aria-label="Utvalg">
+    <div class="rad utvalg" role="toolbar" aria-label="Utvalg">
       <span class="felt"><label class="etikett" for="lag">Lag</label><select id="lag"></select></span>
       <span class="felt"><label class="etikett" for="spiller">Spiller</label><select id="spiller"></select></span>
       <span class="felt"><label class="etikett" for="kamp">Kamp</label><select id="kamp"><option value="">Alle kamper</option></select></span>
@@ -188,6 +196,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       <span class="etikett">Vis</span>
       <div class="seg" role="group" aria-label="Visning av slag"><button class="knapp" id="v-piler" aria-pressed="true">Piler</button><button class="knapp" id="v-soner" aria-pressed="false">Soner</button></div>
       <button class="brikke" id="b-plan" aria-pressed="false">Forsvarsplan</button>
+      <button class="brikke" id="b-test" aria-pressed="false" title="Tar med slag fra kamper merket som test">Ta med testkamper</button>
       <span class="skyv"></span>
       <button class="knapp stille" id="b-skriv">Skriv ut</button>
     </div>
@@ -821,7 +830,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
   // Kampene i et utvalg, nyeste først
   function kamper(slag) {
     const m = new Map();
-    slag.forEach((s) => { const e = m.get(s.kamp) || { kamp: s.kamp, dato: s.dato, lag: s.lag, kontekst: s.kontekst, antall: 0 }; e.antall++; m.set(s.kamp, e); });
+    slag.forEach((s) => { const e = m.get(s.kamp) || { kamp: s.kamp, dato: s.dato, lag: s.lag, kontekst: s.kontekst, test: !!s.test, antall: 0 }; e.antall++; m.set(s.kamp, e); });
     return [...m.values()].sort((a, b) => String(b.dato || '').localeCompare(String(a.dato || '')));
   }
   // Rad fra stats.slaghistorikk -> slag
@@ -2272,10 +2281,10 @@ window.V3Moduler = (function (root) {
     return {
       async kontekster() { return kast(await db.from('contexts').select('id,slug,name,our_team').order('name')); },
       async logo(ktx) { const r = kast(await db.from('logos').select('team,data_url').eq('context_id', ktx.id).eq('team', ktx.our_team)); return r && r[0] ? r[0].data_url : null; },
-      async motstandere(ktx) {
+      async motstandere(ktx, medTest) {
         const o = kast(await db.from('opponents').select('id,slug,name').eq('context_id', ktx.id).order('name'));
-        // Lag som finnes i kampene, men ikke som motstander med tropp, tas også med
-        const m = kast(await db.from('matches').select('home,away').eq('context_id', ktx.id));
+        // Lag som finnes i kampene, men ikke som motstander med tropp, tas også med (lag fra testkamper bare når testkamper er valgt)
+        const m = kast(await db.from('matches').select('home,away,is_test').eq('context_id', ktx.id)).filter((k) => medTest || !k.is_test);
         const navn = new Set(o.map((x) => x.name));
         m.forEach((k) => [k.home, k.away].forEach((t) => { if (t && t !== ktx.our_team && !navn.has(t) && !/^\d\. plass$/.test(t)) { navn.add(t); o.push({ id: null, slug: t, name: t }); } }));
         return o.sort((a, b) => a.name.localeCompare(b.name, 'nb'));
@@ -2286,7 +2295,11 @@ window.V3Moduler = (function (root) {
         const ut = {}; motstandere.forEach((o) => { ut[o.name] = pl.filter((p) => p.opponent_id === o.id); });
         return ut;
       },
-      async slag(ktx, lag) { return kast(await db.rpc('slaghistorikk', { p_lag: lag, p_person: null })).filter((r) => r.kontekst === ktx.slug).map(Analyse.fraRad); },
+      async slag(ktx, lag, medTest) {
+        const vanlig = kast(await db.rpc('slaghistorikk', { p_lag: lag, p_person: null }));
+        const test = medTest ? kast(await db.rpc('slaghistorikk_test', { p_lag: lag })) : [];
+        return vanlig.concat(test.map((r) => Object.assign(r, { test: true }))).filter((r) => r.kontekst === ktx.slug).map((r) => Object.assign(Analyse.fraRad(r), r.test ? { test: true } : {}));
+      },
       async slagForPerson(pid) { return kast(await db.rpc('slaghistorikk', { p_lag: null, p_person: pid })).map(Analyse.fraRad); },
       lagring(ktx) { return Forsvar.supabaseLagring(client, ktx.id, bruker && bruker.id); },
     };
@@ -2349,11 +2362,13 @@ window.V3Moduler = (function (root) {
   }
   function v3Lag() { if (window.V3Moduler && S.ktx) V3Moduler.lag(S.ktx.slug, S.ktx.name).catch((e) => console.error('V3', e)); }
   async function lastKontekst() {
-    S.motstandere = await kilde.motstandere(S.ktx);
+    const forrige = $('lag').value;
+    S.motstandere = await kilde.motstandere(S.ktx, S.medTest);
     S.tropp = await kilde.tropp(S.ktx, S.motstandere);
     $('lag').innerHTML = S.motstandere.map((o) => '<option>' + esc(o.name) + '</option>').join('');
     const fraUrl = q.get('motstander');
     if (fraUrl && S.motstandere.some((o) => o.name === fraUrl)) $('lag').value = fraUrl;
+    if (forrige && S.motstandere.some((o) => o.name === forrige)) $('lag').value = forrige;   // behold laget når testkamper slås av/på
     S.lagring = kilde.lagring(S.ktx);
     if (S.fv) S.fv.fjern();
     S.fv = Forsvar.monter({ svg, lag: $('markorlag'), laget: S.ktx.name, lagring: S.lagring, prefiks: '', motstander: $('lag').value, onEndring: visPlan });
@@ -2362,10 +2377,10 @@ window.V3Moduler = (function (root) {
   }
   async function lastLag() {
     const lag = $('lag').value;
-    S.slag = lag ? await kilde.slag(S.ktx, lag) : [];
+    S.slag = lag ? await kilde.slag(S.ktx, lag, S.medTest) : [];
     S.ekstra = [];
     oppdaterSpillervalg();
-    $('kamp').innerHTML = '<option value="">Alle kamper</option>' + Analyse.kamper(S.slag).map((k) => '<option value="' + esc(k.kamp) + '">' + esc(dato(k.dato)) + ' · ' + k.antall + ' slag</option>').join('');
+    $('kamp').innerHTML = '<option value="">Alle kamper</option>' + Analyse.kamper(S.slag).map((k) => '<option value="' + esc(k.kamp) + '">' + esc(dato(k.dato)) + ' · ' + k.antall + ' slag' + (k.test ? ' · test' : '') + '</option>').join('');
     if (S.fv) { try { await S.fv.last('', lag || null, S.ktx.name); S.feil = ''; } catch (e) { S.feil = 'Kunne ikke hente forsvarsplanen: ' + e.message; visPlan(S.fv.tilstand()); } }
     tegn();
   }
@@ -2457,7 +2472,7 @@ window.V3Moduler = (function (root) {
       const o = Analyse.oppsummer(Analyse.filtrer(base, { spiller: p.nokkel }));
       return '<tr class="klikk' + (p.nokkel === nk ? ' valgt' : '') + '" data-nokkel="' + esc(p.nokkel) + '" tabindex="0"><td><span class="prikk" style="background:' + farge[p.nokkel] + '"></span>#' + esc(p.nr.join('/')) + ' ' + esc(p.navn) + '</td><td class="tall">' + o.antall + '</td><td class="tall">' + o.kamper + '</td><td class="tall">' + o.type.diagonal + '/' + o.type.linje + '/' + o.type.dip + '</td><td class="tall">' + (o.killPst == null ? '–' : o.killPst + ' %') + '</td></tr>';
     }).join('') : '<tr><td colspan="5" class="liten">Ingen slag.</td></tr>';
-    $('kampliste').innerHTML = Analyse.kamper(utvalg).map((k) => esc(dato(k.dato)) + ' · ' + k.antall + ' slag' + (k.kontekst && S.ktx && k.kontekst !== S.ktx.slug ? ' (annen sesong/lag)' : '')).join('<br>') || '–';
+    $('kampliste').innerHTML = Analyse.kamper(utvalg).map((k) => esc(dato(k.dato)) + ' · ' + k.antall + ' slag' + (k.test ? ' <span class="test-merke">· testkamp</span>' : '') + (k.kontekst && S.ktx && k.kontekst !== S.ktx.slug ? ' (annen sesong/lag)' : '')).join('<br>') || '–';
     $('kilde').textContent = S.ekstra.length ? 'Inkluderer ' + S.ekstra.length + ' slag fra andre lag eller sesonger (samme spiller-ID).' : '';
     const fl2 = filter(), deler = [fl2.kamp ? 'én kamp' : 'alle kamper', fl2.sett ? 'sett ' + fl2.sett : null, fl2.type !== 'alle' ? $('type').selectedOptions[0].textContent.toLowerCase() : null, fl2.utfall !== 'alle' ? $('utfall').selectedOptions[0].textContent.toLowerCase() : null, S.visning === 'soner' ? 'soner' : 'piler'].filter(Boolean);
     $('utskrift-tittel').innerHTML = 'Blokk/forsvar · ' + esc(lag) + ' · ' + esc(navn) + '<small>' + esc(S.ktx ? S.ktx.name : '') + ' · ' + esc(deler.join(' · ')) + ' · ' + sum.antall + ' slag</small>';
@@ -2504,6 +2519,8 @@ window.V3Moduler = (function (root) {
 
   // ---------- Utvalg og visning ----------
   $('lag').addEventListener('change', () => { $('spiller').value = ''; lastLag(); });
+  // Testkamper holdes utenfor som standard; knappen tar dem med, merket som test (02.11.2026)
+  $('b-test').addEventListener('click', () => { S.medTest = !S.medTest; $('b-test').setAttribute('aria-pressed', String(S.medTest)); if (S.ktx) lastKontekst(); });
   $('spiller').addEventListener('change', async () => { await hentEkstra(); tegn(); });
   ['kamp', 'sett', 'type', 'utfall'].forEach((id) => $(id).addEventListener('change', tegn));
   $('v-piler').addEventListener('click', () => { S.visning = 'piler'; $('v-piler').setAttribute('aria-pressed', 'true'); $('v-soner').setAttribute('aria-pressed', 'false'); tegn(); });
