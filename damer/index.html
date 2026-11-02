@@ -3403,8 +3403,33 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
   function lukkValg(boks) { if (boks && boks.dataset.apen) { boks.dataset.apen = ''; boks._tegn && boks._tegn(); return true; } return false; }
 
-  // Nettleserens egen fullskjerm når den finnes (ikke på iPhone); appen fungerer like godt uten
+  // Zoom er låst i fullskjerm (02.11.2026): en zoomet visning ble liggende igjen når skjermen ble snudd, og banen kom feil ut.
+  // iPad/iPhone: viewport-taggen får maximum-scale=1 (tilbakestiller også en zoom som alt er gjort), og knipebevegelser stoppes.
+  // Når skjermen snus, tegnes banen på nytt etter at nettleseren har landet på ny størrelse.
+  const stoppGest = (e) => e.preventDefault();
+  const stoppKnip = (e) => { if (e.touches && e.touches.length > 1) e.preventDefault(); };
+  const snudd = () => [80, 350, 700].forEach((ms) => setTimeout(() => window.dispatchEvent(new Event('resize')), ms));
+  let gmlViewport = null;
+  function laasZoom(på) {
+    const m = document.querySelector('meta[name="viewport"]');
+    if (på && gmlViewport === null) {
+      gmlViewport = m ? m.getAttribute('content') : '';
+      if (m) m.setAttribute('content', gmlViewport.replace(/,?\s*(maximum-scale|user-scalable|minimum-scale)=[^,]*/g, '') + ', maximum-scale=1, user-scalable=no');
+      document.documentElement.classList.add('bfs-laas');
+      document.addEventListener('gesturestart', stoppGest, { passive: false }); document.addEventListener('gesturechange', stoppGest, { passive: false });
+      document.addEventListener('touchmove', stoppKnip, { passive: false });
+      window.addEventListener('orientationchange', snudd); if (window.visualViewport) window.visualViewport.addEventListener('resize', snudd);
+    } else if (!på && gmlViewport !== null) {
+      if (m) m.setAttribute('content', gmlViewport); gmlViewport = null;
+      document.documentElement.classList.remove('bfs-laas');
+      document.removeEventListener('gesturestart', stoppGest); document.removeEventListener('gesturechange', stoppGest);
+      document.removeEventListener('touchmove', stoppKnip);
+      window.removeEventListener('orientationchange', snudd); if (window.visualViewport) window.visualViewport.removeEventListener('resize', snudd);
+    }
+  }
+  // Nettleserens egen fullskjerm når den finnes (ikke på iPhone); appen fungerer like godt uten. Zoom låses samtidig.
   async function nettleser(på) {
+    laasZoom(på);
     try {
       const d = document, e = d.documentElement;
       if (på && !(d.fullscreenElement || d.webkitFullscreenElement)) { if (e.requestFullscreen) await e.requestFullscreen(); else if (e.webkitRequestFullscreen) e.webkitRequestFullscreen(); }
@@ -3417,6 +3442,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     'svg.bfs rect[fill="var(--court-opp)"] { opacity: 1; }',
     'svg.bfs line[stroke-dasharray="14 12"] { display: none; }',
     'svg.bfs rect[fill="var(--court-free)"] { display: none; }',
+    'html.bfs-laas, html.bfs-laas body { touch-action: pan-x pan-y; overscroll-behavior: none; }',
+    'html.bfs-laas .dir-ov.fs, html.bfs-laas.bfs-paa .bane, html.bfs-laas .bfs-linje { touch-action: pan-x pan-y; }',
     '.bfs-linje { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 56px; display: flex; gap: 6px; align-items: center; padding: 0 10px; padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: content-box; background: #0A0E14; border-top: 1px solid #2A3240; overflow-x: auto; scrollbar-width: none; }',
     '.bfs-linje::-webkit-scrollbar { display: none; }',
     '.bfs-chip { all: unset; cursor: pointer; flex: none; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px; border-radius: 999px; background: #1D2430; border: 1px solid #2A3240; color: #E8EBF0; font: 600 13px "IBM Plex Sans", system-ui, -apple-system, sans-serif; white-space: nowrap; box-sizing: border-box; }',
@@ -3437,7 +3464,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   ].join('\n');
   if (!document.getElementById('bfs-stil')) { const st = document.createElement('style'); st.id = 'bfs-stil'; st.textContent = CSS_TEKST; (document.head || document.documentElement).appendChild(st); }
 
-  window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, STYRKE, MIN_D, MAKS_D };
+  // Utenom fullskjerm (02.11.2026): samme bane C, motstanderens side til 3-meterlinjen + 1 m
+  const VANLIG_D = MIN_D;
+  window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, laasZoom, STYRKE, MIN_D, MAKS_D, VANLIG_D };
 })();
 </script>
 <style>
@@ -5634,6 +5663,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     el.addEventListener('click', dirClick);
     el.querySelector('#dir-form').addEventListener('submit', dirAddNum);
     const svg = el.querySelector('#dir-svg'), live = el.querySelector('#dir-live');
+    // Bane C for alle lag (02.11.2026): lagfarge-frisone og logo også utenom fullskjerm
+    DIR.fs = false; DIR.bfs = window.BaneFS ? BaneFS.monter(svg, { lag: OUR, logo: (S.logos || {})[OUR] }) : null; if (DIR.bfs) DIR.bfs.tilpass(BaneFS.VANLIG_D);
     const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; const r = p.matrixTransform(svg.getScreenCTM().inverse()); return [Math.round(r.x), Math.round(r.y)]; };
     svg.addEventListener('pointerdown', (ev) => {
       if (DIR.ro || DIR.pres) return;
@@ -5670,8 +5701,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function dirStor(på) {
     if (!DIR.el || !window.BaneFS) return;
     const svg = DIR.el.querySelector('#dir-svg');
-    if (på && !DIR.fs) { DIR.fs = true; DIR.bfs = BaneFS.monter(svg, { lag: OUR, logo: (S.logos || {})[OUR] }); DIR.el.classList.add('fs'); BaneFS.nettleser(true); }
-    else if (!på && DIR.fs) { DIR.fs = false; DIR.fsNr = false; if (DIR.bfs) DIR.bfs.fjern(); DIR.bfs = null; DIR.el.classList.remove('fs'); ['left', 'top', 'width', 'height'].forEach((k) => { DIR.el.querySelector('.dir-court').style[k] = ''; }); BaneFS.nettleser(false); }
+    if (!DIR.bfs) DIR.bfs = BaneFS.monter(svg, { lag: OUR, logo: (S.logos || {})[OUR] });
+    if (på && !DIR.fs) { DIR.fs = true; DIR.el.classList.add('fs'); BaneFS.nettleser(true); }
+    else if (!på && DIR.fs) { DIR.fs = false; DIR.fsNr = false; DIR.bfs.tilpass(BaneFS.VANLIG_D); DIR.el.classList.remove('fs'); ['left', 'top', 'width', 'height'].forEach((k) => { DIR.el.querySelector('.dir-court').style[k] = ''; }); BaneFS.nettleser(false); }
     dirUpdate();
   }
   function dirFsOppsett() {
@@ -5724,7 +5756,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     });
     dirFsOppsett();
   }
-  function dirClose() { if (window.ForsvarKamp) try { window.ForsvarKamp.lukk(); } catch (e) { console.error('Forsvarsplan', e); } DIR.open = false; DIR.drawing = null; if (DIR.fs) { DIR.fs = false; DIR.fsNr = false; DIR.bfs = null; if (window.BaneFS) BaneFS.nettleser(false); } if (DIR.el) DIR.el.remove(); DIR.el = null; document.removeEventListener('keydown', dirKey); }
+  function dirClose() { if (window.ForsvarKamp) try { window.ForsvarKamp.lukk(); } catch (e) { console.error('Forsvarsplan', e); } DIR.open = false; DIR.drawing = null; if (DIR.fs && window.BaneFS) BaneFS.nettleser(false); DIR.fs = false; DIR.fsNr = false; DIR.bfs = null; if (DIR.el) DIR.el.remove(); DIR.el = null; document.removeEventListener('keydown', dirKey); }
   function dirSync() {
     if (!DIR.open) return;
     if (!cur() || (S.view !== 'live' && !(DIR.ro && S.view === 'detail'))) { dirClose(); return; }
@@ -5764,6 +5796,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
         const pg = document.createElement('section'); pg.className = 'dir-page';
         pg.innerHTML = '<div class="dir-ptitle">' + dirTitle(m, label) + '</div>' + COURT_SVG.replace(/ id="dir-/g, ' data-x="') + '<div class="tbl-wrap"><table class="tbl">' + dirTable(evs, nums, v === '*' ? null : v) + '</table></div>';
         const pick = (x) => pg.querySelector('[data-x="' + x + '"]');
+        if (window.BaneFS) BaneFS.monter(pg.querySelector('svg'), { lag: OUR, logo: (S.logos || {})[OUR] }).tilpass(BaneFS.VANLIG_D);
         dirDraw({ defs: pick('defs'), layer: pick('layer'), zones: pick('zones') }, vis, nums, -1, 'p' + i + '-');
         box.appendChild(pg);
       });

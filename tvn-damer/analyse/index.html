@@ -2349,8 +2349,33 @@ window.V3Moduler = (function (root) {
   }
   function lukkValg(boks) { if (boks && boks.dataset.apen) { boks.dataset.apen = ''; boks._tegn && boks._tegn(); return true; } return false; }
 
-  // Nettleserens egen fullskjerm når den finnes (ikke på iPhone); appen fungerer like godt uten
+  // Zoom er låst i fullskjerm (02.11.2026): en zoomet visning ble liggende igjen når skjermen ble snudd, og banen kom feil ut.
+  // iPad/iPhone: viewport-taggen får maximum-scale=1 (tilbakestiller også en zoom som alt er gjort), og knipebevegelser stoppes.
+  // Når skjermen snus, tegnes banen på nytt etter at nettleseren har landet på ny størrelse.
+  const stoppGest = (e) => e.preventDefault();
+  const stoppKnip = (e) => { if (e.touches && e.touches.length > 1) e.preventDefault(); };
+  const snudd = () => [80, 350, 700].forEach((ms) => setTimeout(() => window.dispatchEvent(new Event('resize')), ms));
+  let gmlViewport = null;
+  function laasZoom(på) {
+    const m = document.querySelector('meta[name="viewport"]');
+    if (på && gmlViewport === null) {
+      gmlViewport = m ? m.getAttribute('content') : '';
+      if (m) m.setAttribute('content', gmlViewport.replace(/,?\s*(maximum-scale|user-scalable|minimum-scale)=[^,]*/g, '') + ', maximum-scale=1, user-scalable=no');
+      document.documentElement.classList.add('bfs-laas');
+      document.addEventListener('gesturestart', stoppGest, { passive: false }); document.addEventListener('gesturechange', stoppGest, { passive: false });
+      document.addEventListener('touchmove', stoppKnip, { passive: false });
+      window.addEventListener('orientationchange', snudd); if (window.visualViewport) window.visualViewport.addEventListener('resize', snudd);
+    } else if (!på && gmlViewport !== null) {
+      if (m) m.setAttribute('content', gmlViewport); gmlViewport = null;
+      document.documentElement.classList.remove('bfs-laas');
+      document.removeEventListener('gesturestart', stoppGest); document.removeEventListener('gesturechange', stoppGest);
+      document.removeEventListener('touchmove', stoppKnip);
+      window.removeEventListener('orientationchange', snudd); if (window.visualViewport) window.visualViewport.removeEventListener('resize', snudd);
+    }
+  }
+  // Nettleserens egen fullskjerm når den finnes (ikke på iPhone); appen fungerer like godt uten. Zoom låses samtidig.
   async function nettleser(på) {
+    laasZoom(på);
     try {
       const d = document, e = d.documentElement;
       if (på && !(d.fullscreenElement || d.webkitFullscreenElement)) { if (e.requestFullscreen) await e.requestFullscreen(); else if (e.webkitRequestFullscreen) e.webkitRequestFullscreen(); }
@@ -2363,6 +2388,8 @@ window.V3Moduler = (function (root) {
     'svg.bfs rect[fill="var(--court-opp)"] { opacity: 1; }',
     'svg.bfs line[stroke-dasharray="14 12"] { display: none; }',
     'svg.bfs rect[fill="var(--court-free)"] { display: none; }',
+    'html.bfs-laas, html.bfs-laas body { touch-action: pan-x pan-y; overscroll-behavior: none; }',
+    'html.bfs-laas .dir-ov.fs, html.bfs-laas.bfs-paa .bane, html.bfs-laas .bfs-linje { touch-action: pan-x pan-y; }',
     '.bfs-linje { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 56px; display: flex; gap: 6px; align-items: center; padding: 0 10px; padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: content-box; background: #0A0E14; border-top: 1px solid #2A3240; overflow-x: auto; scrollbar-width: none; }',
     '.bfs-linje::-webkit-scrollbar { display: none; }',
     '.bfs-chip { all: unset; cursor: pointer; flex: none; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px; border-radius: 999px; background: #1D2430; border: 1px solid #2A3240; color: #E8EBF0; font: 600 13px "IBM Plex Sans", system-ui, -apple-system, sans-serif; white-space: nowrap; box-sizing: border-box; }',
@@ -2383,7 +2410,9 @@ window.V3Moduler = (function (root) {
   ].join('\n');
   if (!document.getElementById('bfs-stil')) { const st = document.createElement('style'); st.id = 'bfs-stil'; st.textContent = CSS_TEKST; (document.head || document.documentElement).appendChild(st); }
 
-  window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, STYRKE, MIN_D, MAKS_D };
+  // Utenom fullskjerm (02.11.2026): samme bane C, motstanderens side til 3-meterlinjen + 1 m
+  const VANLIG_D = MIN_D;
+  window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, laasZoom, STYRKE, MIN_D, MAKS_D, VANLIG_D };
 })();
 
 </script>
@@ -2577,7 +2606,7 @@ window.V3Moduler = (function (root) {
   // ---------- Tegning ----------
   const svgEl = (t, a) => { const n = document.createElementNS('http://www.w3.org/2000/svg', t); for (const k in a) n.setAttribute(k, a[k]); return n; };
   function tegn() {
-    if (S.bfs) setTimeout(storTegn, 0);
+    if (S.fs) setTimeout(storTegn, 0);
     const alle = S.slag.concat(S.ekstra), f = filter(), utvalg = Analyse.filtrer(alle, f);
     const farge = Object.fromEntries(Analyse.spillere(alle).map((p) => [p.nokkel, p.farge]));
     layer.innerHTML = ''; zones.innerHTML = '';
@@ -2699,8 +2728,15 @@ window.V3Moduler = (function (root) {
   // ---------- Fullskjerm (02.11.2026) ----------
   // Bane C fra moduler/fullskjerm/banefs.js. Brikkene speiler valgene i verktøylinjen, så alt annet virker som før.
   const BRIKKER = [['lag', 'Lag'], ['spiller', 'Spiller'], ['kamp', 'Kamp'], ['sett', 'Sett'], ['type', 'Type'], ['utfall', 'Utfall']];
+  // Bane C for alle lag (02.11.2026): monteres når laget er kjent, også utenom fullskjerm, og på nytt når logoen er hentet
+  function monterBane() {
+    if (!window.BaneFS || !S.ktx) return;
+    if (S.bfs) S.bfs.fjern();
+    S.bfs = BaneFS.monter(svg, { lag: S.ktx.our_team, logo: logoer[S.ktx.slug] || null });
+    if (S.fs) storOppsett(); else S.bfs.tilpass(BaneFS.VANLIG_D);
+  }
   function storTegn() {
-    if (!S.bfs) return;
+    if (!S.fs) return;
     const brikker = BRIKKER.map(([id, navn]) => { const s = $(id), valg = [...s.options].map((o) => [o.value, o.textContent]);
       return { key: id, navn, verdi: s.value, standard: id === 'lag' ? s.value : (valg[0] ? valg[0][0] : ''), valg }; });
     const ekstra = '<span class="bfs-seg" role="group" aria-label="Visning"><button type="button" data-bfs-klikk="v-piler" aria-pressed="' + (S.visning !== 'soner') + '">Piler</button><button type="button" data-bfs-klikk="v-soner" aria-pressed="' + (S.visning === 'soner') + '">Soner</button></span>'
@@ -2710,19 +2746,20 @@ window.V3Moduler = (function (root) {
     storOppsett();
   }
   function storOppsett() {
-    if (!S.bfs) return;
+    if (!S.fs || !S.bfs) return;
     const b = $('bane'), topp = parseFloat(getComputedStyle(b).paddingTop) || 0, l = $('bfs-linje'), bunn = Math.max(0, l.offsetHeight - 57);
     const o = BaneFS.oppsett(b.clientWidth, b.clientHeight - topp - bunn, false);
     S.bfs.tilpass(o.D);
     Object.assign(svg.style, { left: o.bx + 'px', top: (topp + o.by) + 'px', width: o.bw + 'px', height: o.bh + 'px' });
   }
   function stor(på) {
-    if (!window.BaneFS || !S.ktx || på === !!S.bfs) return;
+    if (!window.BaneFS || !S.ktx || på === !!S.fs) return;
+    if (!S.bfs) monterBane();
+    S.fs = på;
     if (på) {
-      S.bfs = BaneFS.monter(svg, { lag: S.ktx.our_team, logo: logoer[S.ktx.slug] || null });
       document.documentElement.classList.add('bfs-paa'); $('bfs-lukk').hidden = false; $('bfs-linje').hidden = false; BaneFS.nettleser(true); storTegn();
     } else {
-      S.bfs.fjern(); S.bfs = null; ['left', 'top', 'width', 'height'].forEach((k) => { svg.style[k] = ''; });
+      S.bfs.tilpass(BaneFS.VANLIG_D); ['left', 'top', 'width', 'height'].forEach((k) => { svg.style[k] = ''; });
       document.documentElement.classList.remove('bfs-paa'); $('bfs-lukk').hidden = true; $('bfs-linje').hidden = true; BaneFS.nettleser(false);
     }
   }
@@ -2730,14 +2767,15 @@ window.V3Moduler = (function (root) {
   $('b-stor').addEventListener('click', () => stor(true));
   $('bfs-lukk').addEventListener('click', () => stor(false));
   $('bane').addEventListener('click', (e) => { const k = e.target.closest('[data-bfs-klikk]'); if (k) { $(k.dataset.bfsKlikk).click(); setTimeout(storTegn, 0); } });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.bfs && !BaneFS.lukkValg($('bfs-linje'))) stor(false); });
-  window.addEventListener('resize', () => { if (S.bfs) requestAnimationFrame(storOppsett); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.fs && !BaneFS.lukkValg($('bfs-linje'))) stor(false); });
+  window.addEventListener('resize', () => { if (S.fs) requestAnimationFrame(storOppsett); });
   // «Til appen» tar med laget som er valgt her (01.11.2026)
   function tilbakeLenke() {
     const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
     const url = (vis) => { const d = [demo ? 'demo=1' : '', l, vis ? 'vis=' + vis : ''].filter(Boolean); return '../' + (d.length ? '?' + d.join('&') : ''); };
     $('tilbake').href = url(''); $('til-tabell').href = url('tabell'); $('til-dashboard').href = url('dashboard');
     merke();
+    if (S.ktx && S.baneFor !== S.ktx.slug) { S.baneFor = S.ktx.slug; monterBane(); }   // ny lagfarge og logo ved lagbytte
   }
   // Lagmerket som i appen: lagets logo fra databasen, ellers forbokstaver
   const logoer = {};
@@ -2746,7 +2784,7 @@ window.V3Moduler = (function (root) {
     const lag = S.ktx.our_team || '', logo = logoer[S.ktx.slug];
     if (logo) { el.className = 'crest img md'; el.innerHTML = '<img src="' + esc(logo) + '" alt="">'; return; }
     el.className = 'crest sh md'; el.textContent = lag === 'Randaberg' ? 'RB' : lag === 'Norge' ? 'NO' : lag.split(/\s+/).filter(Boolean).slice(0, 2).map((o) => o[0]).join('').toUpperCase();
-    if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) merke(); } }).catch(() => {}); }
+    if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) { merke(); monterBane(); } } }).catch(() => {}); }
   }
   tilbakeLenke();
 
