@@ -8,6 +8,36 @@
 </head><body>
 <title>Kampstatistikk V2</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>/* Lyst og mørkt tema (02.11.2026).
+ * «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
+ * og gjelder både appen og Analyse. Lastes tidlig i <head>, så siden ikke blinker i feil tema. */
+(function (root) {
+  var KEY = 'rv-theme', REKKE = ['auto', 'light', 'dark'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
+  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'auto';
+  function les() { var v = 'auto'; try { v = root.localStorage.getItem(KEY) || 'auto'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'auto'; }
+  function lys() { return valg === 'light' || (valg === 'auto' && !!(mq && mq.matches)); }
+  function bruk() {
+    var l = lys(), d = root.document.documentElement;
+    d.setAttribute('data-theme', l ? 'light' : 'dark'); d.style.colorScheme = l ? 'light' : 'dark';
+    if (root.document.body) root.document.body.style.background = '';
+    lytt.forEach(function (f) { try { f(l); } catch (e) { console.error('Tema', e); } });
+  }
+  function sett(v) {
+    valg = NAVN[v] ? v : 'auto';
+    try { if (valg === 'auto') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
+    bruk(); return valg;
+  }
+  valg = les();
+  if (mq) { var f = function () { if (valg === 'auto') bruk(); }; if (mq.addEventListener) mq.addEventListener('change', f); else if (mq.addListener) mq.addListener(f); }
+  root.addEventListener('storage', function (e) { if (e.key === KEY) { valg = les(); bruk(); } });
+  bruk();
+  root.RVTema = {
+    valg: function () { return valg; }, navn: function () { return NAVN[valg]; }, lys: lys, sett: sett,
+    neste: function () { return sett(REKKE[(REKKE.indexOf(valg) + 1) % REKKE.length]); },
+    vedEndring: function (fn) { lytt.push(fn); }
+  };
+})(window);
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Føring herrer">
@@ -34,9 +64,10 @@
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --row: #F7F6F2; --line: #D9D6CD;
-  --fg: #16181D; --muted: #4A4F5A; --faint: #6B7080; --soft: #2A2E37;
-  --accent: #1B4592; --accent-soft: #DCE4F5; --accent-fg: #FFFFFF; --accent-ink: #122F66; --accent-bar: #2F63C4; --hero: #1B4592;
+  /* Lyst tema «Klar» (valgt 02.11.2026): kjølig hvit, blågrå flater og hvit toppstripe */
+  --bg: #F3F5F9; --surface: #FFFFFF; --sunk: #E9EDF3; --row: #F8FAFC; --line: #D7DDE7;
+  --fg: #111827; --muted: #4B5563; --faint: #6B7280; --soft: #1F2937;
+  --accent: #1D4ED8; --accent-soft: #DFE8FD; --accent-fg: #FFFFFF; --accent-ink: #1E3A8A; --accent-bar: #2563EB; --hero: #1D4ED8;
   --opp: #8A3E0F; --opp-soft: #F5DFCF; --opp-strong: #C85E1C; --opp-nr: #C85E1C;
   --amber: #C27C0E; --amber-fg: #FFFFFF;
   --bad: #B3261E; --block: #7A1A14; --neutral: #5C6270; --good: #1F7A4D;
@@ -44,8 +75,13 @@
   --av: #9B3B47; --av-soft: #F7E4E6; --av-kant: #E2B8BD;
   --win-bg: #DDEFE4; --loss-bg: #F7DCD9; --live-bg: #FBEBCC;
   --demo: #5B3A9E; --demo-bg: #EFE8FB; --demo-kant: #B9A3E3;
-  --bar: #16181D; --bar-fg: #FFFFFF; --bar-muted: #B8BCC6; color-scheme: light;
+  --bar: #FFFFFF; --bar-fg: #111827; --bar-muted: #5B6474; color-scheme: light;
 }
+/* Toppstripen er hvit i lyst tema: knapper og lenker får mørk tekst */
+:root[data-theme="light"] .bar { box-shadow: inset 0 0 0 1px var(--line); }
+:root[data-theme="light"] .bar a, :root[data-theme="light"] .bar .link { color: var(--accent); }
+:root[data-theme="light"] .barbtn:not(.primary-bar):not(.amber):not(.win):not(.lose) { color: var(--fg); }
+:root[data-theme="light"] .barbtn.hn-knapp { color: #8A5200; border-color: #C27C0E; }
 
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px;
@@ -3649,7 +3685,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   let CTX = MAIN_CTX, PFX = '', OUR = 'Randaberg';
   // Hver sesong/lag har sin aksentfarge: Randaberg blå, landslaget rødt. Motstander er alltid oransje
   const THEMES = {
-    blue: { a: '#1B4592', soft: '#DCE4F5', ink: '#122F66', bar: '#2F63C4', hero: '#1B4592', aD: '#8FB3FF', softD: '#1E2A44', inkD: '#C9D6F0', heroD: '#2E4A86', barD: '#2E4A86' },
+    blue: { a: '#1D4ED8', soft: '#DFE8FD', ink: '#1E3A8A', bar: '#2563EB', hero: '#1D4ED8', aD: '#8FB3FF', softD: '#1E2A44', inkD: '#C9D6F0', heroD: '#2E4A86', barD: '#2E4A86' },
     red: { a: '#B0162E', soft: '#F6D5DA', ink: '#7E0F21', bar: '#C8243C', hero: '#B0162E', aD: '#F4A0AD', softD: '#3E1B22', inkD: '#F6D5DA', heroD: '#9E1A2E', barD: '#9E1A2E' }
   };
   function ctxTheme(c) { return THEMES[c && c.theme] || (c && (c.our === 'Norge' || /^u\d/.test(c.id || '')) ? THEMES.red : THEMES.blue); }
@@ -4340,6 +4376,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + (siteUrl() ? '<a class="menu-item" role="menuitem" href="' + esc(siteUrl()) + '" target="_blank" rel="noopener">Åpen side ↗</a><button class="menu-item" role="menuitem" data-a="share">Del lenke til åpen side</button>' : '')
       + (!S.dash && !window.PUBLIC ? '<button class="menu-item" role="menuitem" data-a="logos">Lagmerker</button>' : '')
       + '<button class="menu-item" role="menuitem" data-a="legend">Fargeforklaring</button>'
+      + (window.RVTema && !window.PUBLIC ? '<button class="menu-item" role="menuitem" data-a="tema" aria-label="Bytt tema, nå ' + esc(window.RVTema.navn()) + '">Tema: ' + esc(window.RVTema.navn()) + '</button>' : '')
       + (fsOk() ? fsBtn('menu-item') : '');
     if (window.PUBLIC && !fsOk()) return '';
     return '<div class="menu-wrap"><button class="secondary menu-btn" data-a="menu" aria-haspopup="true" aria-expanded="' + !!S.menuOpen + '" aria-label="Meny"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Meny</span></button>'
@@ -5990,6 +6027,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (a === 'menu') { S.menuOpen = !S.menuOpen; render(); return; }
     if (a === 'logos') { S.menuOpen = false; S.view = 'logos'; render(); toTop(); return; }
     if (a === 'back' && S.view === 'logos') { S.view = 'list'; render(); toTop(); return; }
+    if (a === 'tema' && window.RVTema) { window.RVTema.neste(); render(); return; }   // menyen blir stående åpen, så du kan bla videre
     if (a === 'legend') { S.menuOpen = false; S.legendBack = { view: S.view, matchId: S.matchId }; S.view = 'legend'; render(); toTop(); return; }
     if (a === 'back' && S.view === 'legend' && S.legendBack) { S.view = S.legendBack.view; S.matchId = S.legendBack.matchId; S.legendBack = null; render(); toTop(); return; }
     if (S.menuOpen) { S.menuOpen = false; if (b.closest('.menu-pop') && a === 'fs') render(); }

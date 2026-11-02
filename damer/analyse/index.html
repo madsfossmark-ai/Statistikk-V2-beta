@@ -4,6 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Analyse</title>
+<script>/* Lyst og mørkt tema (02.11.2026).
+ * «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
+ * og gjelder både appen og Analyse. Lastes tidlig i <head>, så siden ikke blinker i feil tema. */
+(function (root) {
+  var KEY = 'rv-theme', REKKE = ['auto', 'light', 'dark'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
+  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'auto';
+  function les() { var v = 'auto'; try { v = root.localStorage.getItem(KEY) || 'auto'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'auto'; }
+  function lys() { return valg === 'light' || (valg === 'auto' && !!(mq && mq.matches)); }
+  function bruk() {
+    var l = lys(), d = root.document.documentElement;
+    d.setAttribute('data-theme', l ? 'light' : 'dark'); d.style.colorScheme = l ? 'light' : 'dark';
+    if (root.document.body) root.document.body.style.background = '';
+    lytt.forEach(function (f) { try { f(l); } catch (e) { console.error('Tema', e); } });
+  }
+  function sett(v) {
+    valg = NAVN[v] ? v : 'auto';
+    try { if (valg === 'auto') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
+    bruk(); return valg;
+  }
+  valg = les();
+  if (mq) { var f = function () { if (valg === 'auto') bruk(); }; if (mq.addEventListener) mq.addEventListener('change', f); else if (mq.addListener) mq.addListener(f); }
+  root.addEventListener('storage', function (e) { if (e.key === KEY) { valg = les(); bruk(); } });
+  bruk();
+  root.RVTema = {
+    valg: function () { return valg; }, navn: function () { return NAVN[valg]; }, lys: lys, sett: sett,
+    neste: function () { return sett(REKKE[(REKKE.indexOf(valg) + 1) % REKKE.length]); },
+    vedEndring: function (fn) { lytt.push(fn); }
+  };
+})(window);
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,8 +51,9 @@
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg: #F2F1EC; --surface: #FFFFFF; --sunk: #E7E5DE; --line: #D9D6CD; --fg: #16181D; --muted: #4A4F5A;
-  --accent: #1B4592; --accent-fg: #FFFFFF; --accent-soft: #DCE4F5; --accent-ink: #122F66; --warn-bg: #FBF3EC; --warn: #8A3E0F;
+  /* Lyst tema «Klar», som i appen (02.11.2026) */
+  --bg: #F3F5F9; --surface: #FFFFFF; --sunk: #E9EDF3; --row: #F8FAFC; --line: #D7DDE7; --fg: #111827; --muted: #4B5563;
+  --accent: #1D4ED8; --accent-fg: #FFFFFF; --accent-soft: #DFE8FD; --accent-ink: #1E3A8A; --warn-bg: #FBF3EC; --warn: #8A3E0F;
   --ok: #1F7A4D; --bad: #B3261E; --heat: #B3261E; color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -212,6 +243,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         <button class="menu-item" role="menuitem" id="m-del" hidden>Del lenke til åpen side</button>
         <button class="menu-item" role="menuitem" id="m-stor">Fullskjerm</button>
         <button class="menu-item" role="menuitem" id="m-skriv">Skriv ut</button>
+        <button class="menu-item" role="menuitem" id="m-tema">Tema: Automatisk</button>
       </div></div>
   </nav>
 
@@ -3938,6 +3970,11 @@ window.V3Moduler = (function (root) {
   $('m-stor').hidden = !window.BaneFS;
   $('m-stor').addEventListener('click', () => { meny(false); stor(true); });
   $('m-skriv').addEventListener('click', () => { meny(false); window.print(); });   // synkront: Safari stopper forsinket utskrift
+  // Tema (02.11.2026): Automatisk → Lyst → Mørkt. Menyen blir stående åpen, så du kan bla videre
+  function temaTekst() { const T = window.RVTema; $('m-tema').hidden = !T; if (T) { $('m-tema').textContent = 'Tema: ' + T.navn(); $('m-tema').setAttribute('aria-label', 'Bytt tema, nå ' + T.navn()); } }
+  $('m-tema').addEventListener('click', (e) => { e.stopPropagation(); if (window.RVTema) window.RVTema.neste(); temaTekst(); });
+  if (window.RVTema) window.RVTema.vedEndring(temaTekst);
+  temaTekst();
   tilbakeLenke();
 
   // Koblinger fra Ukesanalyse (Modul 7, 02.11.2026). Åpner modulene med rapportens motstander/spiller.
