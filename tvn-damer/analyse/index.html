@@ -2972,6 +2972,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         + pill(st[0], st[1]) + (komplett ? pill('Verifisert datagrunnlag', 'ok') : pill('Ufullstendig – ikke fullt verifisert', 'w'))
         + '<div class="uk-knapper"><button class="knapp" type="button" data-uk="arkiv" aria-expanded="' + S.visArkiv + '">Arkiv (' + S.liste.length + ')</button>'
         + (R.har_pdf ? '<button class="knapp" type="button" data-uk="pdf">PDF</button>' : '')
+        + (!R.har_pdf ? pill(R.pdf_status === 'venter' ? 'Venter på PDF' : 'PDF mangler', 'w') : '')
         + (eier ? '<button class="knapp" type="button" data-uk="import">Importer rapport</button>' : '')
         + (eier && ['draft', 'validated'].includes(R.status) && !(R.validation && R.validation.errors && R.validation.errors.length) ? '<button class="knapp primar" type="button" data-uk="publiser">Publiser</button>' : '')
         + '</div></div>';
