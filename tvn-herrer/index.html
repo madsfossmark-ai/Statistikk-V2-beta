@@ -5011,7 +5011,10 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     html.classList.add('rp-printing'); rapportTilpass(true);
     const done = () => { html.classList.remove('rp-printing'); st.textContent = ''; rapportTilpass(); window.removeEventListener('afterprint', done); document.removeEventListener('pointerdown', done, true); };
     window.addEventListener('afterprint', done);
-    setTimeout(() => { try { window.print(); } catch (e) {} setTimeout(() => document.addEventListener('pointerdown', done, true), 800); }, 50);
+    // Utskriften må starte i selve trykket: Safari på iPad/iPhone stopper print() som kommer etter en forsinkelse (02.11.2026)
+    void document.body.offsetHeight;
+    try { window.print(); } catch (e) {}
+    setTimeout(() => document.addEventListener('pointerdown', done, true), 800);
   }
 
   function loadScript(src) {
@@ -5806,7 +5809,10 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     // Ryddes etter utskrift. Noen nettlesere (iPad) sender ikke «afterprint», så neste trykk rydder også.
     const done = () => { html.classList.remove('dir-printing', 'dir-all'); if (box) box.remove(); window.removeEventListener('afterprint', done); document.removeEventListener('pointerdown', done, true); };
     window.addEventListener('afterprint', done);
-    setTimeout(() => { try { window.print(); } catch (e) {} setTimeout(() => document.addEventListener('pointerdown', done, true), 800); }, 50);
+    // Utskriften må starte i selve trykket: Safari på iPad/iPhone stopper print() som kommer etter en forsinkelse (02.11.2026)
+    void document.body.offsetHeight;
+    try { window.print(); } catch (e) {}
+    setTimeout(() => document.addEventListener('pointerdown', done, true), 800);
   }
   function dirTitle(m, label) {
     const oppName = m.home === usName(m) ? m.away : m.home;
