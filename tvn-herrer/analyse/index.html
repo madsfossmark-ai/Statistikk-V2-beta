@@ -28,7 +28,7 @@
 * { box-sizing: border-box; }
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body); }
-main { max-width: 1280px; margin: 0 auto; padding-block: 10px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
+main { max-width: 1432px; margin: 0 auto; padding-block: 24px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; }
 h1 { margin: 0; font: 700 30px/1.05 var(--font-display); }
 h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .topp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; background: var(--surface); border-radius: 16px; padding: 8px 14px; }
@@ -42,6 +42,29 @@ h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-t
 /* Ett lag: navnet i samme felt som lagvelgeren i appen, bare uten pil */
 .topnav .tn-id > .label { display: inline-flex; align-items: center; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--sunk); border: 1px solid var(--line); color: var(--fg); font: 600 14px var(--font-body); letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .topnav .tn-id > .label:empty { display: none; }
+/* Samme mål som appen (02.11.2026): fast bredde på lagfeltet, så fanene ikke flytter seg når navnet lastes eller laget byttes */
+@media (min-width: 641px) {
+  .topnav .tn-id { flex: 0 0 356px; width: 356px; }
+  .topnav .ctx-pick { flex: 1 1 0; min-width: 0; display: block; }
+  .topnav .ctx-pick select { width: 100%; }
+  .topnav .tn-id > .label { flex: 1 1 0; }
+}
+.topnav .ctx-pick[hidden] { display: none !important; }
+.spacer { flex: 1; }
+.secondary { height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); font: 600 15px var(--font-body); cursor: pointer; }
+.menu-btn { display: inline-flex; align-items: center; gap: 8px; }
+.menu-wrap { position: relative; }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 210px; max-width: calc(100vw - 32px); background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 1px var(--line), 0 12px 28px rgba(0,0,0,.18); padding: 6px; display: flex; flex-direction: column; }
+.menu-pop[hidden] { display: none; }
+.menu-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; min-height: 46px; padding: 0 14px; border-radius: 8px; font-weight: 600; font-size: 15px; color: var(--fg); }
+.menu-item:hover, .menu-item:focus-visible { background: var(--sunk); }
+.menu-item:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+@media (max-width: 640px) {
+  .topnav .spacer { display: none; }
+  .topnav .menu-wrap { margin-left: 0; flex: none; }
+  .topnav .menu-btn { height: 44px; }
+  .menu-btn span { display: none; }
+}
 .tn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .navtabs { display: flex; gap: 4px; background: var(--bg); border-radius: 12px; padding: 4px; flex-wrap: wrap; }
 .navtab { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
@@ -57,7 +80,7 @@ h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-t
   .topnav .tn-id .crest.img { width: 36px; height: 36px; }
   .topnav .ctx-pick { flex: 1 1 0; min-width: 0; display: block; }
   .topnav .ctx-pick select { width: 100%; font-size: 16px; }
-  .topnav .tn-id > .label { flex: 1 1 0; display: block; line-height: 42px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topnav .tn-id > .label { flex: 1 1 0; display: block; line-height: 42px; font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .navtabs { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .navtabs::-webkit-scrollbar { display: none; }
   .navtab { flex: 1 0 auto; justify-content: center; padding: 0 8px; min-width: 0; white-space: nowrap; }
@@ -177,11 +200,19 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
   <!-- Samme toppmeny som appen (01.11.2026): lagmerke, lagvelger og fanene Kamper, Tabell, Dashboard og Analyse -->
   <nav class="topnav" aria-label="Hovedmeny">
     <div class="tn-id"><span class="crest sh md" id="tn-merke" aria-hidden="true"></span>
-      <label class="ctx-pick" for="kontekst"><span class="tn-sr">Lag og sesong</span><select id="kontekst" hidden></select></label>
+      <label class="ctx-pick" for="kontekst" hidden><span class="tn-sr">Lag og sesong</span><select id="kontekst" hidden></select></label>
       <span class="label" id="kontekst-navn"></span></div>
     <div class="navtabs">
       <a class="navtab" id="tilbake" href="../">Kamper</a><a class="navtab" id="til-tabell" href="../?vis=tabell">Tabell</a><a class="navtab" id="til-dashboard" href="../?vis=dashboard">Dashboard</a><a class="navtab" aria-current="page" href="#">Analyse</a>
     </div>
+    <span class="spacer"></span>
+    <div class="menu-wrap"><button class="secondary menu-btn" id="meny-knapp" aria-haspopup="true" aria-expanded="false" aria-label="Meny"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Meny</span></button>
+      <div class="menu-pop" id="meny" role="menu" hidden>
+        <a class="menu-item" role="menuitem" id="m-apen" href="#" target="_blank" rel="noopener" hidden>Åpen side ↗</a>
+        <button class="menu-item" role="menuitem" id="m-del" hidden>Del lenke til åpen side</button>
+        <button class="menu-item" role="menuitem" id="m-stor">Fullskjerm</button>
+        <button class="menu-item" role="menuitem" id="m-skriv">Skriv ut</button>
+      </div></div>
   </nav>
 
   <nav class="moduler" aria-label="Analysemoduler">
@@ -2544,7 +2575,7 @@ window.V3Moduler = (function (root) {
       if (!S.ktx) return visFeil('Du har ikke tilgang til noe lag ennå.');
       tilbakeLenke();
       if (!cfg.locked && S.kontekster.length > 1) {
-        const v = $('kontekst'); v.hidden = false;
+        const v = $('kontekst'); v.hidden = false; v.parentNode.hidden = false;
         v.innerHTML = S.kontekster.map((c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>').join('');
         v.value = S.ktx.slug;
         v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); v3Lag(); tilbakeLenke(); });
@@ -2774,7 +2805,7 @@ window.V3Moduler = (function (root) {
     const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
     const url = (vis) => { const d = [demo ? 'demo=1' : '', l, vis ? 'vis=' + vis : ''].filter(Boolean); return '../' + (d.length ? '?' + d.join('&') : ''); };
     $('tilbake').href = url(''); $('til-tabell').href = url('tabell'); $('til-dashboard').href = url('dashboard');
-    merke();
+    merke(); menyLenker();
     if (S.ktx && S.baneFor !== S.ktx.slug) { S.baneFor = S.ktx.slug; monterBane(); }   // ny lagfarge og logo ved lagbytte
   }
   // Lagmerket som i appen: lagets logo fra databasen, ellers forbokstaver
@@ -2786,6 +2817,23 @@ window.V3Moduler = (function (root) {
     el.className = 'crest sh md'; el.textContent = lag === 'Randaberg' ? 'RB' : lag === 'Norge' ? 'NO' : lag.split(/\s+/).filter(Boolean).slice(0, 2).map((o) => o[0]).join('').toUpperCase();
     if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) { merke(); monterBane(); } } }).catch(() => {}); }
   }
+  // Menyen som i appen (02.11.2026): åpen side og deling for laget du står på, fullskjerm og utskrift
+  const SITE_BASE = 'https://madsfossmark-ai.github.io/Randaberg-statistikk/';
+  const SITE_URLS = { randaberg: SITE_BASE, 'randaberg-herrer': SITE_BASE + 'herrer/', 'toppvolley-damer': SITE_BASE + 'toppvolley-damer/',
+    'toppvolley-herrer': SITE_BASE + 'toppvolley-herrer/', 'u20-nevza-2026': SITE_BASE + 'u20/' };
+  const side = () => (S.ktx && SITE_URLS[S.ktx.slug]) || null;
+  function menyLenker() { const u = side(); $('m-apen').hidden = $('m-del').hidden = !u; if (u) $('m-apen').href = u; }
+  function meny(på) { $('meny').hidden = !på; $('meny-knapp').setAttribute('aria-expanded', String(!!på)); }
+  $('meny-knapp').addEventListener('click', (e) => { e.stopPropagation(); meny($('meny').hidden); });
+  document.addEventListener('click', (e) => { if (!$('meny').hidden && !e.target.closest('.menu-wrap')) meny(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('meny').hidden) meny(false); });
+  $('m-apen').addEventListener('click', () => meny(false));
+  $('m-del').addEventListener('click', () => { const u = side(); meny(false); if (!u) return;
+    if (navigator.share) navigator.share({ title: S.ktx.name, url: u }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(u).then(() => { $('m-del').textContent = 'Kopiert ✓'; setTimeout(() => { $('m-del').textContent = 'Del lenke til åpen side'; }, 1500); }).catch(() => {}); });
+  $('m-stor').hidden = !window.BaneFS;
+  $('m-stor').addEventListener('click', () => { meny(false); stor(true); });
+  $('m-skriv').addEventListener('click', () => { meny(false); window.print(); });   // synkront: Safari stopper forsinket utskrift
   tilbakeLenke();
 
   window.__analyse = { S, tegn, get fv() { return S.fv; } };

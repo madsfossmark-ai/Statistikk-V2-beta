@@ -83,6 +83,13 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .navtab { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; text-decoration: none; }
 .navtab[aria-current="page"] { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
 .sec-h { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+/* Fast bredde på lagfeltet (02.11.2026), lik Analyse: fanene står stille når laget byttes */
+@media (min-width: 641px) {
+  .topnav .tn-id { flex: 0 0 356px; width: 356px; }
+  .topnav .ctx-pick { flex: 1 1 0; min-width: 0; display: block; }
+  .topnav .ctx-pick select { width: 100%; }
+  .topnav .tn-id > .label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 /* Mobil: lagmerke, lagvelger og meny på første linje (velgeren krymper og kutter lange navn), menyfanene under */
 .topnav .ctx-pick select { max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 @media (max-width: 640px) {
