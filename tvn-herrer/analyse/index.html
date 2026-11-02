@@ -3156,9 +3156,12 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
           b.disabled = true; b.textContent = 'Henter PDF …';
           const r = await K.pdf(id);
           if (!r || !r.ok) { if (w) w.close(); S.melding = 'PDF mangler: ' + esc((r && r.grunn) || 'ukjent feil'); return tegn(); }
+          // Ukentlig import: PDF-en ligger i Google Drive og åpnes der (krever tilgang til filen i Drive)
+          if (r.lenke) { S.pdf[id] = { url: r.lenke, navn: r.filnavn, drive: true }; if (w) w.location.href = r.lenke; else window.open(r.lenke, '_blank', 'noopener'); b.disabled = false; b.textContent = 'PDF'; return; }
           const bin = atob(r.base64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
           S.pdf[id] = { url: URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), navn: r.filnavn };
         }
+        if (S.pdf[id].drive) { window.open(S.pdf[id].url, '_blank', 'noopener'); b.disabled = false; b.textContent = 'PDF'; return; }
         if (w) w.location.href = S.pdf[id].url; else { const a = document.createElement('a'); a.href = S.pdf[id].url; a.target = '_blank'; a.rel = 'noopener'; a.download = S.pdf[id].navn || 'ukesrapport.pdf'; document.body.appendChild(a); a.click(); a.remove(); }
         b.disabled = false; b.textContent = 'PDF';
       } catch (e) { if (w) w.close(); S.melding = 'Kunne ikke hente PDF: ' + esc(e.message); tegn(); }
