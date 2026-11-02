@@ -2985,17 +2985,20 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       });
     }
     function tegn() {
-      const tittel = (underSett ? 'Endre oppstilling · sett ' : 'Oppstilling · sett ') + opt.setNr;
+      // bareVurder (Ukesanalyse, 02.11.2026): forslaget kan flyttes og sjekkes, men lagres ingen steder
+      const tittel = opt.bareVurder ? 'Vurder startsekser' : (underSett ? 'Endre oppstilling · sett ' : 'Oppstilling · sett ') + opt.setNr;
       const fokus = doc.activeElement && el.contains(doc.activeElement) ? { o: doc.activeElement.dataset.o, v: doc.activeElement.dataset.v || doc.activeElement.dataset.id || doc.activeElement.dataset.p } : null;
-      let h = '<div class="ops-head"><h2>' + esc(tittel) + '</h2><span class="ops-sub">' + esc(opt.lagNavn || '') + (opt.motstander ? ' mot ' + esc(opt.motstander) : '') + '</span><span class="ops-sp"></span>' + (!underSett && opt.onUten ? '<button type="button" class="ops-btn" data-o="uten" title="Velg På banen og I mottak manuelt, som før">Før uten oppstilling</button>' : '') + '<button type="button" class="ops-btn" data-o="lukk">' + (underSett ? 'Avbryt' : 'Senere') + '</button></div>';
-      if (opt.utkastKilde && !underSett) h += '<div class="ops-info">Utkast fra ' + esc(opt.utkastKilde) + '. Sjekk og bekreft – ingenting er lagret ennå.</div>';
+      let h = '<div class="ops-head"><h2>' + esc(tittel) + '</h2><span class="ops-sub">' + esc(opt.lagNavn || '') + (opt.motstander ? ' mot ' + esc(opt.motstander) : '') + '</span><span class="ops-sp"></span>' + (!underSett && opt.onUten ? '<button type="button" class="ops-btn" data-o="uten" title="Velg På banen og I mottak manuelt, som før">Før uten oppstilling</button>' : '') + '<button type="button" class="ops-btn" data-o="lukk">' + (opt.bareVurder ? 'Lukk' : underSett ? 'Avbryt' : 'Senere') + '</button></div>';
+      if (opt.bareVurder) h += '<div class="ops-info">Forslag fra ' + esc(opt.utkastKilde || 'rapporten') + '. Du kan flytte spillere og se rotasjonene, men ingenting lagres: kampens oppstilling, aktiv kamp og registreringer endres ikke. Startseksen settes som vanlig når kampen starter.</div>';
+      else if (opt.utkastKilde && !underSett) h += '<div class="ops-info">Utkast fra ' + esc(opt.utkastKilde) + '. Sjekk og bekreft – ingenting er lagret ennå.</div>';
       if (underSett) h += '<div class="ops-info">Settet er i gang. Endringer gjelder det som er på banen nå; startoppstillingen og tidligere registreringer endres ikke.</div>';
       let feil = [];
       if (S.steg === 'mottak') h += tegnMottak();
       else { const r = tegnOppstilling(); h += r.h; feil = r.feil; }
       if (S.steg !== 'mottak' && feil.length) h += '<div class="ops-feil" role="alert">' + feil.map(esc).join('<br>') + '</div>';
       if (S.feil) h += '<div class="ops-feil" role="alert">' + esc(S.feil) + '</div>';
-      h += '<div class="ops-fot"><button type="button" class="ops-btn prim" data-o="bekreft"' + (feil.length || S.lagrer ? ' disabled' : '') + '>' + (S.lagrer ? 'Lagrer …' : underSett ? 'Lagre endringen' : 'Bekreft og start registrering') + '</button>'
+      if (opt.bareVurder) h += '<div class="ops-fot"><button type="button" class="ops-btn prim" data-o="lukk">Lukk – ingenting lagres</button><span class="ops-sub">' + paBanen(S.o).length + ' på banen · ' + (S.o.receivers || []).length + ' i mottak</span></div>';
+      else h += '<div class="ops-fot"><button type="button" class="ops-btn prim" data-o="bekreft"' + (feil.length || S.lagrer ? ' disabled' : '') + '>' + (S.lagrer ? 'Lagrer …' : underSett ? 'Lagre endringen' : 'Bekreft og start registrering') + '</button>'
         + '<span class="ops-sub">' + paBanen(S.o).length + ' på banen · ' + (S.o.receivers || []).length + ' i mottak</span></div>';
       el.innerHTML = h;
       if (S.steg === 'mottak') markorer();
@@ -3078,7 +3081,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       else if (a === 'mfr') S.mfR = b.dataset.v;
       else if (a === 'mfstd') { const rot = alleRotasjoner(S.o.positions, S.o.roles); S.mf[S.mfR] = standardMottaksformasjon(rot[S.mfR], S.o.roles, S.o.receivers, S.o.libero); }
       else if (a === 'tilbake') S.steg = 'oppstilling';
-      else if (a === 'bekreft') {
+      else if (a === 'bekreft' && !opt.bareVurder) {
         oppdaterAvledet(); const feil = valider(S.o, roster); if (feil.length) { tegn(); return; }
         const ut = Object.assign(kopi(S.o), { receptionPositions: kopi(S.mf) });
         S.lagrer = true; tegn();
@@ -3877,6 +3880,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   let ctxUnsubs = [];
   // Fanene Tabell/Dashboard på Analyse lenker hit med ?vis=; gjelder bare første lag som lastes
   let startVis = ({ tabell: 'table', dashboard: 'season' })[new URLSearchParams(location.search).get('vis')] || null;
+  let startSpiller = new URLSearchParams(location.search).get('spiller');
   function applyCtx(id) {
     CTX = S.contexts.find((c) => c.id === id) || MAIN_CTX;
     PFX = CTX.prefix || ''; OUR = CTX.our || 'Randaberg';
@@ -5406,6 +5410,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const last = reg[reg.length - 1];
     const next = rows.find((r) => !r.done && !isTest(r.m));
     const hasTest = S.matches.some((m) => isOurs(m) && isTest(m));
+    // ?spiller=<draktnr> (fra Ukesanalyse, 02.11.2026): velg spilleren i «Kamp for kamp» én gang når laget er lastet
+    if (startSpiller && S.roster.length) { const sp = S.roster.find((p) => String(p.nr) === String(startSpiller) && !p.archived); if (sp) SEASON.player = sp.id; startSpiller = null; }
     const solo = SEASON.player !== 'team';
     if (solo && SEASON.metric === 'oppAvg') SEASON.metric = 'recAvg';
     const M = METRICS.find((x) => x.k === SEASON.metric) || METRICS[0];
