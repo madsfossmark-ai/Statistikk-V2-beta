@@ -123,6 +123,12 @@ select option { background: var(--surface); color: var(--fg); }
 .innhold { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 860px) { .innhold { grid-template-columns: minmax(0, 1fr); } }
 .bane { position: relative; background: var(--surface); border-radius: 18px; padding: 8px; }
+/* Fullskjerm (02.11.2026, moduler/fullskjerm/banefs.js): bare banen, alle valg som brikker nederst */
+.bane [hidden] { display: none !important; }
+html.bfs-paa, html.bfs-paa body { overflow: hidden; }
+html.bfs-paa .bane { position: fixed; inset: 0; z-index: 100; background: #0A0E14; border-radius: 0; padding: env(safe-area-inset-top, 0px) 0 0; }
+html.bfs-paa .bane svg { position: absolute; max-height: none; min-height: 0; border-radius: 0; }
+html.bfs-paa .utskrift-tittel { display: none; }
 .bane svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); min-height: 320px; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 8px; }
 .panel { background: var(--surface); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .fliser { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
@@ -198,6 +204,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       <button class="brikke" id="b-plan" aria-pressed="false">Forsvarsplan</button>
       <button class="brikke" id="b-test" aria-pressed="false" title="Tar med slag fra kamper merket som test">Ta med testkamper</button>
       <span class="skyv"></span>
+      <button class="knapp stille" id="b-stor">Fullskjerm</button>
       <button class="knapp stille" id="b-skriv">Skriv ut</button>
     </div>
     <div class="rad plan" id="plan" role="toolbar" aria-label="Forsvarsplan" hidden>
@@ -219,6 +226,8 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     <div class="bane" id="bane">
       <div class="utskrift-tittel" id="utskrift-tittel"></div>
       <svg id="dir-svg" viewBox="0 0 900 1200" aria-label="Bane. Dra fra treffpunkt til landing. En krusedull blir dip."><defs id="dir-defs"></defs><rect x="0" y="0" width="900" height="1200" fill="var(--court-free)"></rect><rect x="0" y="0" width="900" height="210" fill="var(--court-opp)" opacity=".6"></rect><line x1="0" y1="110" x2="900" y2="110" stroke="var(--court-line)" stroke-width="4" stroke-dasharray="14 12" opacity=".8"></line><text x="12" y="98" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-line)">MOTSTANDERS SIDE</text><rect x="0" y="210" width="900" height="900" fill="var(--court-floor)"></rect><g id="dir-zones"></g><rect x="2" y="210" width="896" height="898" fill="none" stroke="var(--court-line)" stroke-width="5"></rect><line x1="0" y1="510" x2="900" y2="510" stroke="var(--court-line)" stroke-width="5"></line><line x1="0" y1="210" x2="900" y2="210" stroke="var(--court-net)" stroke-width="9"></line><line x1="3" y1="160" x2="3" y2="260" stroke="#D33A2C" stroke-width="6"></line><line x1="897" y1="160" x2="897" y2="260" stroke="#D33A2C" stroke-width="6"></line><text x="12" y="1098" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-net)" opacity=".55">VÅR BANE</text><g id="dir-layer"></g><path id="dir-live" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path></svg><div id="markorlag"></div>
+      <button type="button" class="bfs-lukk" id="bfs-lukk" aria-label="Lukk fullskjerm" hidden>✕</button>
+      <div class="bfs-linje" id="bfs-linje" role="toolbar" aria-label="Valg for slagretning" hidden></div>
     </div>
     <div class="panel">
       <div class="fliser" id="fliser"></div>
@@ -2224,6 +2233,161 @@ window.V3Moduler = (function (root) {
 
 </script>
 <script>
+/* Fullskjerm for slagretning (02.11.2026) – felles for kampen (app) og Analyse (Blokk/forsvar).
+ *
+ * Bane C («Lagfarge, glatt gulv», valgt av Mads):
+ *  - lyst glatt gulv, frisonen i lagets farge (Randaberg sort, ToppVolley rød, Norge rød), hvite linjer
+ *  - lagets logo svakt på gulvet i vår banehalvdel (40 %), tonet i lagfargen; Norge bruker flagget
+ *  - 1 m frisone rundt hele banen; motstanderens side minst til 3-meterlinjen + 1 m (4 m), hele halvdelen + 1 m når høyden tillater
+ *  - banen fyller bredden på stående skjerm; liggende styrer høyden
+ *
+ * Koordinatene er slagretningsmodulens (100 = 1 m): x 0–900, nettet ved y = 210, vår baklinje ved y = 1110.
+ * Motstanderens 3-meterlinje ligger ved y = −90 og baklinje ved y = −690. Treffpunkt kan derfor ha negativ y.
+ */
+(function () {
+  'use strict';
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+  const MIN_D = 4, MAKS_D = 10, BREDDE = 1100, LINJE_H = 57;
+  const GULV = '#F1E6CC', GULV_MOT = '#E6D9BB', STYRKE = 0.4;
+  const LAG = {
+    'Randaberg': { free: '#16181D', tone: '#16181D' },
+    'ToppVolley Norge': { free: '#C8102E', tone: '#C8102E' },
+    'Norge': { free: '#BA0C2F', tone: '#00205B', flagg: true },
+  };
+  function farger(lag) { return LAG[lag] || { free: '#2E4A86', tone: '#2E4A86' }; }
+  const vbY = (D) => 210 - D * 100, vbH = (D) => D * 100 + 1000;
+
+  // Legger utvidelsen (frisone, motstanderens halvdel, 3-meterlinje) og logoen inn i en eksisterende bane-SVG
+  function monter(svg, opt) {
+    const f = farger(opt.lag), gml = { vb: svg.getAttribute('viewBox'), stil: svg.getAttribute('style') || '' };
+    svg.classList.add('bfs');
+    ['--court-free', f.free, '--court-floor', GULV, '--court-opp', GULV_MOT, '--court-line', '#FFFFFF', '--court-net', '#1B2733'].forEach((v, i, a) => { if (i % 2 === 0) svg.style.setProperty(v, a[i + 1]); });
+    const ext = el('g', { class: 'bfs-ext' });
+    ext.appendChild(el('rect', { x: -100, y: -800, width: 1100, height: 2020, fill: f.free }));
+    ext.appendChild(el('rect', { x: 0, y: -690, width: 900, height: 900, fill: GULV_MOT }));
+    const defs = svg.querySelector('defs'); svg.insertBefore(ext, defs ? defs.nextSibling : svg.firstChild);
+    // Logo mellom gulvet og sonene/pilene
+    const logo = el('g', { class: 'bfs-logo', opacity: String(STYRKE), 'pointer-events': 'none' });
+    const cx = 450, cy = 700;
+    if (f.flagg) {
+      const w = 620, h = 452, x = cx - w / 2, y = cy - h / 2, u = w / 22;
+      logo.appendChild(el('rect', { x, y, width: w, height: h, fill: f.tone, opacity: '.45' }));
+      logo.appendChild(el('rect', { x: x + 6 * u, y, width: 4 * u, height: h, fill: GULV }));
+      logo.appendChild(el('rect', { x, y: y + 6 * u, width: w, height: 4 * u, fill: GULV }));
+      logo.appendChild(el('rect', { x: x + 7 * u, y, width: 2 * u, height: h, fill: f.tone }));
+      logo.appendChild(el('rect', { x, y: y + 7 * u, width: w, height: 2 * u, fill: f.tone }));
+    } else if (opt.logo) {
+      // Vannmerke: mørke deler av logoen blir synlige i lagfargen, lyse deler forsvinner
+      const id = 'bfs-f' + Math.random().toString(36).slice(2, 7), c = (i) => (parseInt(f.tone.slice(1 + 2 * i, 3 + 2 * i), 16) / 255).toFixed(3);
+      const fl = el('filter', { id, 'color-interpolation-filters': 'sRGB' });
+      fl.appendChild(el('feColorMatrix', { type: 'matrix', values: '0 0 0 0 ' + c(0) + ' 0 0 0 0 ' + c(1) + ' 0 0 0 0 ' + c(2) + ' -0.2126 -0.7152 -0.0722 1 0' }));
+      logo.appendChild(fl);
+      const im = el('image', { x: cx - 280, y: cy - 280, width: 560, height: 560, filter: 'url(#' + id + ')', preserveAspectRatio: 'xMidYMid meet' });
+      im.setAttribute('href', opt.logo); logo.appendChild(im);
+    }
+    const linjer = el('g', { class: 'bfs-linjer', 'pointer-events': 'none' });
+    linjer.appendChild(el('path', { d: 'M2.5 210 V-687.5 H897.5 V210', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 5, opacity: '.85' }));
+    linjer.appendChild(el('line', { x1: 0, y1: -90, x2: 900, y2: -90, stroke: '#FFFFFF', 'stroke-width': 5, opacity: '.85' }));
+    const t = el('text', { x: 886, y: -104, 'text-anchor': 'end', 'font-family': 'Barlow Condensed, Arial Narrow, sans-serif', 'font-size': 24, fill: '#FFFFFF', opacity: '.75' }); t.textContent = '3 M'; linjer.appendChild(t);
+    const soner = svg.querySelector('[id$="zones"], [data-x="zones"]');
+    if (soner) { soner.parentNode.insertBefore(logo, soner); soner.parentNode.insertBefore(linjer, soner); }
+    return {
+      tilpass(D) { svg.setAttribute('viewBox', '-100 ' + vbY(D) + ' ' + BREDDE + ' ' + vbH(D)); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet'); },
+      fjern() { ext.remove(); logo.remove(); linjer.remove(); svg.classList.remove('bfs'); svg.setAttribute('viewBox', gml.vb); svg.setAttribute('style', gml.stil); svg.removeAttribute('preserveAspectRatio'); },
+    };
+  }
+
+  // Hvor banen og panelene skal ligge. W/H = flaten under eventuell safe-area; reg = plass til spillere og utfall (kampen)
+  function oppsett(W, H, reg) {
+    const Hc = H - LINJE_H, ligg = W > Hc * 1.1;
+    let D, s, kompakt = false, regH = 0;
+    if (ligg) {
+      const maksB = W * (reg ? 0.52 : 1);
+      s = Hc / vbH(MIN_D); if (BREDDE * s > maksB) s = maksB / BREDDE;
+      D = Math.max(MIN_D, Math.min(MAKS_D, (Hc / s - 1000) / 100));
+    } else {
+      kompakt = !!reg && (Hc - 196) < vbH(MIN_D) * W / BREDDE;
+      regH = reg ? (kompakt ? 62 : 196) : 0;
+      const Hb = Hc - regH, s0 = W / BREDDE;
+      D = Math.max(MIN_D, Math.min(MAKS_D, (Hb / s0 - 1000) / 100));
+      s = Math.min(s0, Hb / vbH(D));
+    }
+    const bw = BREDDE * s, bh = vbH(D) * s, bx = (W - bw) / 2;
+    const by = ligg ? Math.max(0, (Hc - bh) / 2) : Math.max(0, (Hc - regH - bh) / 2);
+    return { ligg, D, bw, bh, bx, by, kompakt, regH, linjeH: LINJE_H };
+  }
+
+  // Brikkelinje: [{ key, navn, verdi, valg: [[v, tekst]], standard }] + ekstra HTML (f.eks. Piler/Soner). Valglisten åpnes oppover.
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function linje(boks, brikker, ekstra, onVelg) {
+    const skroll = boks.scrollLeft, apen = boks.dataset.apen || '';
+    const tekst = (b) => { const o = b.valg.find(([v]) => String(v) === String(b.verdi)); return o ? o[1] : b.verdi; };
+    boks.innerHTML = brikker.map((b) => '<button type="button" class="bfs-chip' + (String(b.verdi) !== String(b.standard) ? ' aktiv' : '') + '" data-bfs-chip="' + esc(b.key) + '" aria-haspopup="true" aria-expanded="' + (apen === b.key) + '" aria-label="' + esc(b.navn) + ': ' + esc(tekst(b)) + '">' + esc(tekst(b)) + '</button>').join('')
+      + (ekstra ? '<span class="bfs-skille" aria-hidden="true"></span>' + ekstra : '');
+    boks.scrollLeft = skroll;
+    const rot = boks.parentNode; let pop = rot.querySelector(':scope > .bfs-pop'); if (pop) pop.remove();
+    const b = brikker.find((x) => x.key === apen);
+    if (b) {
+      const k = boks.querySelector('[data-bfs-chip="' + CSS.escape(b.key) + '"]'), kr = k.getBoundingClientRect(), rr = rot.getBoundingClientRect();
+      pop = document.createElement('div'); pop.className = 'bfs-pop'; pop.setAttribute('role', 'menu');
+      pop.innerHTML = '<span class="bfs-pop-tittel">' + esc(b.navn) + '</span>' + b.valg.map(([v, t]) => '<button type="button" role="menuitemradio" data-bfs-velg="' + esc(v) + '" aria-pressed="' + (String(v) === String(b.verdi)) + '">' + esc(t) + '</button>').join('');
+      rot.appendChild(pop);
+      pop.style.left = Math.max(6, Math.min(rr.width - pop.offsetWidth - 6, kr.left - rr.left)) + 'px';
+      pop.style.bottom = (rr.bottom - kr.top + 8) + 'px';
+    }
+    if (!boks.dataset.koblet) {
+      boks.dataset.koblet = '1';
+      rot.addEventListener('click', (ev) => {
+        const c = ev.target.closest('[data-bfs-chip]'), v = ev.target.closest('[data-bfs-velg]');
+        if (c && boks.contains(c)) { ev.stopPropagation(); boks.dataset.apen = boks.dataset.apen === c.dataset.bfsChip ? '' : c.dataset.bfsChip; boks._tegn && boks._tegn(); return; }
+        if (v) { ev.stopPropagation(); const key = boks.dataset.apen; boks.dataset.apen = ''; boks._velg && boks._velg(key, v.dataset.bfsVelg); return; }
+        if (boks.dataset.apen && !ev.target.closest('.bfs-pop')) { boks.dataset.apen = ''; boks._tegn && boks._tegn(); }
+      });
+    }
+    boks._tegn = () => linje(boks, brikker, ekstra, onVelg); boks._velg = onVelg;
+  }
+  function lukkValg(boks) { if (boks && boks.dataset.apen) { boks.dataset.apen = ''; boks._tegn && boks._tegn(); return true; } return false; }
+
+  // Nettleserens egen fullskjerm når den finnes (ikke på iPhone); appen fungerer like godt uten
+  async function nettleser(på) {
+    try {
+      const d = document, e = d.documentElement;
+      if (på && !(d.fullscreenElement || d.webkitFullscreenElement)) { if (e.requestFullscreen) await e.requestFullscreen(); else if (e.webkitRequestFullscreen) e.webkitRequestFullscreen(); }
+      if (!på && (d.fullscreenElement || d.webkitFullscreenElement)) { if (d.exitFullscreen) await d.exitFullscreen(); else if (d.webkitExitFullscreen) d.webkitExitFullscreen(); }
+    } catch (e) { /* valgfritt */ }
+  }
+
+  // Felles stil (samme i appen og i Analyse)
+  const CSS_TEKST = [
+    'svg.bfs rect[fill="var(--court-opp)"] { opacity: 1; }',
+    'svg.bfs line[stroke-dasharray="14 12"] { display: none; }',
+    'svg.bfs rect[fill="var(--court-free)"] { display: none; }',
+    '.bfs-linje { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 56px; display: flex; gap: 6px; align-items: center; padding: 0 10px; padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: content-box; background: #0A0E14; border-top: 1px solid #2A3240; overflow-x: auto; scrollbar-width: none; }',
+    '.bfs-linje::-webkit-scrollbar { display: none; }',
+    '.bfs-chip { all: unset; cursor: pointer; flex: none; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px; border-radius: 999px; background: #1D2430; border: 1px solid #2A3240; color: #E8EBF0; font: 600 13px "IBM Plex Sans", system-ui, -apple-system, sans-serif; white-space: nowrap; box-sizing: border-box; }',
+    '.bfs-chip::after { content: ""; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid #8B95A5; }',
+    '.bfs-chip.aktiv { background: #8FB3FF; color: #0D1117; border-color: #8FB3FF; } .bfs-chip.aktiv::after { border-bottom-color: #0D1117; }',
+    '.bfs-chip.ingen-pil::after { display: none; }',
+    '.bfs-chip:focus-visible, .bfs-seg button:focus-visible, .bfs-lukk:focus-visible { outline: 2px solid #8FB3FF; outline-offset: 2px; }',
+    '.bfs-seg { display: inline-flex; flex: none; background: #0D1117; border: 1px solid #2A3240; border-radius: 999px; padding: 3px; }',
+    '.bfs-seg button { all: unset; cursor: pointer; padding: 0 11px; height: 26px; display: inline-flex; align-items: center; border-radius: 999px; font: 600 13px "IBM Plex Sans", system-ui, sans-serif; color: #8B95A5; }',
+    '.bfs-seg button[aria-pressed="true"] { background: #E8EBF0; color: #0D1117; }',
+    '.bfs-skille { flex: none; width: 1px; height: 22px; background: #2A3240; }',
+    '.bfs-pop { position: absolute; z-index: 6; min-width: 170px; max-height: 60%; overflow-y: auto; background: #161B24; border: 1px solid #2A3240; border-radius: 14px; padding: 4px; box-shadow: 0 -10px 30px rgba(0,0,0,.5); display: grid; }',
+    '.bfs-pop-tittel { padding: 6px 10px 4px; font: 600 10px "IBM Plex Sans", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8B95A5; }',
+    '.bfs-pop button { all: unset; cursor: pointer; padding: 10px; border-radius: 9px; font: 14px "IBM Plex Sans", system-ui, sans-serif; color: #E8EBF0; }',
+    '.bfs-pop button:hover, .bfs-pop button[aria-pressed="true"] { background: #1D2430; }',
+    '.bfs-pop button[aria-pressed="true"]::before { content: "✓ "; color: #8FB3FF; }',
+    '.bfs-lukk { all: unset; cursor: pointer; position: absolute; right: 8px; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 5; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(13,17,23,.8); border: 1px solid rgba(255,255,255,.3); color: #FFFFFF; font: 700 16px/1 system-ui, sans-serif; box-sizing: border-box; }',
+  ].join('\n');
+  if (!document.getElementById('bfs-stil')) { const st = document.createElement('style'); st.id = 'bfs-stil'; st.textContent = CSS_TEKST; (document.head || document.documentElement).appendChild(st); }
+
+  window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, STYRKE, MIN_D, MAKS_D };
+})();
+
+</script>
+<script>
 /*
  * Analyse-siden, modulen Blokk/forsvar: motstanderens slagretninger på tvers av kamper, per lag eller spiller, og forsvarsplanen mot laget.
  * Leser bare data (slaghistorikk, motstandere, tropper). Skriver bare forsvarsplaner (stats.forsvar_planer).
@@ -2413,6 +2577,7 @@ window.V3Moduler = (function (root) {
   // ---------- Tegning ----------
   const svgEl = (t, a) => { const n = document.createElementNS('http://www.w3.org/2000/svg', t); for (const k in a) n.setAttribute(k, a[k]); return n; };
   function tegn() {
+    if (S.bfs) setTimeout(storTegn, 0);
     const alle = S.slag.concat(S.ekstra), f = filter(), utvalg = Analyse.filtrer(alle, f);
     const farge = Object.fromEntries(Analyse.spillere(alle).map((p) => [p.nokkel, p.farge]));
     layer.innerHTML = ''; zones.innerHTML = '';
@@ -2531,6 +2696,42 @@ window.V3Moduler = (function (root) {
   });
   $('tabell').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('tr[data-nokkel]')) ev.target.click(); });
   $('b-skriv').addEventListener('click', () => window.print());
+  // ---------- Fullskjerm (02.11.2026) ----------
+  // Bane C fra moduler/fullskjerm/banefs.js. Brikkene speiler valgene i verktøylinjen, så alt annet virker som før.
+  const BRIKKER = [['lag', 'Lag'], ['spiller', 'Spiller'], ['kamp', 'Kamp'], ['sett', 'Sett'], ['type', 'Type'], ['utfall', 'Utfall']];
+  function storTegn() {
+    if (!S.bfs) return;
+    const brikker = BRIKKER.map(([id, navn]) => { const s = $(id), valg = [...s.options].map((o) => [o.value, o.textContent]);
+      return { key: id, navn, verdi: s.value, standard: id === 'lag' ? s.value : (valg[0] ? valg[0][0] : ''), valg }; });
+    const ekstra = '<span class="bfs-seg" role="group" aria-label="Visning"><button type="button" data-bfs-klikk="v-piler" aria-pressed="' + (S.visning !== 'soner') + '">Piler</button><button type="button" data-bfs-klikk="v-soner" aria-pressed="' + (S.visning === 'soner') + '">Soner</button></span>'
+      + '<button type="button" class="bfs-chip ingen-pil' + (S.plan ? ' aktiv' : '') + '" data-bfs-klikk="b-plan" aria-pressed="' + !!S.plan + '">Forsvarsplan</button>'
+      + '<button type="button" class="bfs-chip ingen-pil' + (S.medTest ? ' aktiv' : '') + '" data-bfs-klikk="b-test" aria-pressed="' + !!S.medTest + '">Testkamper</button>';
+    BaneFS.linje($('bfs-linje'), brikker, ekstra, (id, v) => { const s = $(id); s.value = v; s.dispatchEvent(new Event('change')); storTegn(); });
+    storOppsett();
+  }
+  function storOppsett() {
+    if (!S.bfs) return;
+    const b = $('bane'), topp = parseFloat(getComputedStyle(b).paddingTop) || 0, l = $('bfs-linje'), bunn = Math.max(0, l.offsetHeight - 57);
+    const o = BaneFS.oppsett(b.clientWidth, b.clientHeight - topp - bunn, false);
+    S.bfs.tilpass(o.D);
+    Object.assign(svg.style, { left: o.bx + 'px', top: (topp + o.by) + 'px', width: o.bw + 'px', height: o.bh + 'px' });
+  }
+  function stor(på) {
+    if (!window.BaneFS || !S.ktx || på === !!S.bfs) return;
+    if (på) {
+      S.bfs = BaneFS.monter(svg, { lag: S.ktx.our_team, logo: logoer[S.ktx.slug] || null });
+      document.documentElement.classList.add('bfs-paa'); $('bfs-lukk').hidden = false; $('bfs-linje').hidden = false; BaneFS.nettleser(true); storTegn();
+    } else {
+      S.bfs.fjern(); S.bfs = null; ['left', 'top', 'width', 'height'].forEach((k) => { svg.style[k] = ''; });
+      document.documentElement.classList.remove('bfs-paa'); $('bfs-lukk').hidden = true; $('bfs-linje').hidden = true; BaneFS.nettleser(false);
+    }
+  }
+  $('b-stor').hidden = !window.BaneFS;
+  $('b-stor').addEventListener('click', () => stor(true));
+  $('bfs-lukk').addEventListener('click', () => stor(false));
+  $('bane').addEventListener('click', (e) => { const k = e.target.closest('[data-bfs-klikk]'); if (k) { $(k.dataset.bfsKlikk).click(); setTimeout(storTegn, 0); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.bfs && !BaneFS.lukkValg($('bfs-linje'))) stor(false); });
+  window.addEventListener('resize', () => { if (S.bfs) requestAnimationFrame(storOppsett); });
   // «Til appen» tar med laget som er valgt her (01.11.2026)
   function tilbakeLenke() {
     const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
