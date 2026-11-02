@@ -9,12 +9,12 @@
 <title>Kampstatistikk V2</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>/* Lyst og mørkt tema (02.11.2026).
- * «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
+ * Mørkt er standard (03.11.2026). «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
  * og gjelder både appen og Analyse. Lastes tidlig i <head>, så siden ikke blinker i feil tema. */
 (function (root) {
-  var KEY = 'rv-theme', REKKE = ['auto', 'light', 'dark'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
-  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'auto';
-  function les() { var v = 'auto'; try { v = root.localStorage.getItem(KEY) || 'auto'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'auto'; }
+  var KEY = 'rv-theme', REKKE = ['dark', 'light', 'auto'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
+  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'dark';
+  function les() { var v = 'dark'; try { v = root.localStorage.getItem(KEY) || 'dark'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'dark'; }
   function lys() { return valg === 'light' || (valg === 'auto' && !!(mq && mq.matches)); }
   function bruk() {
     var l = lys(), d = root.document.documentElement;
@@ -23,8 +23,8 @@
     lytt.forEach(function (f) { try { f(l); } catch (e) { console.error('Tema', e); } });
   }
   function sett(v) {
-    valg = NAVN[v] ? v : 'auto';
-    try { if (valg === 'auto') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
+    valg = NAVN[v] ? v : 'dark';
+    try { if (valg === 'dark') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
     bruk(); return valg;
   }
   valg = les();

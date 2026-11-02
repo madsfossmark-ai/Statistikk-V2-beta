@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Analyse</title>
 <script>/* Lyst og mørkt tema (02.11.2026).
- * «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
+ * Mørkt er standard (03.11.2026). «Automatisk» følger innstillingen på enheten. Valget i Meny huskes på enheten (localStorage «rv-theme»)
  * og gjelder både appen og Analyse. Lastes tidlig i <head>, så siden ikke blinker i feil tema. */
 (function (root) {
-  var KEY = 'rv-theme', REKKE = ['auto', 'light', 'dark'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
-  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'auto';
-  function les() { var v = 'auto'; try { v = root.localStorage.getItem(KEY) || 'auto'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'auto'; }
+  var KEY = 'rv-theme', REKKE = ['dark', 'light', 'auto'], NAVN = { auto: 'Automatisk', light: 'Lyst', dark: 'Mørkt' };
+  var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null, lytt = [], valg = 'dark';
+  function les() { var v = 'dark'; try { v = root.localStorage.getItem(KEY) || 'dark'; } catch (e) { /* ingen lagring */ } return NAVN[v] ? v : 'dark'; }
   function lys() { return valg === 'light' || (valg === 'auto' && !!(mq && mq.matches)); }
   function bruk() {
     var l = lys(), d = root.document.documentElement;
@@ -19,8 +19,8 @@
     lytt.forEach(function (f) { try { f(l); } catch (e) { console.error('Tema', e); } });
   }
   function sett(v) {
-    valg = NAVN[v] ? v : 'auto';
-    try { if (valg === 'auto') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
+    valg = NAVN[v] ? v : 'dark';
+    try { if (valg === 'dark') root.localStorage.removeItem(KEY); else root.localStorage.setItem(KEY, valg); } catch (e) { /* ingen lagring */ }
     bruk(); return valg;
   }
   valg = les();
@@ -243,7 +243,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         <button class="menu-item" role="menuitem" id="m-del" hidden>Del lenke til åpen side</button>
         <button class="menu-item" role="menuitem" id="m-stor">Fullskjerm</button>
         <button class="menu-item" role="menuitem" id="m-skriv">Skriv ut</button>
-        <button class="menu-item" role="menuitem" id="m-tema">Tema: Automatisk</button>
+        <button class="menu-item" role="menuitem" id="m-tema">Tema: Mørkt</button>
       </div></div>
   </nav>
 
@@ -3970,7 +3970,7 @@ window.V3Moduler = (function (root) {
   $('m-stor').hidden = !window.BaneFS;
   $('m-stor').addEventListener('click', () => { meny(false); stor(true); });
   $('m-skriv').addEventListener('click', () => { meny(false); window.print(); });   // synkront: Safari stopper forsinket utskrift
-  // Tema (02.11.2026): Automatisk → Lyst → Mørkt. Menyen blir stående åpen, så du kan bla videre
+  // Tema (02.11.2026): Mørkt (standard) → Lyst → Automatisk. Menyen blir stående åpen, så du kan bla videre
   function temaTekst() { const T = window.RVTema; $('m-tema').hidden = !T; if (T) { $('m-tema').textContent = 'Tema: ' + T.navn(); $('m-tema').setAttribute('aria-label', 'Bytt tema, nå ' + T.navn()); } }
   $('m-tema').addEventListener('click', (e) => { e.stopPropagation(); if (window.RVTema) window.RVTema.neste(); temaTekst(); });
   if (window.RVTema) window.RVTema.vedEndring(temaTekst);
