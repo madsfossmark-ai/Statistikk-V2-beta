@@ -27,6 +27,7 @@
   --lvl-lo: #F07167; --lvl-mid: #FFC94A; --lvl-hi: #4CD08A;
   --av: #D98A92; --av-soft: #1F161A; --av-kant: #4A2C33;
   --win-bg: #16402C; --loss-bg: #4A1F1D; --live-bg: #3A2A10;
+  --demo: #C4A3FF; --demo-bg: #241B38; --demo-kant: #6B4FA8;
   --bar: #161B24; --bar-fg: #FFFFFF; --bar-muted: #8B95A5;
   --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -42,6 +43,7 @@
   --lvl-lo: #B3261E; --lvl-mid: #B07D0B; --lvl-hi: #1F7A4D;
   --av: #9B3B47; --av-soft: #F7E4E6; --av-kant: #E2B8BD;
   --win-bg: #DDEFE4; --loss-bg: #F7DCD9; --live-bg: #FBEBCC;
+  --demo: #5B3A9E; --demo-bg: #EFE8FB; --demo-kant: #B9A3E3;
   --bar: #16181D; --bar-fg: #FFFFFF; --bar-muted: #B8BCC6; color-scheme: light;
 }
 
@@ -374,6 +376,11 @@ html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background
 .b-own { background: var(--accent-soft); color: var(--accent); }
 .b-nvbf { background: var(--sunk); color: var(--muted); }
 .b-live { background: var(--good); color: #FFFFFF; }
+/* Demo-/testkamper (02.11.2026): egen farge i kampoversikten, teller ikke i statistikken */
+.b-demo { background: var(--demo); color: var(--demo-bg); text-transform: uppercase; letter-spacing: .06em; padding: 4px 9px; }
+.match.demo, .match.ours.demo { background: var(--demo-bg); box-shadow: 0 0 0 1px var(--demo-kant); }
+.match.demo .d { color: var(--demo); }
+.round.demo > .label { color: var(--demo); }
 .b-win { background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: .04em; padding: 4px 9px; }
 .b-loss { background: transparent; color: var(--opp); box-shadow: inset 0 0 0 1.5px var(--opp); text-transform: uppercase; letter-spacing: .04em; padding: 4px 9px; }
 /* Lagmerker: klubblogo når den er lastet opp, ellers skjold med forbokstaver. Landslag: flagg */
@@ -3993,7 +4000,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function modusVelger(m) {
     const valgt = S.modusValg || sistModus(), sist = sistModus();
     const kort = (v, tittel, punkt) => '<button class="mvalg ' + (v === 'avansert' ? 'av' : 'en') + '" data-a="modus-valg" data-v="' + v + '" aria-pressed="' + (valgt === v) + '"><span class="mhode">' + (v === 'avansert' ? '★ ' : '○ ') + tittel + '</span><ul>' + punkt.map((x) => '<li>' + x + '</li>').join('') + '</ul>' + (sist === v ? '<span class="msist">Sist brukt</span>' : '') + '</button>';
-    return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + '</span><span class="sub">' + esc(fmtDate(m.date)) + '</span></div></header>'
+    return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + (isTest(m) ? ' <span class="badge b-demo">Demo</span>' : '') + '</span><span class="sub">' + esc(fmtDate(m.date)) + '</span></div></header>'
       + '<section class="panel mvelger"><div class="panel-head"><h2>Hvordan vil du føre denne kampen?</h2></div><div class="mvalg-rad">'
       + kort('enkel', 'Enkel', ['Mottak, angrep og serve', 'Ingen oppstilling', 'Settresultat ved settslutt'])
       + kort('avansert', 'Avansert', ['Alt i Enkel', 'Oppstilling, bytter og rotasjon', 'Poengtelling: sideout og breakpoint'])
@@ -4306,9 +4313,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   function listView() {
     const ms = S.matches.filter((m) => S.filter === 'vare' ? isOurs(m) : true);
-    const upcoming = S.matches.filter((m) => isOurs(m) && m.status !== 'ferdig').sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
+    const upcoming = S.matches.filter((m) => isOurs(m) && m.status !== 'ferdig' && !isTest(m)).sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
     const rounds = {};
-    ms.forEach((m) => { const r = m.custom ? roundLabel(m) + '|' + m.id : roundLabel(m); (rounds[r] ||= []).push(m); });
+    const DEMO_R = 'Demo og test – teller ikke i statistikken';
+    if (ms.some(isTest)) rounds[DEMO_R] = [];   // øverst i lista
+    ms.forEach((m) => { const r = isTest(m) ? DEMO_R : m.custom ? roundLabel(m) + '|' + m.id : roundLabel(m); (rounds[r] ||= []).push(m); });
     let h = navHtml('kamper');
     if (S.showNewCtx) h += newCtxForm();
     if (S.showNew) h += newMatchForm();
@@ -4319,7 +4328,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (!ms.length) h += '<div class="panel"><div class="empty">Ingen kamper her ennå. Legg til en med «Ny kamp».</div></div>';
     h += '<div class="list-controls"><h2 class="sec-h">Terminliste</h2><span class="spacer"></span><div class="tabs" role="group" aria-label="Filter">'
       + [['alle', 'Alle'], ['vare', OUR]].map(([k, l]) => '<button data-a="filter" data-v="' + k + '" aria-pressed="' + (S.filter === k) + '">' + esc(l) + '</button>').join('') + '</div></div>';
-    h += '<div class="rounds">' + Object.entries(rounds).map(([r, list]) => '<section class="round"><h2 class="label">' + esc(r.split('|')[0]) + '</h2>' + list.map(matchRow).join('') + '</section>').join('') + '</div>';
+    h += '<div class="rounds">' + Object.entries(rounds).map(([r, list]) => '<section class="round' + (r === DEMO_R ? ' demo' : '') + '"><h2 class="label">' + esc(r.split('|')[0]) + '</h2>' + list.map(matchRow).join('') + '</section>').join('') + '</div>';
     return h;
   }
 
@@ -4348,8 +4357,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const ours = isOurs(m);
     const res = (m.setsHome != null && m.setsAway != null && (m.setsHome + m.setsAway) > 0) ? m.setsHome + '–' + m.setsAway : (m.status === 'pågår' ? (m.setsHome || 0) + '–' + (m.setsAway || 0) : '–');
     const oc = ours ? outcome(m) : null;
-    const badge = m.status === 'pågår' ? '<span class="badge b-live">Live</span>' : oc ? '<span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss">Tap') + '</span>' : ours ? '' : m.focus && !(m.nvbf && m.nvbf.src) ? '<span class="badge b-own">Egenført</span>' : (m.nvbf && m.nvbf.teams ? '<span class="badge b-nvbf">' + srcName(m.nvbf) + (m.nvbf.partial ? ' · delvis' : '-statistikk') + '</span>' : m.source === 'nvbf' ? '<span class="badge b-nvbf">NVBF</span>' : '');
-    return '<button class="match' + (ours ? ' ours' : '') + '" data-a="open" data-id="' + esc(m.id) + '"><span class="t"><span class="tn">' + (ours ? crest(m.home, 'sm') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'sm') : crest(m.home, 'xs') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'xs')) + '</span><span class="d">' + esc(fmtDate(m.date)) + (m.custom ? ' · ' + esc(TYPES[m.type] || 'Egen kamp') : '') + '</span></span><span class="res num">' + res + '</span>' + badge + '</button>';
+    const demo = isTest(m);
+    const badge = demo ? '<span class="badge b-demo">Demo</span>' + (m.status === 'pågår' ? ' <span class="badge b-live">Live</span>' : '') : m.status === 'pågår' ? '<span class="badge b-live">Live</span>' : oc ? '<span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss">Tap') + '</span>' : ours ? '' : m.focus && !(m.nvbf && m.nvbf.src) ? '<span class="badge b-own">Egenført</span>' : (m.nvbf && m.nvbf.teams ? '<span class="badge b-nvbf">' + srcName(m.nvbf) + (m.nvbf.partial ? ' · delvis' : '-statistikk') + '</span>' : m.source === 'nvbf' ? '<span class="badge b-nvbf">NVBF</span>' : '');
+    return '<button class="match' + (ours ? ' ours' : '') + (demo ? ' demo' : '') + '" data-a="open" data-id="' + esc(m.id) + '"><span class="t"><span class="tn">' + (ours ? crest(m.home, 'sm') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'sm') : crest(m.home, 'xs') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'xs')) + '</span><span class="d">' + esc(fmtDate(m.date)) + (m.custom ? ' · ' + esc(TYPES[m.type] || 'Egen kamp') : '') + '</span></span><span class="res num">' + res + '</span>' + badge + '</button>';
   }
 
   function newMatchForm() {
@@ -4369,7 +4379,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const c = m.current || { set: 1, home: 0, away: 0 };
     const sets = (m.setScores || []).map((s) => s[0] + '–' + s[1]).join(' · ');
     return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button>'
-      + '<div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + '</span><span class="sub" id="bar-sub">' + esc(barSub(m)) + '</span></div>'
+      + '<div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + (isTest(m) ? ' <span class="badge b-demo">Demo</span>' : '') + '</span><span class="sub" id="bar-sub">' + esc(barSub(m)) + '</span></div>'
       + '<div class="score-wrap"><span class="setpill">Sett ' + c.set + '</span></div>' + (opsO && !S.endingSet ? courtChips(m, opsO) : '') + '<span class="spacer"></span><div class="bar-actions">'
       + (S.endingSet
         ? '<form id="setform" class="setform"><span class="sub">Resultat sett ' + c.set + '</span>'
@@ -5281,7 +5291,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const n = egen ? own : hasNvbf ? m.nvbf : null;
     addRecAvg(n);
     const oc = outcome(m);
-    let h = '<header class="bar det-bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm" style="flex-wrap:wrap">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + ' ' + (m.setsHome != null && m.status !== 'kommende' ? m.setsHome + '–' + m.setsAway : '') + (oc ? ' <span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss" style="color:#F0A774;box-shadow:inset 0 0 0 1.5px #F0A774">Tap') + '</span>' : '') + '</span><span class="sub">' + esc(fmtDate(m.date)) + ((m.setScores || []).length ? ' · ' + m.setScores.map((s) => s[0] + '–' + s[1]).join(' · ') : '') + '</span></div><span class="spacer"></span>'
+    let h = '<header class="bar det-bar"><button class="link" data-a="back">‹ Kamper</button><div class="title"><span class="display tm" style="flex-wrap:wrap">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + ' ' + (m.setsHome != null && m.status !== 'kommende' ? m.setsHome + '–' + m.setsAway : '') + (oc ? ' <span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss" style="color:#F0A774;box-shadow:inset 0 0 0 1.5px #F0A774">Tap') + '</span>' : '') + (isTest(m) ? ' <span class="badge b-demo">Demo</span>' : '') + '</span><span class="sub">' + esc(fmtDate(m.date)) + ((m.setScores || []).length ? ' · ' + m.setScores.map((s) => s[0] + '–' + s[1]).join(' · ') : '') + '</span></div><span class="spacer"></span>'
       + (ours ? '<div class="bar-actions">' + (!window.PUBLIC && alleEvs.some((e) => e.type === 'dir') ? '<button class="barbtn" data-a="dir">Slagretning</button>' : '') + '<button class="barbtn" data-a="sheet">Kampark</button>' + (alleEvs.length ? '<button class="barbtn" data-a="rapport">Kamprapport</button>' : '') + (!S.dash && !window.PUBLIC ? '<button class="barbtn" data-a="rett-res">' + (S.retting === m.id ? 'Lukk retting' : 'Rett resultat') + '</button>' : '') + '<button class="barbtn primary-bar" data-a="edit">Åpne for endring</button></div>' : '') + (ours && m.custom && !S.dash ? '<button class="barbtn" data-a="delmatch">Slett kamp</button>' : '') + '</header>';
     if (ours && S.retting === m.id && !S.dash && !window.PUBLIC) h += retteForm(m);
     if (!ours && !S.dash) h += othersPanel(m);
