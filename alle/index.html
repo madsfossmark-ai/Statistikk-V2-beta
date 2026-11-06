@@ -648,6 +648,27 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .tbl td.muted { color: var(--faint); }
 .tbl td.l-al, .tbl th.l-al { text-align: left; }
 
+/* Talltavle (06.11.2026, variant B): stort tall 1–6 over hele skjermen til å vise spillerne fra benken.
+   Fargene er bevisst faste (hvit/sort) og følger ikke temaet. Tallet lagres ikke. */
+.tavle { --t-bg: #FFFFFF; --t-fg: #000000; --t-knapp: rgba(0,0,0,.07); position: fixed; inset: 0; z-index: 60; container-type: size; background: var(--t-bg); color: var(--t-fg);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation; overscroll-behavior: contain; }
+.tavle.sort { --t-bg: #000000; --t-fg: #FFFFFF; --t-knapp: rgba(255,255,255,.12); }
+.tavle .t-tall { position: absolute; inset: 0 0 18cqh 0; display: grid; place-items: center; font: 800 min(74cqh, 130cqw)/1 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tavle button { font-family: var(--font-body); color: var(--t-fg); background: var(--t-knapp); border: 0; border-radius: 1.6cqh; cursor: pointer; }
+.tavle button:focus-visible { outline: 3px solid #8FB3FF; outline-offset: 2px; }
+.tavle .t-rad { position: absolute; left: 0; right: 0; bottom: 0; height: 18cqh; display: flex; gap: 1.2cqh;
+  padding: 1.6cqh max(2cqh, env(safe-area-inset-right, 0px)) calc(1.6cqh + env(safe-area-inset-bottom, 0px)) max(2cqh, env(safe-area-inset-left, 0px)); }
+.tavle .t-rad button { flex: 1; min-height: 44px; font: 700 7.5cqh/1 var(--font-display); }
+.tavle .t-rad button[aria-pressed="true"] { background: var(--t-fg); color: var(--t-bg); }
+.tavle .t-rad .smal { flex: 0 0 auto; padding: 0 2.4cqh; font: 600 3.2cqh var(--font-body); }
+@container (orientation: portrait) {
+  .tavle .t-tall { inset: 0 0 26cqh 0; font-size: min(70cqh, 130cqw); }
+  .tavle .t-rad { height: 26cqh; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: 3fr 2fr; gap: 2cqw;
+    padding: 3cqw max(3cqw, env(safe-area-inset-right, 0px)) calc(3cqw + env(safe-area-inset-bottom, 0px)) max(3cqw, env(safe-area-inset-left, 0px)); }
+  .tavle .t-rad button { font-size: 9cqw; border-radius: 2.4cqw; }
+  .tavle .t-rad .smal { grid-column: span 3; font-size: 4.2cqw; padding: 0; }
+}
+
 /* Slagretning: fullskjermsark over appen, bane til venstre og kontroller til høyre, stables på smal skjerm */
 :root { --court-floor: #F0AE68; --court-free: #4F7FA8; --court-opp: #E2A35F; --court-line: #FFFFFF; --court-net: #1B2733; }
 .dir-ov { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain;
@@ -4428,7 +4449,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
           + (window.Hurtignotat && m.status !== 'ferdig' ? window.Hurtignotat.knapp(ctxSlug()) : '')
           + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
-          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
+          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="tavle">Tavle</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
       + '</div></header>';
   }
@@ -5726,6 +5747,44 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     + '<text x="12" y="1098" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-net)" opacity=".55">VÅR BANE</text>'
     + '<g id="dir-layer"></g><path id="dir-live" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 
+  // ---------- Talltavle (variant B) ----------
+  // Legges over appen som eget lag. Føringen bak tegnes ikke på nytt og er uendret når tavlen lukkes.
+  let tavleN = 1;
+  function tavleOpen() {
+    if (document.querySelector('.tavle')) return;
+    let sort = false; try { sort = localStorage.getItem('rv-tavle-farge') === 'sort'; } catch (e) { /* ingen lagring */ }
+    const fokus = document.activeElement, el = document.createElement('div');
+    el.className = 'tavle'; el.tabIndex = -1; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Talltavle');
+    el.innerHTML = '<div class="t-tall" aria-live="polite"></div><div class="t-rad">'
+      + [1, 2, 3, 4, 5, 6].map((n) => '<button type="button" data-n="' + n + '" aria-label="Vis ' + n + '">' + n + '</button>').join('')
+      + '<button type="button" class="smal" data-x="farge">Snu farger</button><button type="button" class="smal" data-x="lukk">Lukk</button></div>';
+    let las = null;
+    const vis = () => { el.classList.toggle('sort', sort); el.querySelector('.t-tall').textContent = tavleN; el.querySelectorAll('[data-n]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === tavleN))); };
+    const lukk = () => {
+      el.remove(); document.removeEventListener('fullscreenchange', vedFs);
+      try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* ikke støttet */ }
+      try { if (las) las.release(); } catch (e) { /* ikke støttet */ }
+      if (fokus && fokus.focus) fokus.focus();
+    };
+    const vedFs = () => { if (!document.fullscreenElement && el.isConnected) lukk(); };
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.n) { tavleN = +b.dataset.n; vis(); }
+      else if (b.dataset.x === 'farge') { sort = !sort; try { localStorage.setItem('rv-tavle-farge', sort ? 'sort' : 'hvit'); } catch (err) { /* ingen lagring */ } vis(); }
+      else if (b.dataset.x === 'lukk') lukk();
+    });
+    el.addEventListener('keydown', (e) => {
+      e.stopPropagation();   // tastatursnarveier i føringen skal ikke reagere mens tavlen er åpen
+      if (/^[1-6]$/.test(e.key)) { tavleN = +e.key; vis(); }
+      else if (e.key === 'ArrowRight') { tavleN = tavleN % 6 + 1; vis(); }
+      else if (e.key === 'ArrowLeft') { tavleN = (tavleN + 4) % 6 + 1; vis(); }
+      else if (e.key === 'Escape') lukk();
+    });
+    document.body.appendChild(el); vis(); el.focus();
+    try { const r = el.requestFullscreen && el.requestFullscreen(); if (r && r.then) r.then(() => document.addEventListener('fullscreenchange', vedFs)).catch(() => {}); } catch (e) { /* ikke støttet (f.eks. iPhone) */ }
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((l) => { las = l; }).catch(() => {}); } catch (e) { /* ikke støttet */ }
+  }
+
   function dirOpen(opts) {
     const m = cur(); if (!m) return;
     opts = opts || {}; DIR.ro = !!opts.ro; DIR.pres = !!(opts.pres || opts.ro);
@@ -6053,6 +6112,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (a === 'kkpick') { SEASON.player = b.dataset.id; render(); const c = document.getElementById('h-kurve'); if (c) c.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     else if (a === 'psort') { const k = b.dataset.k; if (SEASON.sortK === k) SEASON.sortDir = -SEASON.sortDir; else { SEASON.sortK = k; SEASON.sortDir = k === 'name' ? 1 : -1; } render(); }
     else if (a === 'dir' && m) { dirOpen(S.view === 'detail' ? { ro: true } : null); }
+    else if (a === 'tavle') { tavleOpen(); }
     else if (a === 'squad') { S.view = 'squad'; render(); toTop(); }
     else if ((a === 'lineup' || a === 'lineup-chips') && m) { opsAapne(m, true); }
     else if (a === 'to-live') { S.view = S.view === 'sheet' && S.sheetBack === 'detail' ? 'detail' : 'live'; render(); toTop(); }
