@@ -669,6 +669,11 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   .tavle .t-rad .smal { grid-column: span 3; font-size: 4.2cqw; padding: 0; }
 }
 
+/* Tavle-knappen er hvit, som tavlen. I lyst tema får den en kant mot den hvite toppstripen. */
+.barbtn.tavle-knapp, :root[data-theme="light"] .barbtn.tavle-knapp { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
+:root[data-theme="light"] .barbtn.tavle-knapp { border-color: #9AA3B2; }
+.barbtn.tavle-knapp:hover { background: #F1F3F6; }
+
 /* Slagretning: fullskjermsark over appen, bane til venstre og kontroller til høyre, stables på smal skjerm */
 :root { --court-floor: #F0AE68; --court-free: #4F7FA8; --court-opp: #E2A35F; --court-line: #FFFFFF; --court-net: #1B2733; }
 .dir-ov { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain;
@@ -4449,7 +4454,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
           + (window.Hurtignotat && m.status !== 'ferdig' ? window.Hurtignotat.knapp(ctxSlug()) : '')
           + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
-          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn" data-a="tavle">Tavle</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
+          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn tavle-knapp" data-a="tavle">Tavle</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
       + '</div></header>';
   }
