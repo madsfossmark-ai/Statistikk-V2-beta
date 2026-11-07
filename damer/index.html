@@ -322,7 +322,7 @@ html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .tbl th { font-size: 11px; font-weight: 500; color: var(--muted); text-align: right; padding: 2px 4px 4px; }
 .tbl th:first-child, .tbl td:first-child { text-align: left; }
-.tbl td { text-align: right; padding: 4px; border-top: 1px solid var(--sunk); }
+.tbl td { text-align: right; padding: 4px; border-top: 1px solid var(--sunk); vertical-align: baseline; }   /* snittet (tall med stolpe under) på linje med de andre tallene */
 .tbl tr.total td { font-weight: 700; border-top: 1px solid var(--line); }
 .tbl td.key { font-weight: 600; }
 .tbl td.nm { white-space: nowrap; } .tbl td.nm .weak-tag { margin-left: 6px; vertical-align: 1px; }
@@ -4897,10 +4897,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function angrepMotBlokk(m, evs, oppName) {
     const dir = evs.filter((e) => e.type === 'dir');
     let h = '<div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' angrep · fra slagretning</div>';
-    if (!dir.length) return h + '<div class="empty">Ingen slag registrert. Tegn angrepene i Slagretning, så kommer tallene her.</div></div>';
+    if (!dir.length) return h + '<div class="empty">Ingen angrep registrert. Registrer dem i panelet «' + esc(oppName) + ' angrep», så kommer tallene her.</div></div>';
     const per = {}; dir.forEach((e) => { (per[String(e.p)] = per[String(e.p)] || []).push(e); });
     const nums = Object.keys(per).sort((a, b) => per[b].length - per[a].length || Number(a) - Number(b));
-    return h + '<div class="tbl-wrap"><table class="tbl">' + dirTable(dir, nums, null) + '</table></div><div class="code-legend">Sortert etter flest slag. Kill % = kill av alle slag.</div></div>';
+    // Navn som i mottakstabellen, uten farger (07.11.2026)
+    const navn = (n) => { const p = oppP(m, n) || {}; return '#' + esc(n) + (p.name ? ' ' + esc(utenL(p.name).split(' ')[0]) : '') + esc(oppLib(m, n)); };
+    return h + '<div class="tbl-wrap"><table class="tbl">' + dirTable(dir, nums, null, { navn, utenFarge: true }) + '</table></div><div class="code-legend">Sortert etter flest slag. Snitt 0–2: kill 2, i spill 1, feil og blokkert 0. Kill % = kill av alle slag.</div></div>';
   }
   function statsPanel(m, evs, oppName) {
     const sets = [...new Set(evs.map((e) => e.set))].sort((a, b) => a - b);
@@ -6204,14 +6206,17 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const bits = [DIR.set === 'all' ? 'Hele kampen' : 'Sett ' + DIR.set, DIR.view === 'heat' ? 'Soner' : 'Piler', { all: 'Slag og dip', hit: 'Bare slag', dip: 'Bare dip' }[DIR.kind]];
     return 'Slagretning ' + esc(shortName(oppName)) + ' · ' + esc(label) + '<small>' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + (m.date ? ' · ' + esc(String(m.date).slice(0, 10)) : '') + ' · ' + bits.join(' · ') + '</small>';
   }
-  function dirTable(evs, nums, only) {
-    let h = '<thead><tr><th>Nr</th><th>Ant.</th><th>Kill</th><th>Feil</th><th>Blokk</th><th>Forsv.</th><th>Kill %</th><th>Diag/Linje/Dip</th></tr></thead><tbody>';
+  // Snitt 0–2 for motstanderens angrep, som vårt: kill 2, i spill 1, feil og blokkert 0
+  const dirSnitt = (L) => L.length ? (2 * L.filter((e) => e.c === 'K').length + L.filter((e) => e.c === 'D').length) / L.length : null;
+  function dirTable(evs, nums, only, opt) {
+    opt = opt || {};
+    let h = '<thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Kill</th><th>Feil</th><th>Blokk</th><th>Forsv.</th><th>Kill %</th><th>Diag/Linje/Dip</th></tr></thead><tbody>';
     const rows = nums.filter((n) => !only || n === only).map((n) => [n, evs.filter((e) => String(e.p) === n)]).filter(([, L]) => L.length);
     const row = (lab, L, dot) => { const c = (r) => L.filter((e) => e.c === r).length, k = (x) => L.filter((e) => dirKind(e) === x).length;
-      return '<tr><td class="key">' + (dot ? '<span class="dir-dot" style="background:' + dot + ';vertical-align:-2px"></span> ' : '') + lab + '</td><td>' + L.length + '</td><td>' + c('K') + '</td><td>' + c('F') + '</td><td>' + c('B') + '</td><td>' + c('D') + '</td><td class="key">' + pct(c('K'), L.length) + '</td><td>' + k('diagonal') + '/' + k('linje') + '/' + k('dip') + '</td></tr>'; };
-    rows.forEach(([n, L]) => { h += row('#' + esc(n), L, dirColor(n)); });
+      return '<tr' + (dot === null ? ' class="total"' : '') + '><td class="key">' + (dot ? '<span class="dir-dot" style="background:' + dot + ';vertical-align:-2px"></span> ' : '') + lab + '</td><td>' + L.length + '</td><td class="key">' + avgBar(dirSnitt(L), null, 'att') + '</td><td>' + c('K') + '</td><td>' + c('F') + '</td><td>' + c('B') + '</td><td>' + c('D') + '</td><td class="key">' + pct(c('K'), L.length) + '</td><td>' + k('diagonal') + '/' + k('linje') + '/' + k('dip') + '</td></tr>'; };
+    rows.forEach(([n, L]) => { h += row(opt.navn ? opt.navn(n) : '#' + esc(n), L, opt.utenFarge ? '' : dirColor(n)); });
     if (!only && rows.length > 1) h += row('Totalt', rows.flatMap(([, L]) => L), null);
-    if (!rows.length) h += '<tr><td colspan="8" class="muted" style="text-align:left">Ingen slag i dette utvalget.</td></tr>';
+    if (!rows.length) h += '<tr><td colspan="9" class="muted" style="text-align:left">Ingen slag i dette utvalget.</td></tr>';
     return h + '</tbody>';
   }
   function dirAddNum(ev, felt) {
