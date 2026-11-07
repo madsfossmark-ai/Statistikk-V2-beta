@@ -4553,7 +4553,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   const REC = [['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'Spillbart'], ['2', 'c-good', '2', 'Perfekt']];
   const SRV = [['F', 'c-bad', 'F', 'Feil'], ['I', 'c-mid', 'I', 'I spill'], ['E', 'c-good', 'E', 'Ess']];
-  const ATT = [['0', 'c-bad', '0', 'Feil'], ['B', 'c-block', 'B', 'Blokk'], ['1', 'c-mid', '1', 'I spill'], ['2', 'c-good', '2', 'Poeng']];
+  // Rekkefølge i Angrep (07.11.2026): blokkert, feil, i spill, poeng (grønn B for egen blokk kommer til slutt)
+  const ATT = [['B', 'c-block', 'B', 'Blokk'], ['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'I spill'], ['2', 'c-good', '2', 'Poeng']];
 
   // Motstanderens mottakere (07.11.2026): velg hvem som står i mottak rett i panelet. Libero merkes (L).
   const oppLib = (m, n) => /^libero/i.test((oppP(m, n) || {}).pos || '') ? ' (L)' : '';
@@ -4595,7 +4596,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const courtBtn = '<button class="textbtn" data-a="squad">' + onCourt.length + ' på banen · endre</button>';
     h += '<div class="live-grid">'
       + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
-      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
+      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">B blokkert · 0 feil · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
