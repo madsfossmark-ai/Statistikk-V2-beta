@@ -4749,6 +4749,15 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return who + ' · ' + lbl + ' ' + code;
   }
 
+  // Motstanderens angrep fra Slagretning (07.11.2026), følger valget Kamp/sett i løpende statistikk
+  function angrepMotBlokk(m, evs, oppName) {
+    const dir = evs.filter((e) => e.type === 'dir');
+    let h = '<div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' angrep · fra slagretning</div>';
+    if (!dir.length) return h + '<div class="empty">Ingen slag registrert. Tegn angrepene i Slagretning, så kommer tallene her.</div></div>';
+    const per = {}; dir.forEach((e) => { (per[String(e.p)] = per[String(e.p)] || []).push(e); });
+    const nums = Object.keys(per).sort((a, b) => per[b].length - per[a].length || Number(a) - Number(b));
+    return h + '<div class="tbl-wrap"><table class="tbl">' + dirTable(dir, nums, null) + '</table></div><div class="code-legend">Sortert etter flest slag. Kill % = kill av alle slag.</div></div>';
+  }
   function statsPanel(m, evs, oppName) {
     const sets = [...new Set(evs.map((e) => e.set))].sort((a, b) => a - b);
     const cs = (m.current && m.current.set) || 1;
@@ -4796,8 +4805,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + oppRows.map(([n, r]) => '<tr' + (r.n < 5 ? ' class="small-n"' : (n === weakOpp ? ' class="weakest"' : '')) + '><td class="key">' + esc(oppLabel(m, n)) + (n === weakOpp ? ' <span class="weak-tag">Server hit</span>' : '') + '</td><td>' + r.n + '</td><td class="key">' + avgCell(r.s / r.n) + '</td><td>' + pct(r.c0, r.n) + '</td><td>' + pct(r.c1, r.n) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
       + '<tr class="total"><td>Lag</td><td>' + st.tOpp.n + '</td><td>' + avgBar(st.tOpp.s / st.tOpp.n) + '</td><td>' + pct(st.tOpp.c0, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c1, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c2, st.tOpp.n) + '</td></tr></tbody></table></div>'
       + '<div class="code-legend">Grå rader: under 5 mottak, lite utvalg.</div>';
-
-    h += '</div></div>';
+    h += '</div>' + angrepMotBlokk(m, filt, oppName) + '</div>';   // motstanderens angrep fra Slagretning, så lukkes stats-body
     if (m.legacy) h += legacyBlock(m.legacy);
     // Kampark og CSV-eksport samlet nederst i statistikken (01.11.2026: Kampark flyttet hit fra topplinjen i registreringen)
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (S.view === 'live' && !S.dash && !window.PUBLIC ? '<button class="secondary" data-a="sheet">Kampark</button>' : '') + (S.dl ? '<button class="secondary" data-a="export">Eksporter til regneark (CSV)</button>' : '') + '</div>';
