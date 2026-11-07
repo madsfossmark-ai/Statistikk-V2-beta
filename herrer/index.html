@@ -182,6 +182,8 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .stat-block { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stats-body { display: flex; flex-direction: column; gap: 14px; }
 .stats-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* To kolonner (vår | motstander) også på iPad mini og delt skjerm på iPad */
+@media (min-width: 700px) { #stats .stats-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; } }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .who { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "nr nm" "nr mini"; column-gap: 10px; align-items: center; min-width: 0; }
