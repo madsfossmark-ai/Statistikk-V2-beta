@@ -5766,7 +5766,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const OPS = { el: null, avvist: {} };
   function opsOk() { return !!window.Oppstilling && !window.PUBLIC && !S.dash && erAv(cur()); }
   function opsBekreftet(m) { const st = window.Oppstilling && m ? Oppstilling.settFor(m, (m.current && m.current.set) || 1) : null; return !!(st && st.confirmed); }
-  function opsKnapp(m) { const O = window.Oppstilling, st = O && m ? O.settFor(m, (m.current && m.current.set) || 1) : null, o = st && st.confirmed ? O.aktuelt(st) : null;
+  // Knappen viser rotasjonen vi står i nå (fra serve og poeng), ikke den som sist ble lagret i oppstillingen
+  function opsKnapp(m) { const O = window.Oppstilling, st = O && m ? O.settFor(m, (m.current && m.current.set) || 1) : null, o = st && st.confirmed ? effektivOppstilling(m, O.aktuelt(st)) : null;
     return o ? 'Oppstilling ' + (O.rotasjonAv(o.positions, o.roles) || '') : 'Oppstilling'; }
   function opsHarHendelser(m, nr) { return allEvents().some((e) => Number(e.set) === Number(nr)); }
   function opsAapne(m) {
@@ -5774,7 +5775,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const nr = (m.current && m.current.set) || 1, roster = teamRoster(m), st = Oppstilling.settFor(m, nr);
     const under = !!(st && st.confirmed && opsHarHendelser(m, nr));
     let utkast, kilde = null;
-    if (st && st.confirmed) utkast = Object.assign(JSON.parse(JSON.stringify(Oppstilling.aktuelt(st))), { receptionPositions: st.receptionPositions || {} });
+    // Under settet åpnes velgeren i rotasjonen vi står i nå, så valgt R alltid betyr «herfra og videre»
+    if (st && st.confirmed) utkast = Object.assign(JSON.parse(JSON.stringify(under ? effektivOppstilling(m, Oppstilling.aktuelt(st)) : Oppstilling.aktuelt(st))), { receptionPositions: st.receptionPositions || {} });
     else { const u = Oppstilling.utkastFor(m, nr, roster, S.matches.filter((x) => canLive(x))); utkast = u.oppsett; kilde = u.kilde; }
     OPS.el = Oppstilling.monter({ roster, setNr: nr, lagNavn: usName(m), motstander: m.home === usName(m) ? m.away : m.home, utkast, utkastKilde: kilde, underSett: under,
       onBekreft: (o) => opsLagre(m, nr, o),
@@ -5785,7 +5787,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
   async function opsLagre(m, nr, o) {
     if (!S.db) throw new Error('ikke tilkoblet');
-    const ny = Oppstilling.bekreft(o, { t: new Date().toISOString(), enhet: deviceId }, Oppstilling.settFor(m, nr), opsHarHendelser(m, nr));
+    const tNa = new Date().toISOString(), st0 = Oppstilling.settFor(m, nr), under = !!(st0 && st0.confirmed && opsHarHendelser(m, nr));
+    const effR = under ? Oppstilling.rotasjonAv((effektivOppstilling(m, Oppstilling.aktuelt(st0)) || {}).positions || {}, o.roles) : null, valgtR = Oppstilling.rotasjonAv(o.positions || {}, o.roles);
+    const ny = Oppstilling.bekreft(o, { t: tNa, enhet: deviceId }, st0, opsHarHendelser(m, nr));
+    // Valgt rotasjon midt i settet gjelder fra nå (ankerpunkt), også når den tilfeldigvis er lik den som sist ble lagret
+    if (under && valgtR && effR && valgtR !== effR && !(ny.endringer || []).some((e) => e.type === 'rotasjon' && e.t === tNa)) ny.endringer = (ny.endringer || []).concat([{ t: tNa, enhet: deviceId, type: 'rotasjon' }]);
     const { onCourt, receivers } = Oppstilling.onCourtOgMottak(ny.naa);
     const lu = { v: 1, sets: { [nr]: ny } };
     // Én oppdatering: lineups + onCourt + receivers. Feiler den, endres ingenting lokalt og velgeren blir stående.
