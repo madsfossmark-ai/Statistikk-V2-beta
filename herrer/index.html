@@ -657,8 +657,10 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .legg-rad { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 10px; align-items: center; }
 .legg-nv { font: 700 17px var(--font-display); }
 .legg-n { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
-.legg-stripe { display: flex; height: 30px; border-radius: 8px; overflow: hidden; background: var(--sunk); }
-.legg-stripe i { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; font: 700 12px var(--font-body); color: #0D1117; font-style: normal; }
+.legg-stripe { display: flex; height: 46px; border-radius: 8px; overflow: hidden; background: var(--sunk); }
+.legg-stripe i { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; min-width: 0; overflow: hidden; white-space: nowrap; color: #0D1117; font-style: normal; }
+.legg-stripe b { font: 800 16px var(--font-display); }
+.legg-stripe span { font: 600 12px var(--font-body); }
 .legg-forkl { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-top: 8px; }
 .legg-forkl i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .legg-forkl b { color: var(--fg); }
@@ -4844,7 +4846,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     let h = '<div class="stat-block legg-blokk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Leggefordeling</h2><span class="label">Sett for sett</span></div>';
     if (!L.length) return h + '<div class="empty">Kommer når angrep føres med bekreftet oppstilling. Regnes ut fra hvem som angriper og om hun står foran eller bak.</div></div>';
     const stripe = (U) => { const n = U.length; return '<div class="legg-stripe">' + LEGG.map(([k, , f]) => { const a = U.filter(([, t]) => t === k).length, pr = n ? Math.round(100 * a / n) : 0;
-      return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? pr + ' %' : '') + '</i>' : ''; }).join('') + '</div>'; };
+      return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? '<b>' + k + '</b><span>' + pr + ' %</span>' : pr >= 4 ? '<b>' + k + '</b>' : '') + '</i>' : ''; }).join('') + '</div>'; };   // variant B: bokstav over prosent
     const settene = [...new Set(L.map(([e]) => e.set))].sort((a, b) => a - b);
     const rad = (lab, U) => '<div class="legg-rad"><span class="legg-nv">' + lab + '</span>' + stripe(U) + '<span class="legg-n">' + U.length + '</span></div>';
     h += '<div class="legg-rader">' + settene.map((s) => rad('Sett ' + s, L.filter(([e]) => e.set === s))).join('') + (settene.length > 1 ? rad('Kamp', L) : '') + '</div>';
