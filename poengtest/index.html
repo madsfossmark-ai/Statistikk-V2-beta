@@ -669,9 +669,6 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   .tavle .t-rad .smal { grid-column: span 3; font-size: 4.2cqw; padding: 0; }
 }
 
-/* L for libero ved navnet i statistikken */
-.lib-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 5px; font: 700 11px/16px var(--font-body); letter-spacing: .02em; vertical-align: 1px; background: var(--accent-soft); color: var(--accent-ink); }
-
 /* Tavle-knappen er hvit, som tavlen. I lyst tema får den en kant mot den hvite toppstripen. */
 .barbtn.tavle-knapp, :root[data-theme="light"] .barbtn.tavle-knapp { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
 :root[data-theme="light"] .barbtn.tavle-knapp { border-color: #9AA3B2; }
@@ -3839,7 +3836,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const posOf = (id) => (player(id) || {}).pos || '';
   const posByNr = (nr) => ((S.roster || []).find((x) => !x.archived && String(x.nr) === String(nr)) || {}).pos || '';
   // Libero merkes med L i all statistikk (07.11.2026): posisjon «Libero» i troppen, eller «(L)» bak navnet i NVBF-tallene
-  const L_TAG = ' <span class="lib-tag" title="Libero">L</span>';
+  const L_TAG = ' (L)';
   const erLibero = (p) => !!p && /^libero/i.test(p.pos || '');
   const libTag = (id) => erLibero(player(id)) ? L_TAG : '';
   const utenL = (navn) => String(navn == null ? '' : navn).replace(/\s*\(L\)\s*$/i, '');
