@@ -335,6 +335,13 @@ html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background
 .tbl td { text-align: right; padding: 4px; border-top: 1px solid var(--sunk); vertical-align: baseline; }   /* snittet (tall med stolpe under) på linje med de andre tallene */
 .tbl tr.total td { font-weight: 700; border-top: 1px solid var(--line); }
 .tbl td.key { font-weight: 600; }
+/* Løpende statistikk (07.11.2026): faste kolonnebredder, så Ant. og Snitt står likt under hverandre i alle tabellene */
+@media (min-width: 760px) {
+  #stats .tbl { table-layout: fixed; }
+  #stats .tbl th:first-child { width: 27%; } #stats .tbl th:nth-child(2) { width: 9%; } #stats .tbl th:nth-child(3) { width: 14%; }
+  #stats .tbl td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.ph-valg { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .tbl td.nm { white-space: nowrap; } .tbl td.nm .weak-tag { margin-left: 6px; vertical-align: 1px; }
 /* Fornavn bare når fullt navn ikke får plass i tabellen (måles i tilpassNavn) */
 .tbl .nv-k { display: none; }
@@ -4606,33 +4613,35 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   // Motstanderens mottakere (07.11.2026): velg hvem som står i mottak rett i panelet. Libero merkes (L).
   const oppLib = (m, n) => /^libero/i.test((oppP(m, n) || {}).pos || '') ? ' (L)' : '';
+  // Knappen som åpner valget står i overskriften (07.11.2026)
+  function oppMottakKnapp(m, valgt) { const n = valgt.length, apen = S.oppVelg || !n; return '<button class="textbtn" data-a="oppvelg" aria-expanded="' + apen + '">' + (n ? n + ' i mottak · ' : '') + (apen ? 'skjul valg' : 'velg mottakere') + '</button>'; }
   function oppMottakVelger(m, valgt) {
     const inne = new Set(valgt.map(String));
     const alle = [...new Set(oppRoster(m).map((x) => String(x.nr)).concat([...inne], (m.dirNumbers || []).map(String), allEvents().filter((e) => e.type === 'opp' || e.type === 'dir').map((e) => String(e.p))))]
       .filter(Boolean).sort((a, b) => Number(a) - Number(b));
     const apen = S.oppVelg || !inne.size;
-    let h = '<div class="oppvelg"><button class="textbtn" data-a="oppvelg" aria-expanded="' + apen + '">' + (inne.size ? inne.size + ' i mottak · ' : '') + (apen ? 'skjul valg' : 'velg mottakere') + '</button>';
+    let h = '<div class="oppvelg">';
     if (apen) h += alle.length ? '<div class="oppvelg-chips" role="group" aria-label="Velg mottakere">' + alle.map((n) => '<button type="button" class="ovchip" data-a="orecv" data-nr="' + esc(n) + '" aria-pressed="' + inne.has(n) + '">#' + esc(n) + esc(oppLib(m, n)) + '</button>').join('') + '</div>'
       : '<div class="empty" style="margin-top:6px">Ingen spillere ennå. Legg til draktnummer under.</div>';
     return h + '</div>';
   }
   // Motstanderens angrep (hurtig slagretning, variant A, 07.11.2026): 0/B/1/2 per angriper, så strek på banen.
   // Lagres som vanlig slagretning (type 'dir'): 2 = K kill, 1 = D i spill/forsvart, 0 = F feil, B = B vi blokket.
-  const OATT = [['F', 'c-bad', '0', 'Feil'], ['B', 'c-block', 'B', 'Vi blokk'], ['D', 'c-mid', '1', 'I spill'], ['K', 'c-good', '2', 'Kill']];
+  const OATT = [['B', 'c-block', 'B', 'Vi blokk'], ['F', 'c-bad', '0', 'Feil'], ['D', 'c-mid', '1', 'I spill'], ['K', 'c-good', '2', 'Kill']];
   function oppAngrepPanel(m, oppName) {
     const valgt = (m.oppAttackers || []).map(String), inne = new Set(valgt);
     const alle = [...new Set(oppRoster(m).map((x) => String(x.nr)).concat(valgt, (m.oppNumbers || []).map(String), (m.dirNumbers || []).map(String), allEvents().filter((e) => e.type === 'opp' || e.type === 'dir').map((e) => String(e.p))))]
       .filter(Boolean).sort((a, b) => Number(a) - Number(b));
     const apen = S.oaVelg || !inne.size;
-    let h = '<section class="panel opp p-oatt" aria-label="Motstanderens angrep"><div class="panel-head"><h2><span class="step">5</span>' + esc(oppName) + ' angrep</h2><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></div>'
-      + '<div class="oppvelg"><button class="textbtn" data-a="oavelg" aria-expanded="' + apen + '">' + (inne.size ? inne.size + ' angripere · ' : '') + (apen ? 'skjul valg' : 'velg angripere') + '</button>';
+    let h = '<section class="panel opp p-oatt" aria-label="Motstanderens angrep"><div class="panel-head"><h2><span class="step">5</span>' + esc(oppName) + ' angrep</h2><span class="ph-valg"><button class="textbtn" data-a="oavelg" aria-expanded="' + apen + '">' + (inne.size ? inne.size + ' angripere · ' : '') + (apen ? 'skjul valg' : 'velg angripere') + '</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
+      + '<div class="oppvelg">';
     if (apen) h += alle.length ? '<div class="oppvelg-chips" role="group" aria-label="Velg angripere">' + alle.map((n) => '<button type="button" class="ovchip" data-a="oachip" data-nr="' + esc(n) + '" aria-pressed="' + inne.has(n) + '">#' + esc(n) + esc(oppLib(m, n)) + '</button>').join('') + '</div>'
       : '<div class="empty" style="margin-top:6px">Ingen spillere ennå. Legg til draktnummer under.</div>';
     h += '</div>';
-    h += valgt.length ? valgt.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : '') + '</div><div class="codes">'
+    h += valgt.length ? valgt.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : '') + '<span class="mini" data-mini="oatt|' + esc(n) + '"></span></div><div class="codes">'
       + OATT.map(([c, cls, big, small]) => '<button class="code ' + cls + '" data-a="oalog" data-nr="' + esc(n) + '" data-c="' + c + '" aria-label="#' + esc(n) + ' ' + esc(small) + '">' + big + '<small>' + esc(small) + '</small></button>').join('') + '</div></div>').join('')
       : '<div class="empty">Velg angriperne deres.</div>';
-    return h + '<div class="code-legend">Trykk resultat, så dra streken fra treffpunkt til landing. En krøll (løkke) blir dip. 0 feil · B vi blokket · 1 i spill · 2 kill</div>'
+    return h + '<div class="code-legend">Trykk resultat, så dra streken fra treffpunkt til landing. En krøll (løkke) blir dip. B vi blokket · 0 feil · 1 i spill · 2 kill</div>'
       + '<form class="addopp" id="oattform"><label for="oatt-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="oatt-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>';
   }
   // Rekkefølgen i Angrep (07.11.2026): K1, K2, diagonal, M1, M2, opplegger. Rollen fra oppstillingen, ellers posisjonen i troppen.
@@ -4665,7 +4674,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     P.rec = '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>';
     P.att = '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">B blokkert · 0 feil · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>';
     P.srv = '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">0 feil · 1 i spill · 2 ess</div>' : noCourt) + '</section>';
-    P.opp = '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
+    P.opp = '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span class="ph-valg"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button>' + oppMottakKnapp(m, oppNums) + '</span></div>' + oppMottakVelger(m, oppNums)
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
       + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>';
     P.oatt = oppAngrepPanel(m, oppName);
@@ -4830,14 +4839,18 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const shown = { rec: new Set(), att: new Set(), srv: new Set() };
     app.querySelectorAll('[data-mini]').forEach((el) => { const [t, id] = [el.dataset.mini.slice(0, el.dataset.mini.indexOf('|')), el.dataset.mini.slice(el.dataset.mini.indexOf('|') + 1)]; if (shown[t]) shown[t].add(id); });
     const only = (o, t) => Object.fromEntries(Object.entries(o).filter(([id]) => shown[t].has(id)));
+    // Motstanderens angrep (slagretning): antall og snitt 0–2 per nummer
+    const oattMini = {}; const dirAlle = allEvents().filter((e) => e.type === 'dir');
+    [...new Set(dirAlle.map((e) => String(e.p)))].forEach((n) => { const L = dirAlle.filter((e) => String(e.p) === n); oattMini[n] = { n: L.length, s: dirSnitt(L) }; });
     const ex = { rec: extremes(only(st.rec, 'rec'), recAvg, 5), att: extremes(only(st.att, 'att'), attAvg, 5), srv: extremes(only(st.srv, 'srv'), srvAvg, 3) };
     app.querySelectorAll('[data-mini]').forEach((el) => {
       const i = el.dataset.mini.indexOf('|'); const t = el.dataset.mini.slice(0, i), id = el.dataset.mini.slice(i + 1);
-      const r = ({ rec: st.rec, att: st.att, srv: st.srv, opp: st.opp })[t][id];
+      const r = t === 'oatt' ? oattMini[id] : ({ rec: st.rec, att: st.att, srv: st.srv, opp: st.opp })[t][id];
       let txt = '<span class="avgbar blk" aria-hidden="true"></span><span class="mt">0 · snitt –</span>';
       const lv = (v, k, ps) => '<b class="lvl-' + avgLvl(v, k, ps) + '">' + dec(v) + '</b>';
       if (r && r.n) {
-        if (t === 'rec' || t === 'opp') txt = avgBarOnly(r.s / r.n, 'blk') + '<span class="mt">' + r.n + ' · snitt ' + lv(r.s / r.n) + '</span>';
+        if (t === 'oatt') txt = avgBarOnly(r.s, 'blk', 'att') + '<span class="mt">' + r.n + ' · snitt ' + lv(r.s, 'att') + '</span>';
+        else if (t === 'rec' || t === 'opp') txt = avgBarOnly(r.s / r.n, 'blk') + '<span class="mt">' + r.n + ' · snitt ' + lv(r.s / r.n) + '</span>';
         else if (t === 'att') txt = avgBarOnly(attAvg(r), 'blk', 'att', posOf(id)) + '<span class="mt">' + r.n + ' · snitt ' + lv(attAvg(r), 'att', posOf(id)) + '</span>';
         else txt = avgBarOnly(srvAvg(r), 'blk', 'srv') + '<span class="mt">' + r.n + ' · ' + lv(srvAvg(r), 'srv') + ' · ess ' + r.E + ' · feil ' + r.F + '</span>';
       }
@@ -6296,7 +6309,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const dirSnitt = (L) => L.length ? (2 * L.filter((e) => e.c === 'K').length + L.filter((e) => e.c === 'D').length) / L.length : null;
   function dirTable(evs, nums, only, opt) {
     opt = opt || {};
-    let h = '<thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Kill</th><th>Feil</th><th>Blokk</th><th>Forsv.</th><th>Kill %</th><th>Diag/Linje/Dip</th></tr></thead><tbody>';
+    let h = '<thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Kill</th><th>Feil</th><th>Blokk</th><th>Forsv.</th><th>Kill %</th><th title="Diagonal / linje / dip">D/L/Dip</th></tr></thead><tbody>';
     const rows = nums.filter((n) => !only || n === only).map((n) => [n, evs.filter((e) => String(e.p) === n)]).filter(([, L]) => L.length);
     const row = (lab, L, dot) => { const c = (r) => L.filter((e) => e.c === r).length, k = (x) => L.filter((e) => dirKind(e) === x).length;
       return '<tr' + (dot === null ? ' class="total"' : '') + '><td class="key">' + (dot ? '<span class="dir-dot" style="background:' + dot + ';vertical-align:-2px"></span> ' : '') + lab + '</td><td>' + L.length + '</td><td class="key">' + avgBar(dirSnitt(L), null, 'att') + '</td><td>' + c('K') + '</td><td>' + c('F') + '</td><td>' + c('B') + '</td><td>' + c('D') + '</td><td class="key">' + pct(c('K'), L.length) + '</td><td>' + k('diagonal') + '/' + k('linje') + '/' + k('dip') + '</td></tr>'; };
