@@ -739,7 +739,8 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .dir-ov.pres .dir-body { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
 .dir-ov.pres .dir-court svg { width: 100%; height: calc(100vh - 175px); min-height: 320px; max-height: none; }
 @media (max-width: 820px) { .dir-ov.pres .dir-body { grid-template-columns: minmax(0, 1fr); } .dir-ov.pres .dir-court svg { height: auto; } }
-.dir-ov.ro .dir-court svg { touch-action: auto; }
+/* Bare visning (07.11.2026): fingeren skal kunne rulle siden over banen. Forsvarsmarkørene har egen touch-action: none */
+.dir-ov.ro .dir-court svg, .dir-ov.pres .dir-court svg { touch-action: auto; }
 /* iPhone (07.11.2026): spillervalget rett under toppstripen, så banen, så resten. «Ferdig» står helt nederst (ikke flytende). */
 .dir-bunn { display: none; }
 @media (max-width: 640px) {
