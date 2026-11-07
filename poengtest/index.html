@@ -4823,7 +4823,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // ---------- Leggefordeling (07.11.2026, bare Avansert) ----------
   // Regnes ut av angrepsregistreringen: angriperens rolle og om hun sto i forrekka eller bakrekka da angrepet ble ført.
   // Kant forrekke = 4, kant bakrekke = Pipe, midt = Midt, diagonal bakrekke = X, diagonal forrekke = 2. Opplegger og libero telles ikke.
-  const LEGG = [['4', '4', '#5B8DEF'], ['P', 'Pipe', '#F07167'], ['M', 'Midt', '#F0A13A'], ['X', 'X', '#C77DFF'], ['2', '2', '#4CD08A']];
+  // [nøkkel, navn i forklaringen, farge, bokstav i stripen]. Kant foran vises som K og diagonal foran som D (07.11.2026).
+  const LEGG = [['4', 'K', '#5B8DEF', 'K'], ['P', 'Pipe', '#F07167', 'P'], ['M', 'Midt', '#F0A13A', 'M'], ['X', 'X', '#C77DFF', 'X'], ['2', 'D', '#4CD08A', 'D']];
   function angrepPlass(m, id) {
     if (!m || modus(m) !== 'avansert' || !window.Oppstilling || !opsBekreftet(m)) return null;
     const o = effektivOppstilling(m, Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1))); if (!o || !o.positions) return null;
@@ -4846,13 +4847,13 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     let h = '<div class="stat-block legg-blokk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Leggefordeling</h2><span class="label">Sett for sett</span></div>';
     if (!L.length) return h + '<div class="empty">Kommer når angrep føres med bekreftet oppstilling. Regnes ut fra hvem som angriper og om hun står foran eller bak.</div></div>';
     const stripe = (U) => { const n = U.length; return '<div class="legg-stripe">' + LEGG.map(([k, , f]) => { const a = U.filter(([, t]) => t === k).length, pr = n ? Math.round(100 * a / n) : 0;
-      return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? '<b>' + k + '</b><span>' + pr + ' %</span>' : pr >= 4 ? '<b>' + k + '</b>' : '') + '</i>' : ''; }).join('') + '</div>'; };   // variant B: bokstav over prosent
+      return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? '<b>' + LEGG.find((x) => x[0] === k)[3] + '</b><span>' + pr + ' %</span>' : pr >= 4 ? '<b>' + LEGG.find((x) => x[0] === k)[3] + '</b>' : '') + '</i>' : ''; }).join('') + '</div>'; };   // variant B: bokstav over prosent
     const settene = [...new Set(L.map(([e]) => e.set))].sort((a, b) => a - b);
     const rad = (lab, U) => '<div class="legg-rad"><span class="legg-nv">' + lab + '</span>' + stripe(U) + '<span class="legg-n">' + U.length + '</span></div>';
     h += '<div class="legg-rader">' + settene.map((s) => rad('Sett ' + s, L.filter(([e]) => e.set === s))).join('') + (settene.length > 1 ? rad('Kamp', L) : '') + '</div>';
     const tot = L.length;
     h += '<div class="legg-forkl">' + LEGG.map(([k, nv, f]) => { const a = L.filter(([, t]) => t === k).length; return '<span><i style="background:' + f + '"></i>' + nv + ' <b>' + (tot ? Math.round(100 * a / tot) : 0) + ' %</b> <small>(' + a + ')</small></span>'; }).join('') + '</div>';
-    return h + '<div class="code-legend">Kant foran = 4, kant bak = Pipe, diagonal bak = X, diagonal foran = 2. Bare angrep som er ført, legg uten angrep er ikke med.</div></div>';
+    return h + '<div class="code-legend">K = kant foran, P = pipe (kant bak), M = midt, X = diagonal bak, D = diagonal foran. Bare angrep som er ført, legg uten angrep er ikke med.</div></div>';
   }
 
   // Motstanderens angrep fra Slagretning (07.11.2026), følger valget Kamp/sett i løpende statistikk
