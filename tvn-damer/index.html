@@ -709,7 +709,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 /* iPhone (07.11.2026): spillervalget rett under toppstripen, så banen, så resten. «Ferdig» står helt nederst (ikke flytende). */
 .dir-bunn { display: none; }
 @media (max-width: 640px) {
-  .dir-ov:not(.pres):not(.fs) .dir-body { display: flex; flex-direction: column; gap: 10px; }
+  .dir-ov:not(.pres):not(.fs) .dir-body { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }   /* alle boksene i full bredde */
   .dir-ov:not(.pres):not(.fs) .dir-side { display: contents; }
   .dir-ov:not(.pres):not(.fs) .dir-spiller { order: -1; }
   .dir-ov:not(.pres):not(.fs) > header [data-d="close"] { display: none; }
