@@ -217,6 +217,8 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
   .flis { background: #F2F1EC; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+/* L for libero ved navnet (som i appen) */
+.lib-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 5px; font: 700 11px/16px var(--font-body, system-ui); vertical-align: 1px; background: var(--accent-soft); color: var(--accent-ink, var(--accent)); }
 </style>
 <!-- app-ikon -->
 <link rel="apple-touch-icon" sizes="180x180" href="../../ikoner/apple-touch-icon.png">
@@ -968,7 +970,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       const lagFlagg = forelopig ? ['Foreløpige tall (ikke bekreftet som endelige)'] : [];
       if (t.totals && t.totals.rec && prosent(t.totals.recPerf) === 0) lagFlagg.push('0 % perfekte mottak hos laget (mulig forenklet føring)');
       (t.players || []).forEach((p) => {
-        const base = { kampId: m.id, dato: m.date || null, lag: t.name, motstander: mot ? mot.name : null, nr: String(p.nr || ''), navn: String(p.name || '').replace(/\s*\(L\)\s*$/, ''),
+        const base = { kampId: m.id, dato: m.date || null, lag: t.name, motstander: mot ? mot.name : null, nr: String(p.nr || ''), navn: String(p.name || '').replace(/\s*\(L\)\s*$/, ''), libero: /\(L\)\s*$/.test(String(p.name || '')),
           kilde, definisjon: DEF.dv, omfang, hentet: nv.statsFetchedAt || nv.checked || null, flagg: lagFlagg.slice() };
         if (p.rec) out.push(Object.assign({}, base, { kategori: 'mottak', tall: { n: tall(p.rec), feil: tall(p.recErr), posPct: prosent(p.recPos), perfPct: prosent(p.recPerf) } }));
         if (p.att) out.push(Object.assign({}, base, { kategori: 'angrep', tall: { n: tall(p.att), kill: tall(p.kills), feil: tall(p.attErr), blokkert: tall(p.blocked) } }));
@@ -978,6 +980,9 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     return out;
   }
 
+  // Libero (07.11.2026): «(L)» i NVBF-navnet eller posisjon «Libero» i troppen. Brukes til L-merket ved navnet.
+  const erLib = (r) => !!r && /^libero/i.test(r.pos || '');
+
   function egneObs(m, events, data, our) {
     if (!events || !events.length) return [];
     const us = m.focus || our, them = m.home === us ? m.away : m.home;
@@ -985,19 +990,19 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const oppRos = ((data.opponents[them] || {}).players || []);
     const fokusRos = m.focus ? ((data.opponents[m.focus] || {}).players || []) : [];
     const spiller = (id) => {
-      if (ros) { const r = ros.find((x) => x.id === id); return r ? { nr: String(r.nr || ''), navn: r.name || '' } : { nr: '', navn: String(id) }; }
-      const nr = String(id).split(':').pop(); const r = fokusRos.find((x) => String(x.nr) === nr); return { nr, navn: (r && r.name) || '' };
+      if (ros) { const r = ros.find((x) => x.id === id); return r ? { nr: String(r.nr || ''), navn: r.name || '', libero: erLib(r) } : { nr: '', navn: String(id) }; }
+      const nr = String(id).split(':').pop(); const r = fokusRos.find((x) => String(x.nr) === nr); return { nr, navn: (r && r.name) || '', libero: erLib(r) };
     };
     const acc = {};
     const add = (lag, mot, sp, kat, f) => {
       const k = lag + '|' + (sp.nr || sp.navn) + '|' + kat;
-      const o = acc[k] || (acc[k] = { kampId: m.id, dato: m.date || null, lag, motstander: mot, nr: sp.nr, navn: sp.navn, kategori: kat, kilde: 'egen', definisjon: DEF.egen,
+      const o = acc[k] || (acc[k] = { kampId: m.id, dato: m.date || null, lag, motstander: mot, nr: sp.nr, navn: sp.navn, libero: !!sp.libero, kategori: kat, kilde: 'egen', definisjon: DEF.egen,
         omfang: m.status === 'ferdig' ? 'kamp' : 'delvis', hentet: null, flagg: [], tall: kat === 'mottak' ? { n: 0, feil: 0, k1: 0, k2: 0 } : kat === 'angrep' ? { n: 0, kill: 0, feil: 0, blokkert: 0 } : { n: 0, ess: 0, feil: 0 } });
       f(o.tall);
     };
     events.forEach((e) => {
       if (e.type === 'rec') add(us, them, spiller(e.p), 'mottak', (t) => { t.n++; if (e.c === '0') t.feil++; if (e.c === '1') t.k1++; if (e.c === '2') t.k2++; });
-      else if (e.type === 'opp') { const r = oppRos.find((x) => String(x.nr) === String(e.p)); add(them, us, { nr: String(e.p), navn: (r && r.name) || '' }, 'mottak', (t) => { t.n++; if (e.c === '0') t.feil++; if (e.c === '1') t.k1++; if (e.c === '2') t.k2++; }); }
+      else if (e.type === 'opp') { const r = oppRos.find((x) => String(x.nr) === String(e.p)); add(them, us, { nr: String(e.p), navn: (r && r.name) || '', libero: erLib(r) }, 'mottak', (t) => { t.n++; if (e.c === '0') t.feil++; if (e.c === '1') t.k1++; if (e.c === '2') t.k2++; }); }
       else if (e.type === 'att') add(us, them, spiller(e.p), 'angrep', (t) => { t.n++; if (e.c === '2') t.kill++; if (e.c === '0') t.feil++; if (e.c === 'B') t.blokkert++; });
       else if (e.type === 'srv') add(us, them, spiller(e.p), 'serve', (t) => { t.n++; if (e.c === 'E') t.ess++; if (e.c === 'F') t.feil++; });
     });
@@ -1104,8 +1109,9 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const spillere = {};
     mine.forEach((o) => {
       const k = spillerNokkel(o);
-      const s = spillere[k] || (spillere[k] = { nr: o.nr, navn: [], obs: [] });
+      const s = spillere[k] || (spillere[k] = { nr: o.nr, navn: [], obs: [], libero: false });
       if (o.navn && !s.navn.includes(o.navn)) s.navn.push(o.navn);
+      if (o.libero) s.libero = true;
       s.obs.push(o);
     });
     const lagAngrep = mine.filter((o) => o.kategori === 'angrep').reduce((a, o) => a + o.tall.n, 0);
@@ -1114,7 +1120,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       const flagg = [...new Set(s.obs.flatMap((o) => o.flagg))];
       if (s.navn.length > 1) flagg.push('Ulike navn på samme nummer: ' + s.navn.join(' / '));
       if (s.navn.some((n) => /ukjent spiller|player unknown/i.test(n))) flagg.push('Navnet mangler i kilden');
-      return { nr: s.nr, navn: s.navn[0] || '', navn_alle: s.navn, mottak: m.length ? mottak(m) : null, angrep: a.length ? angrep(a, lagAngrep) : null, serve: v.length ? serve(v) : null, flagg };
+      return { nr: s.nr, navn: s.navn[0] || '', navn_alle: s.navn, libero: s.libero, mottak: m.length ? mottak(m) : null, angrep: a.length ? angrep(a, lagAngrep) : null, serve: v.length ? serve(v) : null, flagg };
     }).sort((x, y) => (Number(x.nr) || 999) - (Number(y.nr) || 999));
     const kamper = [...new Set(mine.map((o) => o.kampId))];
     const kilder = {};
@@ -1152,7 +1158,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       const grunner = [`${m.feil} feil på ${m.n} mottak (${pct(m.feilPct)}), lagsnitt ${pct(100 * e0)}`];
       if (m.positiv) grunner.push(`positivt ${m.positiv.avrundet ? '≈ ' : ''}${pct(m.positiv.pct)} av ${m.positiv.n} mottak hos ${m.kilder.filter((k) => k !== 'egen').join('/')}` + (m.positiv.avrundet ? ` (${pct(m.positiv.loPct)}–${pct(m.positiv.hiPct)} pga. avrunding)` : '') + (p0 != null ? `, lagsnitt ${pct(100 * p0)}` : ''));
       if (m.egen) grunner.push(`egen føring: snitt ${m.egen.snitt.toFixed(2).replace('.', ',')} på ${m.egen.n} mottak (0–2-skala, ikke sammenlignbar med Pos%)`);
-      return { nr: s.nr, navn: s.navn, n: m.n, kamper: m.kamper, kilder: m.kilder, feilPct: m.feilPct, positiv: m.positiv, egen: m.egen, score: q.nivaa === 'for lite' ? null : score,
+      return { nr: s.nr, navn: s.navn, libero: !!s.libero, n: m.n, kamper: m.kamper, kilder: m.kilder, feilPct: m.feilPct, positiv: m.positiv, egen: m.egen, score: q.nivaa === 'for lite' ? null : score,
         kvalitet: q, flagg: s.flagg, grunner };
     });
     rader.sort((a, b) => (a.score == null) - (b.score == null) || (b.score || 0) - (a.score || 0) || b.n - a.n);
@@ -1177,7 +1183,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const sammenligning = plan.rader.filter((r) => r.rang != null).slice(0, 6).map((r) => {
       const o = perSpiller['#' + r.nr] || [];
       const m = o.length ? mottak(o) : null;
-      return { nr: r.nr, navn: r.navn, rang: r.rang, foerFeilPct: r.feilPct, foerN: r.n, iKamp: m, kilde: o.length ? KILDENAVN[o[0].kilde] : null };
+      return { nr: r.nr, navn: r.navn, libero: !!r.libero, rang: r.rang, foerFeilPct: r.feilPct, foerN: r.n, iKamp: m, kilde: o.length ? KILDENAVN[o[0].kilde] : null };
     });
     const vaar = kampObs(modell, kamp.id, eget).filter((o) => o.kategori === 'serve');
     return { plan, sammenligning, vaarServe: vaar.length ? serve(vaar) : null, navn: idag };
@@ -1641,7 +1647,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       const maks = Math.max(1, ...rangert.map((m) => m.feilPct || 0));
       rader.forEach((m) => {
         const q = m.kvalitet || {}, kv = q.nivaa === 'god' ? 'Godt grunnlag' : q.nivaa === 'middels' ? 'Middels' : q.nivaa === 'svak' ? 'Lite grunnlag' : 'For få mottak';
-        h += '<div class="sp-mott"><span class="pl">' + (m.rang || '–') + '</span><span class="nv">#' + esc(m.nr) + ' ' + esc(m.navn) + '</span><span class="sp-kv ' + esc(q.nivaa || '') + '">' + kv + '</span>'
+        h += '<div class="sp-mott"><span class="pl">' + (m.rang || '–') + '</span><span class="nv">#' + esc(m.nr) + ' ' + esc(m.navn) + (m.libero ? ' <span class="lib-tag" title="Libero">L</span>' : '') + '</span><span class="sp-kv ' + esc(q.nivaa || '') + '">' + kv + '</span>'
           + (m.rang ? '<div class="mt"><i style="width:' + Math.max(6, Math.round(100 * (m.feilPct || 0) / maks)) + '%"></i></div>' : '')
           + '<span class="tl">' + (m.feilPct != null ? Math.round(m.feilPct) + ' % feil' : '') + (m.positiv ? ' · ' + Math.round(m.positiv.pct) + ' % positivt' : '') + ' · ' + m.n + ' mottak' + (m.egen ? ' · egen 0–2: ' + m.egen.snitt.toFixed(2).replace('.', ',') : '') + '</span></div>';
       });
