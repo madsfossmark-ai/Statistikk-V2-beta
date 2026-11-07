@@ -752,6 +752,42 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 }
 
 /* Tavle-knappen er hvit, som tavlen. I lyst tema får den en kant mot den hvite toppstripen. */
+/* Tavle som stor boks oppe til høyre i registreringen (08.11.2026) */
+.bar.har-tavle { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 10px; }
+.bar.har-tavle > .bar-inn { display: flex; align-items: center; gap: inherit; flex-wrap: wrap; min-width: 0; }
+.tavle-boks { border: 0; border-radius: 14px; background: #FFFFFF; color: #000000; cursor: pointer; display: grid; place-items: center; align-content: center; gap: 2px; padding: 8px 16px; min-width: 120px; font-family: var(--font-display); }
+.tavle-boks b { font-size: 26px; font-weight: 800; letter-spacing: .05em; line-height: 1; }
+.tavle-boks small { font: 600 11px var(--font-body); color: #444; }
+.tavle-boks .tb-ik svg { width: 34px; height: 22px; display: block; }
+.tavle-boks:hover { background: #F1F3F6; }
+:root[data-theme="light"] .tavle-boks { box-shadow: inset 0 0 0 2px #9AA3B2; }
+@media (max-width: 700px) { .bar.har-tavle { grid-template-columns: minmax(0, 1fr); } .tavle-boks { display: flex; gap: 10px; min-height: 52px; } .tavle-boks small { display: none; } }
+/* Tavle: Bane-modus (08.11.2026). Bare sort og hvitt. Flytt, Penn og Visk er hver sin modus. */
+.tavle .t-modus { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; z-index: 3; display: inline-flex; border: 2px solid var(--t-fg); border-radius: 12px; overflow: hidden; }
+.tavle .t-modus button { border-radius: 0; background: var(--t-bg); min-height: 44px; padding: 0 16px; font: 700 17px var(--font-display); letter-spacing: .04em; }
+.tavle .t-modus button[aria-pressed="true"] { background: var(--t-fg); color: var(--t-bg); }
+.tavle.bane .t-tall, .tavle.bane .t-rad { display: none; }
+.tavle .t-bane { display: none; position: absolute; inset: 0; }
+.tavle.bane .t-bane { display: block; }
+.tavle .tb-topp { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 3; display: flex; gap: 8px; }
+.tavle .tb-flate { position: absolute; left: 8px; right: 8px; top: calc(max(12px, env(safe-area-inset-top)) + 56px); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px); }
+.tavle.staa .tb-flate { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 118px); }
+.tavle .tb-flate svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tavle .tb-v { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; width: max-content; max-width: calc(100% - 20px); }
+.tavle.staa .tb-v { width: 560px; row-gap: 10px; }
+.tavle .tb-k { min-height: 44px; min-width: 44px; padding: 0 12px; border: 2px solid var(--t-fg); background: var(--t-bg); border-radius: 12px; font: 700 16px var(--font-display); letter-spacing: .04em; }
+.tavle .tb-k[aria-pressed="true"] { background: var(--t-fg); color: var(--t-bg); }
+.tavle .tb-k:disabled { border-style: dashed; opacity: .35; cursor: default; }
+.tavle .tb-seg { display: inline-flex; border: 2px solid var(--t-fg); border-radius: 12px; overflow: hidden; }
+.tavle .tb-seg button { border-radius: 0; background: var(--t-bg); min-height: 44px; padding: 0 14px; font: 700 17px var(--font-display); letter-spacing: .04em; }
+.tavle .tb-seg button[aria-pressed="true"] { background: var(--t-fg); color: var(--t-bg); }
+.tavle .tb-status { width: 150px; text-align: center; white-space: nowrap; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+.tavle .tb-skille { width: 2px; align-self: stretch; background: var(--t-fg); opacity: .25; margin: 4px 2px; }
+.tavle.staa .tb-skille { display: none; }
+.tavle .tb-brikke text { font: 700 34px var(--font-display); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.tavle .m-flytt .tb-brikke { cursor: grab; } .tavle .m-penn, .tavle .m-penn * { cursor: crosshair; }
+.tavle .m-penn .tb-brikke, .tavle .m-visk .tb-brikke { pointer-events: none; }
+.tavle .m-flytt [data-s] { pointer-events: none; }
 .barbtn.tavle-knapp, :root[data-theme="light"] .barbtn.tavle-knapp { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
 :root[data-theme="light"] .barbtn.tavle-knapp { border-color: #9AA3B2; }
 .barbtn.tavle-knapp:hover { background: #F1F3F6; }
@@ -4583,7 +4619,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function scoreBar(m, opsO) {
     const c = m.current || { set: 1, home: 0, away: 0 };
     const sets = (m.setScores || []).map((s) => s[0] + '–' + s[1]).join(' · ');
-    return '<header class="bar"><button class="link" data-a="back">‹ Kamper</button>'
+    return '<header class="bar har-tavle"><div class="bar-inn"><button class="link" data-a="back">‹ Kamper</button>'
       + '<div class="title"><span class="display tm">' + crest(m.home, 'sm') + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + crest(m.away, 'sm') + (isTest(m) ? ' <span class="badge b-demo">Demo</span>' : '') + '</span><span class="sub" id="bar-sub">' + esc(barSub(m)) + '</span></div>'
       + '<div class="score-wrap"><span class="setpill">Sett ' + c.set + '</span></div>' + (opsO && !S.endingSet ? courtChips(m, opsO) : '') + '<span class="spacer"></span><div class="bar-actions">'
       + (S.endingSet
@@ -4596,9 +4632,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
           + (window.Hurtignotat && m.status !== 'ferdig' ? window.Hurtignotat.knapp(ctxSlug()) : '')
           + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
-          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn tavle-knapp" data-a="tavle">Tavle</button><button class="barbtn' + (S.tilpass ? ' aktiv-tilpass' : '') + '" data-a="tilpass">Tilpass</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
+          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn' + (S.tilpass ? ' aktiv-tilpass' : '') + '" data-a="tilpass">Tilpass</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
-      + '</div></header>';
+      + '</div></div><button class="tavle-boks" data-a="tavle" aria-label="Åpne tavla"><span class="tb-ik" aria-hidden="true"><svg viewBox="0 0 34 22"><rect x="1" y="1" width="32" height="20" fill="none" stroke="currentColor" stroke-width="2"/><line x1="17" y1="1" x2="17" y2="21" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="11" r="3" fill="currentColor"/><circle cx="25" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span><b>TAVLE</b><small>tall · bane</small></button></header>';
   }
   function barSub(m) {
     const us = m.home === usName(m) ? (m.setsHome || 0) : (m.setsAway || 0);
@@ -6173,13 +6209,18 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     let sort = false; try { sort = localStorage.getItem('rv-tavle-farge') === 'sort'; } catch (e) { /* ingen lagring */ }
     const fokus = document.activeElement, el = document.createElement('div');
     el.className = 'tavle'; el.tabIndex = -1; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Talltavle');
-    el.innerHTML = '<div class="t-tall" aria-live="polite"></div><div class="t-rad">'
+    el.innerHTML = '<div class="t-modus" role="group" aria-label="Modus"><button type="button" data-tm="tall" aria-pressed="true">Tall</button><button type="button" data-tm="bane" aria-pressed="false">Bane</button></div>'
+      + '<div class="t-bane"></div><div class="t-tall" aria-live="polite"></div><div class="t-rad">'
       + [1, 2, 3, 4, 5, 6].map((n) => '<button type="button" data-n="' + n + '" aria-label="Vis ' + n + '">' + n + '</button>').join('')
       + '<button type="button" class="smal" data-x="farge">Snu farger</button><button type="button" class="smal" data-x="lukk">Lukk</button></div>';
     let las = null;
-    const vis = () => { el.classList.toggle('sort', sort); el.querySelector('.t-tall').textContent = tavleN; el.querySelectorAll('[data-n]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === tavleN))); };
+    // Tavla åpner alltid i Tall (08.11.2026). Bane har egen tilstand som nullstilles når tavla lukkes.
+    const TB = { modus: 'tall', verktoy: 'flytt', pil: false, stiplet: false, streker: [], brikker: tavleOppstilling() };
+    const banen = () => tavleBane(el, TB, sort, () => { sort = !sort; try { localStorage.setItem('rv-tavle-farge', sort ? 'sort' : 'hvit'); } catch (err) { /* ingen lagring */ } vis(); }, () => lukk());
+    const vis = () => { el.classList.toggle('sort', sort); el.classList.toggle('bane', TB.modus === 'bane'); el.querySelectorAll('[data-tm]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tm === TB.modus))); if (TB.modus === 'bane') banen(); el.querySelector('.t-tall').textContent = tavleN; el.querySelectorAll('[data-n]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === tavleN))); };
+    const snu = () => { if (el.isConnected && TB.modus === 'bane') banen(); };
     const lukk = () => {
-      el.remove(); document.removeEventListener('fullscreenchange', vedFs);
+      el.remove(); document.removeEventListener('fullscreenchange', vedFs); window.removeEventListener('resize', snu);
       try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* ikke støttet */ }
       try { if (las) las.release(); } catch (e) { /* ikke støttet */ }
       if (fokus && fokus.focus) fokus.focus();
@@ -6187,20 +6228,101 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const vedFs = () => { if (!document.fullscreenElement && el.isConnected) lukk(); };
     el.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.tm) { TB.modus = b.dataset.tm; vis(); return; }
+      if (b.closest('.t-bane')) return;   // banens knapper håndteres i tavleBane
       if (b.dataset.n) { tavleN = +b.dataset.n; vis(); }
       else if (b.dataset.x === 'farge') { sort = !sort; try { localStorage.setItem('rv-tavle-farge', sort ? 'sort' : 'hvit'); } catch (err) { /* ingen lagring */ } vis(); }
       else if (b.dataset.x === 'lukk') lukk();
     });
     el.addEventListener('keydown', (e) => {
       e.stopPropagation();   // tastatursnarveier i føringen skal ikke reagere mens tavlen er åpen
+      if (e.key === 'Escape') { lukk(); return; }
+      if (TB.modus !== 'tall') return;
       if (/^[1-6]$/.test(e.key)) { tavleN = +e.key; vis(); }
       else if (e.key === 'ArrowRight') { tavleN = tavleN % 6 + 1; vis(); }
       else if (e.key === 'ArrowLeft') { tavleN = (tavleN + 4) % 6 + 1; vis(); }
       else if (e.key === 'Escape') lukk();
     });
-    document.body.appendChild(el); vis(); el.focus();
+    document.body.appendChild(el); vis(); el.focus(); window.addEventListener('resize', snu);
     try { const r = el.requestFullscreen && el.requestFullscreen(); if (r && r.then) r.then(() => document.addEventListener('fullscreenchange', vedFs)).catch(() => {}); } catch (e) { /* ikke støttet (f.eks. iPhone) */ }
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((l) => { las = l; }).catch(() => {}); } catch (e) { /* ikke støttet */ }
+  }
+
+  // Brikkene i rotasjonen vi står i (bekreftet oppstilling), ellers standard R1. Motstanderen: standard R1 speilet.
+  // Koordinater: liggende bane 2000 x 1100, 100 = 1 m, vår side til venstre (baklinje x = 100, nett x = 1000).
+  function tavleOppstilling() {
+    const PL = { 1: [7.5, 7.5], 2: [1.5, 7.5], 3: [1.5, 4.5], 4: [1.5, 1.5], 5: [7.5, 1.5], 6: [7.5, 4.5] };
+    const STD = { 1: 'O', 2: 'K1', 3: 'M2', 4: 'D', 5: 'K2', 6: 'M1' };
+    let oss = Object.assign({}, STD);
+    try {
+      const m = cur();
+      if (m && window.Oppstilling && opsBekreftet(m)) {
+        const o = effektivOppstilling(m, Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1)));
+        if (o && o.positions) {
+          const L = o.libero || {}, inne = Oppstilling.liberoInne && Oppstilling.liberoInne(o), server1 = poengPaa(m) && poengTilstand(m).server === 'oss';
+          oss = {};
+          [1, 2, 3, 4, 5, 6].forEach((p) => { const id = o.positions[p]; let r = (o.roles || {})[id] || ((player(id) || {}).nr ? '#' + player(id).nr : '?');
+            if (inne && String(L.erstatter) === String(id) && !(p === 1 && server1)) r = 'L'; oss[p] = r; });
+        }
+      }
+    } catch (e) { oss = Object.assign({}, STD); }
+    const dem = Object.assign({}, STD, { 6: 'L' }), b = [];
+    Object.entries(oss).forEach(([p, r]) => { const [d, y] = PL[p]; b.push({ id: 'o' + p, r, lag: 'oss', x: 100 + (9 - d) * 100, y: 100 + y * 100 }); });
+    Object.entries(dem).forEach(([p, r]) => { const [d, y] = PL[p]; b.push({ id: 'd' + p, r, lag: 'dem', x: 100 + (9 + d) * 100, y: 100 + (9 - y) * 100 }); });
+    return b;
+  }
+  function tavleBane(el, TB, sort, byttFarge, lukk) {
+    const W = 2000, H = 1100, OX = 100, OY = 100, NS2 = 'http://www.w3.org/2000/svg';
+    const st = innerHeight > innerWidth;   // stående iPad: banen står, vår side nederst
+    el.classList.toggle('staa', st);
+    const mk = (t, a, p) => { const e = document.createElementNS(NS2, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+    const k = (txt, data, pr, dis) => '<button type="button" class="tb-k" ' + data + (pr != null ? ' aria-pressed="' + pr + '"' : '') + (dis ? ' disabled' : '') + '>' + txt + '</button>';
+    const md = (id, t) => '<button type="button" data-tv="' + id + '" aria-pressed="' + (TB.verktoy === id) + '">' + t + '</button>';
+    const penn = TB.verktoy === 'penn';
+    const rot = el.querySelector('.t-bane');
+    rot.innerHTML = '<div class="tb-topp">' + k(sort ? 'Hvit' : 'Sort', 'data-tx="farge"') + k('✕', 'data-tx="lukk" aria-label="Lukk tavla"') + '</div>'
+      + '<div class="tb-flate m-' + TB.verktoy + '"></div>'
+      + '<div class="tb-v" role="toolbar" aria-label="Verktøy"><div class="tb-seg" role="group" aria-label="Modus på banen">' + md('flytt', 'Flytt') + md('penn', 'Penn') + md('visk', 'Visk') + '</div>'
+      + k('Pil', 'data-to="pil"', TB.pil, !penn) + k('Stiplet', 'data-to="stiplet"', TB.stiplet, !penn)
+      + '<span class="tb-status" aria-live="polite">' + { flytt: 'Flytt spillere', penn: 'Tegn', visk: 'Visk ut' }[TB.verktoy] + '</span><span class="tb-skille"></span>'
+      + k('Angre', 'data-tx="angre"') + k('Tøm', 'data-tx="tom"') + k('Oppstilling', 'data-tx="ops"') + '</div>';
+    const s0 = mk('svg', { viewBox: st ? '0 0 ' + H + ' ' + W : '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Volleyballbane med brikker og streker' }, rot.querySelector('.tb-flate'));
+    mk('defs', {}, s0).innerHTML = '<marker id="tb-pil" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--t-fg)"/></marker>';
+    const s = mk('g', st ? { transform: 'translate(0,' + W + ') rotate(-90)' } : {}, s0);
+    const L = { stroke: 'var(--t-fg)', 'stroke-width': 6, fill: 'none' };
+    mk('rect', Object.assign({ x: OX, y: OY, width: 1800, height: 900 }, L), s);
+    mk('line', Object.assign({ x1: OX + 600, x2: OX + 600, y1: OY, y2: OY + 900 }, L), s);
+    mk('line', Object.assign({ x1: OX + 1200, x2: OX + 1200, y1: OY, y2: OY + 900 }, L), s);
+    mk('line', { x1: OX + 900, x2: OX + 900, y1: OY - 60, y2: OY + 960, stroke: 'var(--t-fg)', 'stroke-width': 14 }, s);
+    const lbl = (x, t) => { const a = st ? { x: H - 30, y: W - x, transform: 'rotate(90 ' + (H - 30) + ' ' + (W - x) + ')' } : { x, y: OY + 960 };
+      mk('text', Object.assign(a, { 'text-anchor': 'middle', fill: 'var(--t-fg)', opacity: .5, style: 'font:700 30px var(--font-display);letter-spacing:.08em' }), s0).textContent = t; };
+    lbl(OX + 450, 'VÅR SIDE'); lbl(OX + 1350, 'MOTSTANDER');
+    const gS = mk('g', {}, s), gB = mk('g', {}, s), live = mk('path', { fill: 'none', stroke: 'var(--t-fg)', 'stroke-width': 8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, s);
+    const sti = (p) => p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(0) + ',' + q[1].toFixed(0)).join(' ');
+    TB.streker.forEach((x, i) => mk('path', { d: sti(x.p), fill: 'none', stroke: 'var(--t-fg)', 'stroke-width': 8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': x.stiplet ? '22 18' : '', 'marker-end': x.pil ? 'url(#tb-pil)' : '', 'data-s': i }, gS));
+    TB.brikker.forEach((b) => { const g = mk('g', { class: 'tb-brikke', 'data-b': b.id, transform: 'translate(' + b.x + ',' + b.y + ')', role: 'img', 'aria-label': (b.lag === 'oss' ? 'Vår ' : 'Motstanderens ') + b.r }, gB);
+      mk('circle', { r: 44, fill: b.lag === 'oss' ? 'var(--t-fg)' : 'var(--t-bg)', stroke: 'var(--t-fg)', 'stroke-width': 6 }, g);
+      mk('text', Object.assign({ fill: b.lag === 'oss' ? 'var(--t-bg)' : 'var(--t-fg)' }, st ? { transform: 'rotate(90)' } : {}), g).textContent = b.r; });
+    const pt = (e) => { const p = s0.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(s.getScreenCTM().inverse()); return [q.x, q.y]; };   // liggende koordinater også når banen står
+    let dra = null, strek = null;
+    s0.addEventListener('pointerdown', (e) => {
+      if (TB.verktoy === 'flytt') { const g = e.target.closest('[data-b]'); if (!g) return; e.preventDefault(); try { s0.setPointerCapture(e.pointerId); } catch (x) {} const b = TB.brikker.find((x) => x.id === g.dataset.b), p = pt(e); dra = { b, g, dx: p[0] - b.x, dy: p[1] - b.y }; gB.appendChild(g); return; }
+      if (TB.verktoy === 'visk') { const x = e.target.closest('[data-s]'); if (x) { TB.streker.splice(Number(x.dataset.s), 1); tavleBane(el, TB, sort, byttFarge, lukk); } return; }
+      e.preventDefault(); try { s0.setPointerCapture(e.pointerId); } catch (x) {} strek = [pt(e)];
+    });
+    s0.addEventListener('pointermove', (e) => {
+      if (dra) { const p = pt(e); dra.b.x = Math.max(40, Math.min(W - 40, p[0] - dra.dx)); dra.b.y = Math.max(40, Math.min(H - 40, p[1] - dra.dy)); dra.g.setAttribute('transform', 'translate(' + dra.b.x + ',' + dra.b.y + ')'); return; }
+      if (strek) { const p = pt(e), l = strek[strek.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 6) { strek.push(p); live.setAttribute('d', sti(strek)); live.setAttribute('stroke-dasharray', TB.stiplet ? '22 18' : ''); } }
+    });
+    const slipp = () => { if (dra) dra = null; if (strek) { if (strek.length > 2) TB.streker.push({ p: strek, pil: TB.pil, stiplet: TB.stiplet }); strek = null; tavleBane(el, TB, sort, byttFarge, lukk); } };
+    s0.addEventListener('pointerup', slipp); s0.addEventListener('pointercancel', slipp);
+    rot.onclick = (e) => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      if (b.dataset.tv) TB.verktoy = b.dataset.tv; else if (b.dataset.to) TB[b.dataset.to] = !TB[b.dataset.to];
+      else if (b.dataset.tx === 'angre') TB.streker.pop(); else if (b.dataset.tx === 'tom') TB.streker = []; else if (b.dataset.tx === 'ops') TB.brikker = tavleOppstilling();
+      else if (b.dataset.tx === 'farge') { byttFarge(); return; } else if (b.dataset.tx === 'lukk') { lukk(); return; }
+      tavleBane(el, TB, sort, byttFarge, lukk);
+    };
   }
 
   function dirOpen(opts) {
