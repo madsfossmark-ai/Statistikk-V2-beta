@@ -652,7 +652,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .tbl td.l-al, .tbl th.l-al { text-align: left; }
 
 /* Leggefordeling sett for sett (over begge kolonner) */
-.legg-blokk { margin-top: 14px; }
+.legg-panel { margin-bottom: 12px; }
 .legg-rader { display: grid; gap: 8px; }
 .legg-rad { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 10px; align-items: center; }
 .legg-nv { font: 700 17px var(--font-display); }
@@ -4789,7 +4789,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function leggeBlokk(m, evs) {
     if (modus(m) !== 'avansert') return '';
     const L = evs.map((e) => [e, leggMaal(e)]).filter(([, t]) => t);
-    let h = '<div class="stat-block legg-blokk"><div class="label" style="color:var(--accent)">Leggefordeling · sett for sett</div>';
+    let h = '<div class="stat-block legg-blokk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Leggefordeling</h2><span class="label">Sett for sett</span></div>';
     if (!L.length) return h + '<div class="empty">Kommer når angrep føres med bekreftet oppstilling. Regnes ut fra hvem som angriper og om hun står foran eller bak.</div></div>';
     const stripe = (U) => { const n = U.length; return '<div class="legg-stripe">' + LEGG.map(([k, , f]) => { const a = U.filter(([, t]) => t === k).length, pr = n ? Math.round(100 * a / n) : 0;
       return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? pr + ' %' : '') + '</i>' : ''; }).join('') + '</div>'; };
@@ -4816,7 +4816,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (!sets.includes(cs)) sets.push(cs);
     const filt = S.statSet === 'all' ? evs : evs.filter((e) => String(e.set) === String(S.statSet));
     const st = computeStats(filt);
-    let h = '<section class="panel" aria-label="Løpende statistikk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Løpende statistikk</h2>'
+    // Leggefordeling (bare Avansert) som eget panel før løpende statistikk (07.11.2026)
+    const legg = leggeBlokk(m, evs);
+    let h = (legg ? '<section class="panel legg-panel" aria-label="Leggefordeling">' + legg + '</section>' : '') + '<section class="panel" aria-label="Løpende statistikk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Løpende statistikk</h2>'
       + '<div class="seg" role="group" aria-label="Utvalg"><button data-a="statset" data-v="all" aria-pressed="' + (S.statSet === 'all') + '">Kamp</button>' + sets.map((s) => { const sc = scoreStr((m.setScores || [])[s - 1]); return '<button data-a="statset" data-v="' + s + '" aria-pressed="' + (String(S.statSet) === String(s)) + '">Sett ' + s + (sc ? ' · ' + sc : '') + '</button>'; }).join('') + '</div></div>';
 
     const recRows = Object.entries(st.rec).sort((a, b) => b[1].n - a[1].n);
@@ -4859,7 +4861,6 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<tr class="total"><td>Lag</td><td>' + st.tOpp.n + '</td><td>' + avgBar(st.tOpp.s / st.tOpp.n) + '</td><td>' + pct(st.tOpp.c0, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c1, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c2, st.tOpp.n) + '</td></tr></tbody></table></div>'
       + '<div class="code-legend">Grå rader: under 5 mottak, lite utvalg.</div>';
     h += '</div>' + angrepMotBlokk(m, filt, oppName) + '</div></div>';   // motstanderens angrep, så lukkes motstanderkolonnen og stats-body
-    h += leggeBlokk(m, evs);   // leggefordeling sett for sett over hele bredden (bare Avansert)
     if (m.legacy) h += legacyBlock(m.legacy);
     // Kampark og CSV-eksport samlet nederst i statistikken (01.11.2026: Kampark flyttet hit fra topplinjen i registreringen)
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (S.view === 'live' && !S.dash && !window.PUBLIC ? '<button class="secondary" data-a="sheet">Kampark</button>' : '') + (S.dl ? '<button class="secondary" data-a="export">Eksporter til regneark (CSV)</button>' : '') + '</div>';
