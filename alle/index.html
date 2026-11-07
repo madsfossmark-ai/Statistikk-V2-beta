@@ -651,6 +651,18 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .tbl td.muted { color: var(--faint); }
 .tbl td.l-al, .tbl th.l-al { text-align: left; }
 
+/* Leggefordeling sett for sett (over begge kolonner) */
+.legg-blokk { margin-top: 14px; }
+.legg-rader { display: grid; gap: 8px; }
+.legg-rad { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 10px; align-items: center; }
+.legg-nv { font: 700 17px var(--font-display); }
+.legg-n { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.legg-stripe { display: flex; height: 30px; border-radius: 8px; overflow: hidden; background: var(--sunk); }
+.legg-stripe i { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; font: 700 12px var(--font-body); color: #0D1117; font-style: normal; }
+.legg-forkl { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legg-forkl i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.legg-forkl b { color: var(--fg); }
+
 /* Talltavle (06.11.2026, variant B): stort tall 1–6 over hele skjermen til å vise spillerne fra benken.
    Fargene er bevisst faste (hvit/sort) og følger ikke temaet. Tallet lagres ikke. */
 .tavle { --t-bg: #FFFFFF; --t-fg: #000000; --t-knapp: rgba(0,0,0,.07); position: fixed; inset: 0; z-index: 60; container-type: size; background: var(--t-bg); color: var(--t-fg);
@@ -1246,6 +1258,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       const g = {}; for (const [x, v] of Object.entries(ev)) if (!['id', 't', 'set', 'type', 'p', 'c', 'n', 'pid'].includes(x)) g[x] = v;
       rad.geom = g;
     }
+    // Angrep i Avansert: forrekke/bakrekke og rolle (leggefordeling, 07.11.2026)
+    if (type === 'att' && (ev.rad === 'f' || ev.rad === 'b')) rad.geom = { rad: ev.rad, rolle: String(ev.rolle || '').slice(0, 4) };
     if (ev.id && !erUuid(ev.id)) rad.legacy_id = String(ev.id);
     return rad;
   }
@@ -4752,6 +4766,41 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return who + ' · ' + lbl + ' ' + code;
   }
 
+  // ---------- Leggefordeling (07.11.2026, bare Avansert) ----------
+  // Regnes ut av angrepsregistreringen: angriperens rolle og om hun sto i forrekka eller bakrekka da angrepet ble ført.
+  // Kant forrekke = 4, kant bakrekke = Pipe, midt = Midt, diagonal bakrekke = X, diagonal forrekke = 2. Opplegger og libero telles ikke.
+  const LEGG = [['4', '4', '#5B8DEF'], ['P', 'Pipe', '#F07167'], ['M', 'Midt', '#F0A13A'], ['X', 'X', '#C77DFF'], ['2', '2', '#4CD08A']];
+  function angrepPlass(m, id) {
+    if (!m || modus(m) !== 'avansert' || !window.Oppstilling || !opsBekreftet(m)) return null;
+    const o = Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1)); if (!o || !o.positions) return null;
+    const plass = Oppstilling.plassAv(o.positions, id); if (!plass) return null;
+    const rolle = (o.roles || {})[id] || '';
+    return { rad: Oppstilling.BAK.includes(Number(plass)) ? 'b' : 'f', rolle };
+  }
+  function leggMaal(e) {
+    if (e.type !== 'att' || !e.rad) return null;
+    const ro = String(e.rolle || '').toUpperCase(), pos = (player(e.p) || {}).pos || '';
+    const kind = /^K/.test(ro) ? 'K' : /^M/.test(ro) ? 'M' : /^D/.test(ro) ? 'D' : /^O|^L/.test(ro) ? '' : /^kant/i.test(pos) ? 'K' : /^midt/i.test(pos) ? 'M' : /^diag/i.test(pos) ? 'D' : '';
+    if (kind === 'K') return e.rad === 'b' ? 'P' : '4';
+    if (kind === 'D') return e.rad === 'b' ? 'X' : '2';
+    if (kind === 'M') return 'M';
+    return null;
+  }
+  function leggeBlokk(m, evs) {
+    if (modus(m) !== 'avansert') return '';
+    const L = evs.map((e) => [e, leggMaal(e)]).filter(([, t]) => t);
+    let h = '<div class="stat-block legg-blokk"><div class="label" style="color:var(--accent)">Leggefordeling · sett for sett</div>';
+    if (!L.length) return h + '<div class="empty">Kommer når angrep føres med bekreftet oppstilling. Regnes ut fra hvem som angriper og om hun står foran eller bak.</div></div>';
+    const stripe = (U) => { const n = U.length; return '<div class="legg-stripe">' + LEGG.map(([k, , f]) => { const a = U.filter(([, t]) => t === k).length, pr = n ? Math.round(100 * a / n) : 0;
+      return a ? '<i style="width:' + (100 * a / n) + '%;background:' + f + '" title="' + esc(LEGG.find((x) => x[0] === k)[1]) + ': ' + a + ' av ' + n + ' (' + pr + ' %)">' + (pr >= 8 ? pr + ' %' : '') + '</i>' : ''; }).join('') + '</div>'; };
+    const settene = [...new Set(L.map(([e]) => e.set))].sort((a, b) => a - b);
+    const rad = (lab, U) => '<div class="legg-rad"><span class="legg-nv">' + lab + '</span>' + stripe(U) + '<span class="legg-n">' + U.length + '</span></div>';
+    h += '<div class="legg-rader">' + settene.map((s) => rad('Sett ' + s, L.filter(([e]) => e.set === s))).join('') + (settene.length > 1 ? rad('Kamp', L) : '') + '</div>';
+    const tot = L.length;
+    h += '<div class="legg-forkl">' + LEGG.map(([k, nv, f]) => { const a = L.filter(([, t]) => t === k).length; return '<span><i style="background:' + f + '"></i>' + nv + ' <b>' + (tot ? Math.round(100 * a / tot) : 0) + ' %</b> <small>(' + a + ')</small></span>'; }).join('') + '</div>';
+    return h + '<div class="code-legend">Kant foran = 4, kant bak = Pipe, diagonal bak = X, diagonal foran = 2. Bare angrep som er ført, legg uten angrep er ikke med.</div></div>';
+  }
+
   // Motstanderens angrep fra Slagretning (07.11.2026), følger valget Kamp/sett i løpende statistikk
   function angrepMotBlokk(m, evs, oppName) {
     const dir = evs.filter((e) => e.type === 'dir');
@@ -4810,6 +4859,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<tr class="total"><td>Lag</td><td>' + st.tOpp.n + '</td><td>' + avgBar(st.tOpp.s / st.tOpp.n) + '</td><td>' + pct(st.tOpp.c0, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c1, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c2, st.tOpp.n) + '</td></tr></tbody></table></div>'
       + '<div class="code-legend">Grå rader: under 5 mottak, lite utvalg.</div>';
     h += '</div>' + angrepMotBlokk(m, filt, oppName) + '</div></div>';   // motstanderens angrep, så lukkes motstanderkolonnen og stats-body
+    h += leggeBlokk(m, evs);   // leggefordeling sett for sett over hele bredden (bare Avansert)
     if (m.legacy) h += legacyBlock(m.legacy);
     // Kampark og CSV-eksport samlet nederst i statistikken (01.11.2026: Kampark flyttet hit fra topplinjen i registreringen)
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (S.view === 'live' && !S.dash && !window.PUBLIC ? '<button class="secondary" data-a="sheet">Kampark</button>' : '') + (S.dl ? '<button class="secondary" data-a="export">Eksporter til regneark (CSV)</button>' : '') + '</div>';
@@ -6190,7 +6240,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       if (b.dataset.confirm !== '1') { b.dataset.confirm = '1'; b.textContent = 'Bekreft'; return; }
       const n = b.dataset.nr, tm = b.dataset.team || oppTeam(m); saveOpp(m, rosterOf(tm).filter((p) => String(p.nr) !== n), tm); if (tm === oppTeam(m)) setOppNumbers(m, (m.oppNumbers || []).filter((x) => String(x) !== n));
     }
-    else if (a === 'log') { logEvent(b.dataset.t, b.dataset.p, b.dataset.c); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 300); }
+    else if (a === 'log') { logEvent(b.dataset.t, b.dataset.p, b.dataset.c, b.dataset.t === 'att' ? angrepPlass(m, b.dataset.p) : null); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 300); }
     else if (a === 'undo') { undo(); }
     else if (a === 'statset') { S.statSet = b.dataset.v; render(); }
     else if (a === 'kpiscope') { S.kpiScope = S.kpiScope === 'kamp' ? 'sett' : 'kamp'; render(); }
