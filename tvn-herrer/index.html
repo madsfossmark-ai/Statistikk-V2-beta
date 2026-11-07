@@ -663,6 +663,12 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .legg-forkl i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .legg-forkl b { color: var(--fg); }
 
+/* Velg motstanderens mottakere i registreringen */
+.oppvelg { margin: -2px 0 8px; }
+.oppvelg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ovchip { min-height: 40px; min-width: 52px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--muted); font: 700 15px var(--font-display); cursor: pointer; }
+.ovchip[aria-pressed="true"] { background: var(--opp-soft); border-color: var(--opp); color: var(--fg); box-shadow: inset 0 0 0 1px var(--opp); }
+
 /* Talltavle (06.11.2026, variant B): stort tall 1–6 over hele skjermen til å vise spillerne fra benken.
    Fargene er bevisst faste (hvit/sort) og følger ikke temaet. Tallet lagres ikke. */
 .tavle { --t-bg: #FFFFFF; --t-fg: #000000; --t-knapp: rgba(0,0,0,.07); position: fixed; inset: 0; z-index: 60; container-type: size; background: var(--t-bg); color: var(--t-fg);
@@ -4521,6 +4527,18 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const SRV = [['F', 'c-bad', 'F', 'Feil'], ['I', 'c-mid', 'I', 'I spill'], ['E', 'c-good', 'E', 'Ess']];
   const ATT = [['0', 'c-bad', '0', 'Feil'], ['B', 'c-block', 'B', 'Blokk'], ['1', 'c-mid', '1', 'I spill'], ['2', 'c-good', '2', 'Poeng']];
 
+  // Motstanderens mottakere (07.11.2026): velg hvem som står i mottak rett i panelet. Libero merkes (L).
+  const oppLib = (m, n) => /^libero/i.test((oppP(m, n) || {}).pos || '') ? ' (L)' : '';
+  function oppMottakVelger(m, valgt) {
+    const inne = new Set(valgt.map(String));
+    const alle = [...new Set(oppRoster(m).map((x) => String(x.nr)).concat([...inne], (m.dirNumbers || []).map(String), allEvents().filter((e) => e.type === 'opp' || e.type === 'dir').map((e) => String(e.p))))]
+      .filter(Boolean).sort((a, b) => Number(a) - Number(b));
+    const apen = S.oppVelg || !inne.size;
+    let h = '<div class="oppvelg"><button class="textbtn" data-a="oppvelg" aria-expanded="' + apen + '">' + (inne.size ? inne.size + ' i mottak · ' : '') + (apen ? 'skjul valg' : 'velg mottakere') + '</button>';
+    if (apen) h += alle.length ? '<div class="oppvelg-chips" role="group" aria-label="Velg mottakere">' + alle.map((n) => '<button type="button" class="ovchip" data-a="orecv" data-nr="' + esc(n) + '" aria-pressed="' + inne.has(n) + '">#' + esc(n) + esc(oppLib(m, n)) + '</button>').join('') + '</div>'
+      : '<div class="empty" style="margin-top:6px">Ingen spillere ennå. Legg til draktnummer under.</div>';
+    return h + '</div>';
+  }
   function liveView() {
     const m = cur();
     const oppName = m.home === usName(m) ? m.away : m.home;
@@ -4545,8 +4563,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
       + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
-      + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
-      + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + '</span>' : '') + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
+      + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
+      + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
       + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
       + '<div class="col stats" id="stats">' + statsPanel(m, evs, oppName) + '</div></div>' + modusRad(m) + '</div>';
     return h;
@@ -4607,7 +4625,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
   }
   function liveSig(m) {
-    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -5758,7 +5776,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   function dirEvents() { return allEvents().filter((e) => e.type === 'dir'); }
   function dirNums(m) {
-    const set = new Set((m.oppNumbers || []).map(String));
+    const set = new Set((m.oppNumbers || []).map(String).concat((m.dirNumbers || []).map(String), oppRoster(m).map((x) => String(x.nr))));
     dirEvents().forEach((e) => set.add(String(e.p)));
     return [...set].sort((a, b) => Number(a) - Number(b));
   }
@@ -6072,8 +6090,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function dirAddNum(ev, felt) {
     ev.preventDefault(); const m = cur(); if (!m) return;
     const inp = felt || DIR.el.querySelector('#dir-nr'); const v = (inp.value || '').replace(/[^0-9]/g, ''); if (!v) return;
-    const list = (m.oppNumbers || []).slice();
-    if (!list.includes(v)) { list.push(v); list.sort((x, y) => Number(x) - Number(y)); m.oppNumbers = list; saveMatch(m.id, { oppNumbers: list }); }
+    // Nummer fra Slagretning er angripere, ikke mottakere (07.11.2026): egen liste, kommer ikke i mottakslisten
+    const list = (m.dirNumbers || []).map(String);
+    if (!list.includes(v)) { list.push(v); list.sort((x, y) => Number(x) - Number(y)); m.dirNumbers = list; saveMatch(m.id, { dirNumbers: list }); }
     DIR.active = v; inp.value = ''; render(); dirUpdate();
   }
   function dirUpdate() {
@@ -6236,6 +6255,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       deleteMatch(m);
     }
     else if (a === 'inseason' && m) { m.inSeason = m.inSeason === false; render(); saveMatch(m.id, { inSeason: m.inSeason }); }
+    else if (a === 'oppvelg') { S.oppVelg = !(S.oppVelg || !(m && (m.oppNumbers || []).length)); render(); }
     else if (a === 'orecv' && m) { const n = b.dataset.nr, list = (m.oppNumbers || []).map(String); setOppNumbers(m, list.includes(n) ? list.filter((x) => x !== n) : list.concat([n])); }
     else if (a === 'odel' && m) {
       if (b.dataset.confirm !== '1') { b.dataset.confirm = '1'; b.textContent = 'Bekreft'; return; }
