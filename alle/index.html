@@ -648,6 +648,10 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .tbl td.muted { color: var(--faint); }
 .tbl td.l-al, .tbl th.l-al { text-align: left; }
 
+/* Motstanderens angrep i motstanderpanelet under registrering */
+.p-angrep { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.p-angrep .tbl td, .p-angrep .tbl th { padding-top: 5px; padding-bottom: 5px; }
+
 /* Talltavle (06.11.2026, variant B): stort tall 1–6 over hele skjermen til å vise spillerne fra benken.
    Fargene er bevisst faste (hvit/sort) og følger ikke temaet. Tallet lagres ikke. */
 .tavle { --t-bg: #FFFFFF; --t-fg: #000000; --t-knapp: rgba(0,0,0,.07); position: fixed; inset: 0; z-index: 60; container-type: size; background: var(--t-bg); color: var(--t-fg);
@@ -4530,7 +4534,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>'
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + '</span>' : '') + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
-      + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
+      + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form>' + angrepMotLive(m, evs, oppName) + '</section>'
       + '<div class="col stats" id="stats">' + statsPanel(m, evs, oppName) + '</div></div>' + modusRad(m) + '</div>';
     return h;
   }
@@ -4604,6 +4608,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const chips = document.getElementById('last-chips'); if (chips) chips.innerHTML = lastChips(evs, oppName);
     const u = document.getElementById('undo-btn'); if (u) u.disabled = !ownCount();
     const st = document.getElementById('stats'); if (st) st.innerHTML = statsPanel(m, evs, oppName);
+    const pa = document.querySelector('.p-opp .p-angrep'); if (pa) pa.outerHTML = angrepMotLive(m, evs, oppName);   // motstanderens angrep i registreringen
     const kp = document.getElementById('live-kpis'); if (kp) kp.innerHTML = kpiRow(m, evs, oppName);
     const pr = document.getElementById('poeng-root'); if (pr) pr.innerHTML = poengRad(m);
     const er = document.getElementById('err'); if (er) er.innerHTML = errHtml();
@@ -4757,6 +4762,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const per = {}; dir.forEach((e) => { (per[String(e.p)] = per[String(e.p)] || []).push(e); });
     const nums = Object.keys(per).sort((a, b) => per[b].length - per[a].length || Number(a) - Number(b));
     return h + '<div class="tbl-wrap"><table class="tbl">' + dirTable(dir, nums, null) + '</table></div><div class="code-legend">Sortert etter flest slag. Kill % = kill av alle slag.</div></div>';
+  }
+  // Samme oppsummering rett i motstanderpanelet i registreringen, så den kan følges live (følger Kamp/sett-valget)
+  function angrepMotLive(m, evs, oppName) {
+    const filt = S.statSet === 'all' ? evs : evs.filter((e) => String(e.set) === String(S.statSet));
+    const utv = S.statSet === 'all' ? 'kamp' : 'sett ' + S.statSet;
+    return '<div class="p-angrep">' + angrepMotBlokk(m, filt, oppName).replace(' angrep · fra slagretning</div>', ' angrep · fra slagretning · ' + utv + '</div>') + '</div>';
   }
   function statsPanel(m, evs, oppName) {
     const sets = [...new Set(evs.map((e) => e.set))].sort((a, b) => a - b);
