@@ -251,6 +251,16 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .sdot.skjult { visibility: hidden; }
 .prot { font-size: 13px; color: var(--muted); background: var(--sunk); border-radius: 999px; padding: 4px 10px; }
 .prot b { color: var(--fg); }
+.pstill .psep { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; }
+.plag { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 12px 0 14px; border-radius: 12px; border: 0; cursor: pointer; color: var(--fg); font-family: var(--font-display); }
+.plag.oss { background: color-mix(in oklab, var(--accent) 20%, var(--surface)); box-shadow: inset 0 0 0 2px var(--accent); }
+.plag.dem { background: color-mix(in oklab, var(--opp) 18%, var(--surface)); box-shadow: inset 0 0 0 2px var(--opp); }
+.plag .pn { color: var(--fg); font-size: 16px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plag b { font-size: 36px; min-width: 40px; text-align: center; }
+.plag .p1 { font-size: 15px; font-weight: 800; padding: 3px 7px; border-radius: 8px; }
+.plag.oss .p1 { background: var(--accent); color: var(--accent-fg); } .plag.dem .p1 { background: var(--opp); color: #1A1203; }
+.plag:active { transform: scale(.97); }
+@media (max-width: 600px) { .pstill { width: 100%; } .plag { flex: 1 1 0; min-width: 0; justify-content: space-between; padding: 0 8px; gap: 6px; } .plag .pn { font-size: 13px; text-transform: none; } .plag b { font-size: 30px; min-width: 0; } .poengrad { row-gap: 6px; } .poengrad .prot { font-size: 12px; padding: 3px 8px; } .poengrad [data-a="poeng-angre"] { height: 32px; font-size: 13px; padding: 0 10px; } }
 .pknapp { min-height: 52px; min-width: 104px; padding: 0 14px; border: 0; border-radius: 12px; font-family: var(--font-display); font-weight: 800; font-size: 20px; cursor: pointer; }
 .pknapp.oss { background: var(--accent); color: var(--accent-fg); } .pknapp.dem { background: var(--opp); color: #1A1203; }
 .pkvitt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-radius: 12px; padding: 6px 12px; background: var(--accent-soft); border: 1px solid var(--accent); font-size: 14px; }
@@ -684,6 +694,24 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .oa-bane { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; }
 .oa-bane svg { height: 100%; width: 100%; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 12px; }
 .oa-ov .textbtn { font-size: 16px; padding: 10px 6px; }
+/* Boksene i to kolonner (07.11.2026): rekkefølgen kan tilpasses per enhet */
+.live-grid.kolonner .kol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.live-grid.kolonner > .col.stats { grid-column: 1 / -1; grid-row: auto; }
+@media (max-width: 759px) and (min-height: 501px) { .live-grid.kolonner { gap: 12px; } }
+.tilpass-band { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: color-mix(in oklab, var(--accent) 14%, var(--surface)); border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.tilpass-band b { color: var(--accent); margin-right: 6px; }
+.tb-knapper { display: flex; gap: 8px; }
+.barbtn.tb-las { background: #F4C542; color: #1A1406; border-color: #F4C542; }
+.barbtn.aktiv-tilpass { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.live-grid.tilpass .panel { position: relative; outline: 2px dashed var(--accent); outline-offset: -2px; }
+.live-grid.tilpass .panel .codes, .live-grid.tilpass .panel form, .live-grid.tilpass .panel .oppvelg { opacity: .35; pointer-events: none; }
+.live-grid.tilpass .kol { min-height: 80px; border-radius: 14px; }
+.live-grid.tilpass .kol.tp-mal { box-shadow: 0 0 0 3px #F4C542; }
+.hndl { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-fg); font: 700 22px/44px var(--font-body); text-align: center; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.live-grid.tilpass .panel-head { padding-right: 52px; }
+.panel.tp-drar { opacity: .45; }
+.panel.tp-mal { box-shadow: 0 0 0 3px #F4C542; }
+.tp-spoke { position: fixed !important; z-index: 70; pointer-events: none; overflow: hidden; opacity: .92; transform: rotate(1.5deg); box-shadow: 0 18px 44px rgba(0,0,0,.55); }
 .tavle { --t-bg: #FFFFFF; --t-fg: #000000; --t-knapp: rgba(0,0,0,.07); position: fixed; inset: 0; z-index: 60; container-type: size; background: var(--t-bg); color: var(--t-fg);
   user-select: none; -webkit-user-select: none; touch-action: manipulation; overscroll-behavior: contain; }
 .tavle.sort { --t-bg: #000000; --t-fg: #FFFFFF; --t-knapp: rgba(255,255,255,.12); }
@@ -4239,10 +4267,14 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (!poengPaa(m)) return '';
     const t = poengTilstand(m), hjemme = m.home === usName(m);
     const venstre = hjemme ? t.oss : t.dem, hoyre = hjemme ? t.dem : t.oss, sv = (hjemme ? t.server === 'oss' : t.server === 'dem');
-    let h = '<div class="poengrad"><div class="pstill"><span class="sdot' + (sv ? '' : ' skjult') + '" title="Server"></span><b>' + venstre + '</b><span>–</span><b>' + hoyre + '</b><span class="sdot' + (sv ? ' skjult' : '') + '" title="Server"></span></div>'
+    // Variant B, kompakt (07.11.2026): lagets felt med stillingen er selve +1-knappen, på samme side som laget står
+    const lagKnapp = (side, navn, tall) => '<button class="plag ' + side + '" data-a="poeng" data-v="' + side + '" aria-label="+1 ' + esc(navn) + ', stilling ' + tall + '"><span class="pn">' + esc(navn) + '</span><b>' + tall + '</b><span class="p1">+1</span></button>';
+    const vSide = hjemme ? 'oss' : 'dem', hSide = hjemme ? 'dem' : 'oss';
+    let h = '<div class="poengrad"><div class="pstill">' + lagKnapp(vSide, shortName(vSide === 'oss' ? usName(m) : oppTeam(m)), venstre)
+      + '<span class="psep"><span class="sdot' + (sv ? '' : ' skjult') + '" title="Server"></span><span>–</span><span class="sdot' + (sv ? ' skjult' : '') + '" title="Server"></span></span>'
+      + lagKnapp(hSide, shortName(hSide === 'oss' ? usName(m) : oppTeam(m)), hoyre) + '</div>'
       + '<span class="prot">' + (t.rot ? 'Rotasjon <b>' + esc(t.rot) + '</b> · ' : '') + (t.server === 'oss' ? 'vi server' : 'vi mottar') + (t.kjentStart ? '' : ' · <span title="Bekreft oppstilling for å følge rotasjonen">uten oppstilling</span>') + '</span>'
-      + '<span class="spacer"></span><button class="pknapp oss" data-a="poeng" data-v="oss">+1 ' + esc(shortName(usName(m))) + '</button><button class="pknapp dem" data-a="poeng" data-v="dem">+1 ' + esc(shortName(oppTeam(m))) + '</button>'
-      + '<button class="barbtn" data-a="poeng-angre"' + (t.egne ? '' : ' disabled') + '>Angre poeng</button></div>';
+      + '<span class="spacer"></span><button class="barbtn" data-a="poeng-angre"' + (t.egne ? '' : ' disabled') + '>Angre poeng</button></div>';
     if (S.poengKv && S.poengKv.lik) h += '<div class="pkvitt lik" role="status">' + esc(S.poengKv.tekst) + '</div>';
     else if (S.poengKv) h += '<div class="pkvitt' + (S.poengKv.v === 'dem' ? ' dem' : '') + '" role="status"><b>+1 ' + esc(shortName(S.poengKv.v === 'oss' ? usName(m) : oppTeam(m))) + '</b><span>' + esc(S.poengKv.tekst) + ' · telt automatisk</span><span class="spacer"></span><button class="barbtn" data-a="poeng-angre">Angre</button></div>';
     else if (S.poengGrunn) h += '<div class="pgrunner" role="group" aria-label="Grunn for poenget"><span class="liten-p">Poeng til ' + esc(shortName(S.poengGrunn === 'oss' ? usName(m) : oppTeam(m))) + '. Grunn (valgfritt):</span>'
@@ -4541,7 +4573,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           + ((m.setScores || []).length ? '<button class="barbtn" data-a="setback">Tilbake til sett ' + (c.set - 1) + '</button>' : '')
           + (window.Hurtignotat && m.status !== 'ferdig' ? window.Hurtignotat.knapp(ctxSlug()) : '')
           + (opsOk() && m.status !== 'ferdig' ? '<button class="barbtn" data-a="bytte">Bytte</button>' : '')
-          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn tavle-knapp" data-a="tavle">Tavle</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
+          + (opsOk() ? '<button class="barbtn" data-a="lineup">' + esc(opsKnapp(m)) + '</button>' : '') + '<button class="barbtn" data-a="dir">Slagretning</button><button class="barbtn tavle-knapp" data-a="tavle">Tavle</button><button class="barbtn' + (S.tilpass ? ' aktiv-tilpass' : '') + '" data-a="tilpass">Tilpass</button><button class="barbtn" data-a="squad">Tropp</button>' + fsBtn('barbtn')
           + (m.status !== 'ferdig' ? '<button class="barbtn" data-a="endmatch">Avslutt kamp</button>' : '<button class="barbtn primary-bar" data-a="toview">Ferdig med endringer</button>'))
       + '</div></header>';
   }
@@ -4629,14 +4661,19 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
     const noCourt = '<div class="empty">Ingen på banen. Åpne Tropp og velg seks spillere.</div>';
     const courtBtn = '<button class="textbtn" data-a="squad">' + onCourt.length + ' på banen · endre</button>';
-    h += '<div class="live-grid">'
-      + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
-      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">B blokkert · 0 feil · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
-      + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">0 feil · 1 i spill · 2 ess</div>' : noCourt) + '</section>'
-      + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
+    const P = {};
+    P.rec = '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>';
+    P.att = '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">B blokkert · 0 feil · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>';
+    P.srv = '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">0 feil · 1 i spill · 2 ess</div>' : noCourt) + '</section>';
+    P.opp = '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
-      + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
-      + oppAngrepPanel(m, oppName)
+      + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>';
+    P.oatt = oppAngrepPanel(m, oppName);
+    // Egen plassering av boksene (07.11.2026, variant A): to kolonner, lagret per enhet. «Tilpass» åpner, «Lås» lagrer.
+    const L = oppsett(), fl = (id) => P[id].replace('<section class="panel', '<section data-pid="' + id + '" class="panel').replace('<div class="panel-head">', (S.tilpass ? '<span class="hndl" data-hndl="' + id + '" aria-label="Dra for å flytte boksen">⠿</span>' : '') + '<div class="panel-head">');
+    if (S.tilpass) h += '<div class="tilpass-band" role="status"><span><b>Tilpass</b> Dra en boks i ⠿ og slipp den på en annen boks, så bytter de plass. Slipp under en kolonne for å legge den nederst der.</span><span class="tb-knapper"><button class="barbtn" data-a="tilpass-std">Standard</button><button class="barbtn tb-las" data-a="tilpass-las">🔒 Lås</button></span></div>';
+    h += '<div class="live-grid kolonner' + (S.tilpass ? ' tilpass' : '') + '">'
+      + ['v', 'h'].map((k) => '<div class="kol" data-kol="' + k + '">' + L[k].map(fl).join('') + '</div>').join('')
       + '<div class="col stats" id="stats">' + statsPanel(m, evs, oppName) + '</div></div>' + modusRad(m) + '</div>';
     return h;
   }
@@ -4697,8 +4734,20 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     S.bytte = null; S.info = msg; render(); setTimeout(() => { if (S.info === msg) { S.info = null; render(); } }, 4000);
     saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
   }
+  // Boksenes plassering i registreringen, per enhet (localStorage). Ukjente eller manglende bokser legges til fra standard.
+  const OPPSETT_STD = { v: ['rec', 'srv'], h: ['att', 'opp', 'oatt'] };
+  function oppsett() {
+    let L = null; try { L = JSON.parse(localStorage.getItem('rv-oppsett') || 'null'); } catch (e) { L = S.oppsettMinne || null; }
+    if (!L || !Array.isArray(L.v) || !Array.isArray(L.h)) return { v: OPPSETT_STD.v.slice(), h: OPPSETT_STD.h.slice() };
+    const alle = OPPSETT_STD.v.concat(OPPSETT_STD.h), sett = new Set();
+    const ren = (a) => a.filter((id) => alle.includes(id) && !sett.has(id) && sett.add(id));
+    const v = ren(L.v), h = ren(L.h);
+    alle.forEach((id) => { if (!sett.has(id)) (OPPSETT_STD.v.includes(id) ? v : h).push(id); });
+    return { v, h };
+  }
+  function oppsettLagre(L) { try { if (L) localStorage.setItem('rv-oppsett', JSON.stringify(L)); else localStorage.removeItem('rv-oppsett'); } catch (e) { /* ingen lagring: gjelder til siden lastes på nytt */ S.oppsettMinne = L; } }
   function liveSig(m) {
-    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], m.oppAttackers || [], !!S.oaVelg, poengPaa(m) ? poengTilstand(m).rot + '|' + poengTilstand(m).server : '', teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], m.oppAttackers || [], !!S.oaVelg, !!S.tilpass, JSON.stringify(oppsett()), poengPaa(m) ? poengTilstand(m).rot + '|' + poengTilstand(m).server : '', teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -5942,6 +5991,43 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     + '<text x="12" y="1098" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-size="22" fill="var(--court-net)" opacity=".55">VÅR BANE</text>'
     + '<g id="dir-layer"></g><path id="dir-live" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 
+  // ---------- Tilpass: dra en boks i håndtaket og slipp på en annen (07.11.2026) ----------
+  (function () {
+    let dra = null;
+    document.addEventListener('pointerdown', (e) => {
+      const hd = e.target.closest && e.target.closest('[data-hndl]'); if (!hd || !S.tilpass) return;
+      e.preventDefault();
+      const p = hd.closest('[data-pid]'), r = p.getBoundingClientRect(), sp = p.cloneNode(true);
+      sp.classList.add('tp-spoke'); sp.removeAttribute('data-pid'); Object.assign(sp.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: Math.min(r.height, 260) + 'px' });
+      document.body.appendChild(sp); p.classList.add('tp-drar');
+      dra = { id: p.dataset.pid, p, sp, dx: e.clientX - r.left, dy: e.clientY - r.top, mal: null };
+      try { hd.setPointerCapture(e.pointerId); } catch (x) {}
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!dra) return;
+      dra.sp.style.left = (e.clientX - dra.dx) + 'px'; dra.sp.style.top = (e.clientY - dra.dy) + 'px';
+      dra.sp.style.display = 'none'; const under = document.elementFromPoint(e.clientX, e.clientY); dra.sp.style.display = '';
+      document.querySelectorAll('.tp-mal').forEach((q) => q.classList.remove('tp-mal'));
+      const boks = under && under.closest('.live-grid.tilpass [data-pid]'), kol = under && under.closest('.live-grid.tilpass .kol');
+      if (boks && boks !== dra.p) { boks.classList.add('tp-mal'); dra.mal = { boks: boks.dataset.pid }; }
+      else if (!boks && kol) { kol.classList.add('tp-mal'); dra.mal = { kol: kol.dataset.kol }; }
+      else dra.mal = null;
+      // Rull siden når boksen dras mot kanten
+      if (e.clientY > innerHeight - 60) scrollBy(0, 14); else if (e.clientY < 60) scrollBy(0, -14);
+    });
+    const slipp = () => {
+      if (!dra) return; const d = dra; dra = null; d.sp.remove(); d.p.classList.remove('tp-drar');
+      document.querySelectorAll('.tp-mal').forEach((q) => q.classList.remove('tp-mal'));
+      if (!d.mal) return;
+      const L = oppsett(), hvor = (id) => (L.v.includes(id) ? ['v', L.v.indexOf(id)] : ['h', L.h.indexOf(id)]);
+      const [k1, i1] = hvor(d.id);
+      if (d.mal.boks) { const [k2, i2] = hvor(d.mal.boks); L[k1][i1] = d.mal.boks; L[k2][i2] = d.id; }
+      else { L[k1].splice(i1, 1); L[d.mal.kol].push(d.id); }
+      oppsettLagre(L); render();
+    };
+    document.addEventListener('pointerup', slipp); document.addEventListener('pointercancel', slipp);
+  })();
+
   // ---------- Hurtig slagretning (variant A, 07.11.2026) ----------
   // Etter 0/B/1/2 fyller banen skjermen. Dra fra treffpunkt (motstanderens side) til landing. Slipper du, lagres slaget og banen lukkes.
   function oaOpen(nr, kode) {
@@ -6387,6 +6473,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       deleteMatch(m);
     }
     else if (a === 'inseason' && m) { m.inSeason = m.inSeason === false; render(); saveMatch(m.id, { inSeason: m.inSeason }); }
+    else if (a === 'tilpass') { S.tilpass = !S.tilpass; render(); }
+    else if (a === 'tilpass-las') { S.tilpass = false; S.info = 'Oppsettet er låst og lagret på denne enheten.'; render(); setTimeout(() => { if (S.info === 'Oppsettet er låst og lagret på denne enheten.') { S.info = null; render(); } }, 2500); }
+    else if (a === 'tilpass-std') { oppsettLagre(null); render(); }
     else if (a === 'oavelg') { S.oaVelg = !(S.oaVelg || !(m && (m.oppAttackers || []).length)); render(); }
     else if (a === 'oachip' && m) { const n = String(b.dataset.nr), list = (m.oppAttackers || []).map(String); const ny = [...new Set(list.includes(n) ? list.filter((x) => x !== n) : list.concat([n]))].sort((x, y) => Number(x) - Number(y)); m.oppAttackers = ny; render(); saveMatch(m.id, { oppAttackers: ny }); }
     else if (a === 'oalog' && m) { oaOpen(b.dataset.nr, b.dataset.c); }
