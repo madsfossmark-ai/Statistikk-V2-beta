@@ -4101,8 +4101,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Slått på per kamp, og bare der siden tillater det (V2_CONFIG.poengmodus). Ellers føres det nøyaktig som før.
   // Poengene lagres som egne registreringer (stats.poeng): én liste per enhet og sett, angre blir en egen rad. Stillingen lagres også i current.
   const POENG_AV = { 'att-2': ['oss', 'Kill'], 'srv-E': ['oss', 'Ess'], 'blk-P': ['oss', 'Blokk'], 'opp-0': ['oss', 'Motstander mottaksfeil'],
-    'att-0': ['dem', 'Angrepsfeil'], 'att-B': ['dem', 'Blokkert'], 'srv-F': ['dem', 'Servefeil'], 'rec-0': ['dem', 'Mottaksfeil'] };
-  const POENG_PAR = { 'srv-E': 'opp-0', 'opp-0': 'srv-E' };   // samme ballveksling sett fra begge sider: telles én gang
+    'att-0': ['dem', 'Angrepsfeil'], 'att-B': ['dem', 'Blokkert'], 'srv-F': ['dem', 'Servefeil'], 'rec-0': ['dem', 'Mottaksfeil'],
+    // Motstanderens angrep (07.11.2026): 0 feil og B (vi blokket) gir poeng til oss, 2 kill gir poeng til dem. 1 i spill: ballvekslingen fortsetter.
+    'dir-F': ['oss', 'Motstander angrepsfeil'], 'dir-B': ['oss', 'Blokk'], 'dir-K': ['dem', 'Motstander kill'] };
+  // Samme ballveksling sett fra begge sider: telles én gang (ess/mottaksfeil, egen blokk/motstander blokkert)
+  const POENG_PAR = { 'srv-E': 'opp-0', 'opp-0': 'srv-E', 'blk-P': 'dir-B', 'dir-B': 'blk-P' };   // samme ballveksling sett fra begge sider: telles én gang
   const POENG_GRUNNER = { oss: ['Motstander servefeil', 'Motstander angrepsfeil', 'Blokk', 'Regelfeil hos dem'], dem: ['Motstander angrep', 'Regelfeil hos oss'] };
   // Registreringsmodus (01.11.2026): Enkel = som før (mottak, angrep, serve). Avansert = oppstilling, bytter, rotasjon og poengtelling.
   // Velges før registreringen starter, kan byttes nederst under live statistikk. Lagres på kampen (legacy «modus»).
@@ -4214,7 +4217,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const l = pEgen(set); l.splice(i, 1);
     S.poengKv = null; S.poengGrunn = null; S.poengSiste = null; poengSkriv(m, set, l); poengLagre(m); render();
   }
-  function poengNr(m, ev) { return ev.type === 'opp' ? ev.p : ((player(ev.p) || {}).nr || ''); }
+  function poengNr(m, ev) { return ev.type === 'opp' || ev.type === 'dir' ? ev.p : ((player(ev.p) || {}).nr || ''); }
   function poengFraReg(m, ev) {
     if (!poengPaa(m)) return;
     const key = ev.type + '-' + ev.c, a = POENG_AV[key];
