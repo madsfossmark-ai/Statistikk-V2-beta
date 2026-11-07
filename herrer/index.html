@@ -338,12 +338,22 @@ html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background
 /* Løpende statistikk (07.11.2026): faste kolonnebredder, så Ant. og Snitt står likt under hverandre i alle tabellene */
 @media (min-width: 760px) {
   #stats .tbl, .det-stats .tbl { table-layout: fixed; }
-  #stats .tbl th:first-child, .det-stats .tbl th:first-child { width: 27%; } #stats .tbl th:nth-child(2), .det-stats .tbl th:nth-child(2) { width: 9%; } #stats .tbl th:nth-child(3), .det-stats .tbl th:nth-child(3) { width: 14%; }
+  #stats .tbl th:first-child, .det-stats .tbl th:first-child { width: 28%; } #stats .tbl th:nth-child(2), .det-stats .tbl th:nth-child(2) { width: 7%; } #stats .tbl th:nth-child(3), .det-stats .tbl th:nth-child(3) { width: 12%; }
   #stats .tbl td:first-child, .det-stats .tbl td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 .det-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
 .det-kpis .kpi.mot { box-shadow: inset 3px 0 0 var(--opp); }
 .det-stats { display: flex; flex-direction: column; gap: 12px; }
+.nm-k { display: none; }
+td.kort-n .nm-l { display: none; } td.kort-n .nm-k { display: inline; }
+/* Navnet kortes med … , merket Lav/Høy/Server hit står alltid helt (08.11.2026) */
+.tbl.std td.nm .nmt { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.tbl.std td.nm.medtag .nmt { max-width: calc(100% - 52px); }
+.tbl.std th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* For smalt til to tabeller ved siden av hverandre med fulle kolonnenavn: én kolonne, vår tabell rett over motstanderens */
+@media (max-width: 1099px) { .stats-body.rader, #stats .stats-body.rader { grid-template-columns: minmax(0, 1fr) !important; } }
+@media (max-width: 759px) { .tbl.std td.nm { min-width: 112px; max-width: 150px; } .tbl.std td.nm .weak-tag { padding: 1px 5px; font-size: 9px; margin-left: 3px; } .tbl.std td.nm.medtag .nmt { max-width: calc(100% - 36px); } }
+@media (max-width: 600px) { .nm-l { display: none; } .nm-k { display: inline; } }
 .ph-valg { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .tbl td.nm { white-space: nowrap; } .tbl td.nm .weak-tag { margin-left: 6px; vertical-align: 1px; }
 /* Fornavn bare når fullt navn ikke får plass i tabellen (måles i tilpassNavn) */
@@ -3950,6 +3960,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Navn slik de var da registreringen ble gjort (følger spilleren selv om tropp eller nummer endres senere)
   const NAMEHINT = {}, OPPHINT = {};
   const learnNames = (evs, opp) => evs.forEach((e) => { if (!e.n) return; if (e.type === 'opp' || e.type === 'dir') { if (opp) opp[String(e.p)] = e.n; } else NAMEHINT[e.p] = e.n; });
+  // Kort navn med nummer (08.11.2026): «#9 Kaia», som motstanderen
+  const pkort = (id) => { const p = player(id); return (p && p.nr ? '#' + p.nr + ' ' : '') + pname(id); };
   const pname = (id) => { const p = player(id); return p ? p.name.split(' ')[0] : NAMEHINT[id] ? NAMEHINT[id].split(' ')[0] : (EXTRA[id] || '?'); };
   // Kamptyper: serie fra terminlisten, eller egne kamper (cup, europacup, trening)
   const TYPES = { serie: 'Seriekamp', cup: 'Cupkamp', europacup: 'Europacup', turnering: 'Turnering', trening: 'Treningskamp' };
@@ -4352,6 +4364,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function render() {
     if (UI.velger && UI.velger.isConnected && document.activeElement === UI.velger) { UI.utsatt = true; return; }
     if (window.Oppstilling) setTimeout(opsAuto, 0);
+    requestAnimationFrame(tilpassNavn);
     if (S.view === 'live' && !S.offline && cur()) {
       const root = document.getElementById('live-root');
       if (root && root.dataset.sig === liveSig(cur())) { updateLive(); return; }
@@ -4914,11 +4927,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   function errHtml() { return (S.info ? '<div class="notice info" role="status">' + esc(S.info) + ' <button class="textbtn" data-a="clear-info">Lukk</button></div>' : '') + (S.error ? '<div class="notice" role="alert">' + esc(S.error) + ' <button class="textbtn" data-a="clear-err">Lukk</button></div>' : ''); }
 
   function evLabel(e, oppName) {
-    if (e.type === 'dir') return oppName + ' #' + e.p + ' · slag ' + dirKind(e) + (e.c ? ' ' + (DRES[e.c] || '').toLowerCase() : '');
-    if (e.type === 'blk') return pname(e.p) + ' · blokkpoeng';
+    if (e.type === 'dir') return oppName + ' ' + oppLabel(cur(), e.p) + ' · slag ' + dirKind(e) + (e.c ? ' ' + (DRES[e.c] || '').toLowerCase() : '');
+    if (e.type === 'blk') return pkort(e.p) + ' · blokkpoeng';
     const lbl = { rec: 'mottak', att: 'angrep', srv: 'serve', opp: 'mottak' }[e.type];
     const code = e.type === 'srv' ? ({ F: 'feil', I: 'i spill', E: 'ess' }[e.c]) : e.type === 'att' && e.c === 'B' ? 'blokkert' : e.c;
-    const who = e.type === 'opp' ? oppName + ' ' + oppLabel(cur(), e.p) : pname(e.p);
+    const who = e.type === 'opp' ? oppName + ' ' + oppLabel(cur(), e.p) : pkort(e.p);
     return who + ' · ' + lbl + ' ' + code;
   }
 
@@ -4959,16 +4972,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
 
   // Motstanderens angrep fra Slagretning (07.11.2026), følger valget Kamp/sett i løpende statistikk
-  function angrepMotBlokk(m, evs, oppName) {
-    const dir = evs.filter((e) => e.type === 'dir');
-    let h = '<div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' angrep · fra slagretning</div>';
-    if (!dir.length) return h + '<div class="empty">Ingen angrep registrert. Registrer dem i panelet «' + esc(oppName) + ' angrep», så kommer tallene her.</div></div>';
-    const per = {}; dir.forEach((e) => { (per[String(e.p)] = per[String(e.p)] || []).push(e); });
-    const nums = Object.keys(per).sort((a, b) => per[b].length - per[a].length || Number(a) - Number(b));
-    // Navn som i mottakstabellen, uten farger (07.11.2026)
-    const navn = (n) => { const p = oppP(m, n) || {}; return '#' + esc(n) + (p.name ? ' ' + esc(utenL(p.name).split(' ')[0]) : '') + esc(oppLib(m, n)); };
-    return h + '<div class="tbl-wrap"><table class="tbl">' + dirTable(dir, nums, null, { navn, utenFarge: true }) + '</table></div><div class="code-legend">Sortert etter flest slag. Snitt 0–2: kill 2, i spill 1, feil og blokkert 0. Kill % = kill av alle slag.</div></div>';
-  }
+
   // opt.fast (kampvisningen etter kamp): evs er allerede valgt utvalg, egen tittel og ingen settknapper
   function statsPanel(m, evs, oppName, opt) {
     opt = opt || {};
@@ -4983,57 +4987,130 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     let h = (opt.leggEtter ? '' : leggHtml) + '<section class="panel" aria-label="' + esc(opt.tittel || 'Løpende statistikk') + '"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">' + esc(opt.tittel || 'Løpende statistikk') + '</h2>'
       + (opt.fast ? '' : '<div class="seg" role="group" aria-label="Utvalg"><button data-a="statset" data-v="all" aria-pressed="' + (S.statSet === 'all') + '">Kamp</button>' + sets.map((s) => { const sc = scoreStr((m.setScores || [])[s - 1]); return '<button data-a="statset" data-v="' + s + '" aria-pressed="' + (String(S.statSet) === String(s)) + '">Sett ' + s + (sc ? ' · ' + sc : '') + '</button>'; }).join('') + '</div>') + '</div>';
 
-    const recRows = Object.entries(st.rec).sort((a, b) => b[1].n - a[1].n);
-    const exRec = extremes(st.rec, (r) => r.s / r.n, 5);
-    const avgCell = (v) => avgBar(v);
-    // Vår statistikk i venstre kolonne, motstanderens i høyre (07.11.2026). Stables på smal skjerm.
-    // Rader (07.11.2026): mottak ved siden av motstanderens mottak, angrep ved siden av deres angrep, serve under. Lettere å sammenligne.
-    let bRec = '<div class="stat-block"><div class="label" style="color:var(--accent)">Mottak</div>';
-    if (!recRows.length) bRec += '<div class="empty">Ingen mottak registrert.</div>';
-    else bRec += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Feil</th><th>Spillbart</th><th>Perfekt</th></tr></thead><tbody>'
-      + recRows.map(([id, r]) => '<tr' + loHi(id, exRec)[0] + '>' + navnCelle('', pname(id), libTag(id) + loHi(id, exRec)[1], recRows.map(([x]) => pname(x))) + '<td>' + r.n + '</td><td class="key">' + avgCell(r.s / r.n) + '</td><td>' + pct(r.c0, r.n) + '</td><td>' + pct(r.c1, r.n) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
-      + '<tr class="total"><td>Lag</td><td>' + st.tRec.n + '</td><td>' + avgBar(st.tRec.s / st.tRec.n) + '</td><td>' + pct(st.tRec.c0, st.tRec.n) + '</td><td>' + pct(st.tRec.c1, st.tRec.n) + '</td><td>' + pct(st.tRec.c2, st.tRec.n) + '</td></tr></tbody></table></div>';
-
-    // Blokkpoeng i angrepstabellen (07.11.2026). Spillere med blokkpoeng uten angrep får egen rad.
-    const attRows = Object.entries(st.att).sort((a, b) => b[1].n - a[1].n);
-    Object.keys(st.blk).forEach((id) => { if (!st.att[id]) attRows.push([id, null]); });
-    const exAtt = extremes(st.att, attAvg, 5);
-    bRec += '</div>';
-    let bAtt = '<div class="stat-block"><div class="label" style="color:var(--accent)">Angrep</div>';
-    if (!attRows.length) bAtt += '<div class="empty">Ingen angrep eller blokkpoeng registrert.</div>';
-    else bAtt += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th title="Angrepet ble blokkert">Blokkert</th><th title="Egen blokk som ga poeng">Blokkp.</th><th>Uttelling</th></tr></thead><tbody>'
-      + attRows.map(([id, r]) => r ? '<tr' + loHi(id, exAtt)[0] + '>' + navnCelle('', pname(id), libTag(id) + loHi(id, exAtt)[1], attRows.map(([x]) => pname(x))) + '<td>' + r.n + '</td><td class="key">' + avgBar(1 + (r.c2 - r.c0 - r.B) / r.n, null, 'att', posOf(id)) + '</td><td>' + r.c2 + '</td><td>' + r.c0 + '</td><td>' + r.B + '</td><td>' + (st.blk[id] || 0) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>'
-        : '<tr>' + navnCelle('', pname(id), libTag(id), attRows.map(([x]) => pname(x))) + '<td>0</td><td class="key">–</td><td>–</td><td>–</td><td>–</td><td>' + st.blk[id] + '</td><td>–</td></tr>').join('')
-      + '<tr class="total"><td>Lag</td><td>' + st.tAtt.n + '</td><td>' + avgBar(1 + (st.tAtt.c2 - st.tAtt.c0 - st.tAtt.B) / st.tAtt.n, null, 'att') + '</td><td>' + st.tAtt.c2 + '</td><td>' + st.tAtt.c0 + '</td><td>' + st.tAtt.B + '</td><td>' + st.tBlk + '</td><td>' + pct(st.tAtt.c2, st.tAtt.n) + '</td></tr></tbody></table></div>';
-    const t = st.tSrv;
-    bAtt += '</div>';
-    let bSrv = '<div class="stat-block"><div class="label" style="color:var(--accent)">Serve</div><div class="kpis">'
-      + '<div class="kpi"><div class="display num">' + t.n + '</div><div class="k">Server</div></div>'
-      + '<div class="kpi"><div class="display num">' + t.E + '</div><div class="k">Ess · ' + pct(t.E, t.n) + '</div></div>'
-      + '<div class="kpi"><div class="display num">' + t.F + '</div><div class="k">Feil · ' + pct(t.F, t.n) + '</div></div>'
-      + '<div class="kpi"><div class="display num">' + pct(t.n - t.F, t.n) + '</div><div class="k">I spill eller ess</div></div></div>';
-    const srvRows = Object.entries(st.srv).sort((a, b) => b[1].n - a[1].n);
-    const exSrv = extremes(st.srv, srvAvg, 3);
-    if (srvRows.length) bSrv += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Ess</th><th>Feil</th><th>Ess %</th><th>Feil %</th></tr></thead><tbody>'
-      + srvRows.map(([id, r]) => '<tr' + loHi(id, exSrv)[0] + '>' + navnCelle('', pname(id), libTag(id) + loHi(id, exSrv)[1], srvRows.map(([x]) => pname(x))) + '<td>' + r.n + '</td><td class="key">' + avgBar(srvAvg(r), null, 'srv') + '</td><td>' + r.E + '</td><td>' + r.F + '</td><td>' + pct(r.E, r.n) + '</td><td>' + pct(r.F, r.n) + '</td></tr>').join('') + '</tbody></table></div>';
-
-    const oppRows = Object.entries(st.opp).sort((a, b) => (a[1].s / a[1].n) - (b[1].s / b[1].n) || b[1].n - a[1].n);
-    const weakOpp = (oppRows.find(([, r]) => r.n >= 5) || [])[0];
-    bSrv += '</div>';
-    let bOpp = '<div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' mottak · svakest først</div>';
-    if (!oppRows.length) bOpp += '<div class="empty">Ingen motstandermottak registrert.</div>';
-    else bOpp += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Feil</th><th>Spillbart</th><th>Perfekt</th></tr></thead><tbody>'
-      + oppRows.map(([n, r]) => '<tr' + (r.n < 5 ? ' class="small-n"' : (n === weakOpp ? ' class="weakest"' : '')) + '><td class="key">' + esc(oppLabel(m, n)) + (n === weakOpp ? ' <span class="weak-tag">Server hit</span>' : '') + '</td><td>' + r.n + '</td><td class="key">' + avgCell(r.s / r.n) + '</td><td>' + pct(r.c0, r.n) + '</td><td>' + pct(r.c1, r.n) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
-      + '<tr class="total"><td>Lag</td><td>' + st.tOpp.n + '</td><td>' + avgBar(st.tOpp.s / st.tOpp.n) + '</td><td>' + pct(st.tOpp.c0, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c1, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c2, st.tOpp.n) + '</td></tr></tbody></table></div>'
-      + '<div class="code-legend">Grå rader: under 5 mottak, lite utvalg.</div>';
-    bOpp += '</div>';
-    h += '<div class="stats-body rader">' + bRec + bOpp + bAtt + angrepMotBlokk(m, filt, oppName) + bSrv + '</div>';
+    const D = stdFraEgen(m, filt, oppName);
+    h += stdRader(D.oss, D.mot);
     if (m.legacy) h += legacyBlock(m.legacy);
     // Kampark og CSV-eksport samlet nederst i statistikken (01.11.2026: Kampark flyttet hit fra topplinjen i registreringen)
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (S.view === 'live' && !S.dash && !window.PUBLIC ? '<button class="secondary" data-a="sheet">Kampark</button>' : '') + (S.dl ? '<button class="secondary" data-a="export">Eksporter til regneark (CSV)</button>' : '') + '</div>';
     h += '<div class="code-legend">Egenført 0–1–2-score. Angrep: feil og blokkert = 0, i spill = 1, poeng = 2. ' + legendLink() + '</div></section>';
     if (opt.leggEtter) h += leggHtml;   // etter kamp: leggefordelingen under statistikken (07.11.2026)
     return h;
+  }
+
+
+  // ---------- Én standard for statistikktabeller (08.11.2026) ----------
+  // Samme navn, kolonner, rekkefølge og oppsett i Løpende, Egen føring og NVBF.
+  // Navn: «#nr Fornavn Etternavn» (iPhone: «#nr Fornavn»). Bare spillere med tall vises.
+  const STD_KOL = {
+    rec: ['Spiller', 'Ant.', 'Snitt', 'Feil', 'Spillbart', 'Perfekt'],
+    att: ['Spiller', 'Ant.', 'Snitt', 'Poeng', 'Feil', 'Blokkert', 'Blokkp.', 'Uttelling'],
+    srv: ['Spiller', 'Ant.', 'Snitt', 'Ess', 'Feil', 'Ess %', 'Feil %'],
+  };
+  const KOL_TITTEL = { 'Blokkert': 'Angrepet ble blokkert', 'Blokkp.': 'Blokk som ga poeng', 'Positivt': 'Positivt mottak slik NVBF teller det (perfekt og godt)' };
+  function spNavn(nr, full, lib) {
+    full = utenL(full || '').trim(); const fn = full.split(' ')[0];
+    const pre = nr != null && nr !== '' ? '#' + nr + (full ? ' ' : '') : '';
+    if (!full && !pre) return '?';
+    return full && fn !== full ? '<span class="nm-l">' + esc(pre + full) + '</span><span class="nm-k">' + esc(pre + fn) + '</span>' + esc(lib || '') : esc(pre + full) + esc(lib || '');
+  }
+  const TAGG = { lo: ' <span class="weak-tag">Lav</span>', hi: ' <span class="weak-tag strong">Høy</span>', hit: ' <span class="weak-tag">Server hit</span>' };
+  const TR_KL = { lo: 'weakest', hi: 'strongest', hit: 'weakest' };
+  // rader: [{ navn (html), n, snitt, celler: [...], tag, gra, pos }], tot: { n, snitt, celler } eller null
+  // Fullt navn når det får plass, ellers «#nr Fornavn» (sjekkes etter hver tegning og når skjermen endres)
+  function tilpassNavn() {
+    document.querySelectorAll('.tbl.std td.nm').forEach((td) => {
+      const s = td.querySelector('.nmt'); if (!s || !s.querySelector('.nm-l')) return;
+      td.classList.remove('kort-n'); if (s.scrollWidth > s.clientWidth + 1) td.classList.add('kort-n');
+    });
+  }
+  window.addEventListener('resize', () => requestAnimationFrame(tilpassNavn));
+  function stdTabell(type, rader, tot, opt) {
+    opt = opt || {};
+    const kol = STD_KOL[type].slice(); if (opt.k4) kol[4] = opt.k4;
+    const kind = type === 'rec' ? 'rec' : type;
+    return '<div class="tbl-wrap"><table class="tbl std"><thead><tr>' + kol.map((k) => '<th' + (KOL_TITTEL[k] ? ' title="' + esc(KOL_TITTEL[k]) + '"' : '') + '>' + esc(k) + '</th>').join('') + '</tr></thead><tbody>'
+      + rader.map((x) => { const kl = [x.tag ? TR_KL[x.tag] : '', x.gra ? 'small-n' : ''].filter(Boolean).join(' ');
+        return '<tr' + (kl ? ' class="' + kl + '"' : '') + '><td class="key nm' + (x.tag ? ' medtag' : '') + '"><span class="nmt">' + x.navn + '</span>' + (x.tag ? TAGG[x.tag] : '') + '</td><td>' + x.n + '</td><td class="key">' + (x.snitt == null || !isFinite(x.snitt) ? '–' : avgBar(x.snitt, null, kind, x.pos)) + '</td>' + x.celler.map((c) => '<td>' + c + '</td>').join('') + '</tr>'; }).join('')
+      + (tot ? '<tr class="total"><td>Lag</td><td>' + tot.n + '</td><td>' + (tot.snitt == null || !isFinite(tot.snitt) ? '–' : avgBar(tot.snitt, null, kind)) + '</td>' + tot.celler.map((c) => '<td>' + c + '</td>').join('') + '</tr>' : '')
+      + '</tbody></table></div>';
+  }
+  const stdBlokk = (tittel, opp, innhold) => '<div class="stat-block"><div class="label" style="color:var(' + (opp ? '--opp' : '--accent') + ')">' + esc(tittel) + '</div>' + innhold + '</div>';
+  const srvKpi = (n, E, F) => '<div class="kpis">' + '<div class="kpi"><div class="display num">' + n + '</div><div class="k">Server</div></div>'
+    + '<div class="kpi"><div class="display num">' + E + '</div><div class="k">Ess · ' + pct(E, n) + '</div></div>'
+    + '<div class="kpi"><div class="display num">' + F + '</div><div class="k">Feil · ' + pct(F, n) + '</div></div>'
+    + '<div class="kpi"><div class="display num">' + pct(n - F, n) + '</div><div class="k">I spill eller ess</div></div></div>';
+  // Ett lag: { navn, rec: {rader, tot, k4, legend}, att: {...}, srv: {rader, tot, n, E, F} } → seks blokker i rader (mottak, angrep, serve)
+  function stdRader(oss, mot) {
+    const del = (L, type, opp, tom) => { const d = L[type]; const tit = opp ? L.navn + ' ' + { rec: 'mottak', att: 'angrep', srv: 'serve' }[type] : { rec: 'Mottak', att: 'Angrep', srv: 'Serve' }[type];
+      if (!d || !d.rader.length) return stdBlokk(tit, opp, '<div class="empty">' + (d && d.tom ? d.tom : tom) + '</div>');
+      return stdBlokk(tit, opp, (type === 'srv' && d.n != null ? srvKpi(d.n, d.E, d.F) : '') + stdTabell(type, d.rader, d.tot, { k4: d.k4 }) + (d.legend ? '<div class="code-legend">' + d.legend + '</div>' : '')); };
+    return '<div class="stats-body rader">' + del(oss, 'rec', false, 'Ingen mottak registrert.') + del(mot, 'rec', true, 'Ingen mottak registrert.')
+      + del(oss, 'att', false, 'Ingen angrep registrert.') + del(mot, 'att', true, 'Ingen angrep registrert.')
+      + del(oss, 'srv', false, 'Ingen serve registrert.') + (mot.srv && mot.srv.rader.length ? del(mot, 'srv', true, '') : '<div></div>') + '</div>';
+  }
+  // Egen føring (registreringene) → standardformat
+  function stdFraEgen(m, filt, oppNavn) {
+    const st = computeStats(filt);
+    const vaar = (id) => { const p = player(id); return { nr: p ? p.nr : '', full: p ? p.name : (NAMEHINT[id] || pname(id)) }; };
+    const vn = (id) => { const v = vaar(id); return spNavn(v.nr, v.full, libTag(id)); };
+    const exRec = extremes(st.rec, (x) => x.s / x.n, 5), exAtt = extremes(st.att, attAvg, 5), exSrv = extremes(st.srv, srvAvg, 3);
+    const tg = (id, ex) => id === ex.lo ? 'lo' : id === ex.hi ? 'hi' : null;
+    const recR = Object.entries(st.rec).sort((a, b) => b[1].n - a[1].n).map(([id, x]) => ({ navn: vn(id), n: x.n, snitt: x.s / x.n, celler: [pct(x.c0, x.n), pct(x.c1, x.n), pct(x.c2, x.n)], tag: tg(id, exRec) }));
+    const T = st.tRec, A = st.tAtt, V = st.tSrv;
+    const attIds = Object.keys(st.att).sort((a, b) => st.att[b].n - st.att[a].n).concat(Object.keys(st.blk).filter((id) => !st.att[id]));
+    const attR = attIds.map((id) => { const x = st.att[id]; return x ? { navn: vn(id), n: x.n, snitt: 1 + (x.c2 - x.c0 - x.B) / x.n, pos: posOf(id), celler: [x.c2, x.c0, x.B, st.blk[id] || 0, pct(x.c2, x.n)], tag: tg(id, exAtt) }
+      : { navn: vn(id), n: 0, snitt: null, celler: ['–', '–', '–', st.blk[id], '–'] }; });
+    const srvR = Object.entries(st.srv).sort((a, b) => b[1].n - a[1].n).map(([id, x]) => ({ navn: vn(id), n: x.n, snitt: srvAvg(x), celler: [x.E, x.F, pct(x.E, x.n), pct(x.F, x.n)], tag: tg(id, exSrv) }));
+    const oss = { navn: usName(m),
+      rec: { rader: recR, tot: T.n ? { n: T.n, snitt: T.s / T.n, celler: [pct(T.c0, T.n), pct(T.c1, T.n), pct(T.c2, T.n)] } : null },
+      att: { rader: attR, tot: A.n || st.tBlk ? { n: A.n, snitt: A.n ? 1 + (A.c2 - A.c0 - A.B) / A.n : null, celler: [A.c2, A.c0, A.B, st.tBlk, pct(A.c2, A.n)] } : null },
+      srv: { rader: srvR, tot: V.n ? { n: V.n, snitt: srvAvg(V), celler: [V.E, V.F, pct(V.E, V.n), pct(V.F, V.n)] } : null, n: V.n, E: V.E, F: V.F } };
+    // Motstanderen: mottak (svakest først) og angrep fra hurtig slagretning
+    const oppR = Object.entries(st.opp).sort((a, b) => (a[1].s / a[1].n) - (b[1].s / b[1].n) || b[1].n - a[1].n);
+    const weak = (oppR.find(([, x]) => x.n >= 5) || [])[0], O = st.tOpp;
+    const mn = (nr) => spNavn(nr, oppName(m, nr), oppLib(m, nr));
+    const dir = filt.filter((e) => e.type === 'dir'), per = {}; dir.forEach((e) => { (per[String(e.p)] = per[String(e.p)] || []).push(e); });
+    const c = (L, k) => L.filter((e) => e.c === k).length, kd = (L, k) => L.filter((e) => dirKind(e) === k).length;
+    const dirR = Object.keys(per).sort((a, b) => per[b].length - per[a].length || Number(a) - Number(b)).map((nr) => { const L = per[nr]; return { navn: mn(nr), n: L.length, snitt: dirSnitt(L), celler: [c(L, 'K'), c(L, 'F'), c(L, 'B'), '–', pct(c(L, 'K'), L.length)] }; });
+    const mot = { navn: oppNavn,
+      rec: { rader: oppR.map(([nr, x]) => ({ navn: mn(nr), n: x.n, snitt: x.s / x.n, celler: [pct(x.c0, x.n), pct(x.c1, x.n), pct(x.c2, x.n)], tag: nr === weak ? 'hit' : null, gra: x.n < 5 })),
+        tot: O.n ? { n: O.n, snitt: O.s / O.n, celler: [pct(O.c0, O.n), pct(O.c1, O.n), pct(O.c2, O.n)] } : null, legend: oppR.length ? 'Svakest først. Grå rader: under 5 mottak, lite utvalg.' : '', tom: 'Ingen motstandermottak registrert.' },
+      att: { rader: dirR, tot: dir.length ? { n: dir.length, snitt: dirSnitt(dir), celler: [c(dir, 'K'), c(dir, 'F'), c(dir, 'B'), '–', pct(c(dir, 'K'), dir.length)] } : null,
+        legend: dir.length ? 'Fra slagretning. Blokkert = vi blokket. Diagonal / linje / dip: ' + kd(dir, 'diagonal') + ' / ' + kd(dir, 'linje') + ' / ' + kd(dir, 'dip') + '.' : '', tom: 'Ingen angrep registrert. Registrer dem i panelet «' + esc(oppNavn) + ' angrep».' } };
+    return { oss, mot };
+  }
+  // NVBF (offisielle tall per spiller) → standardformat. Mottak: «Positivt» i stedet for Spillbart.
+  function stdFraNvbf(m, t, erVaar) {
+    const pnum = (v) => v == null ? null : parseFloat(String(v).replace(',', '.').replace('%', ''));
+    const pick = (arr, cnt, f, minN) => { const el = arr.filter((p) => cnt(p) >= minN).sort((a, b) => f(a) - f(b) || cnt(b) - cnt(a)); return el.length > 1 && f(el[0]) !== f(el[el.length - 1]) ? { lo: el[0], hi: el[el.length - 1] } : {}; };
+    const tg = (p, ex) => p === ex.lo ? 'lo' : p === ex.hi ? 'hi' : null;
+    const nv = (p) => spNavn(p.nr, p.name, nvLib(p.name, p.nr, t.name));
+    const P = t.players || [];
+    const pr = P.filter((p) => p.rec > 0).sort((a, b) => b.rec - a.rec), recTot = pr.reduce((a, p) => a + p.rec, 0);
+    const exR = pick(pr, (p) => p.rec, (p) => pnum(p.recAvg) || 0, Math.max(8, Math.round(recTot * 0.15)));
+    const pa = P.filter((p) => p.att > 0 || p.blocks > 0).sort((a, b) => (b.att || 0) - (a.att || 0)), attTot = pa.reduce((a, p) => a + (p.att || 0), 0);
+    const aS = (p) => p.att ? 1 + ((p.kills || 0) - (p.attErr || 0) - (p.blocked || 0)) / p.att : null;
+    const exA = pick(pa.filter((p) => p.att), (p) => p.att || 0, aS, Math.max(5, Math.round(attTot * 0.1)));
+    const ps = P.filter((p) => p.srv > 0).sort((a, b) => b.srv - a.srv);
+    const sS = (p) => 1 + ((p.aces || 0) - (p.srvErr || 0)) / p.srv;
+    const sum = (arr, f) => arr.reduce((a, p) => a + (Number(p[f]) || 0), 0);
+    const recErr = sum(pr, 'recErr'), T = t.totals || {};
+    const kills = sum(pa, 'kills'), aErr = sum(pa, 'attErr'), blkd = sum(pa, 'blocked'), blocks = sum(pa, 'blocks');
+    const nS = sum(ps, 'srv'), ess = sum(ps, 'aces'), sF = sum(ps, 'srvErr');
+    return { navn: t.name,
+      rec: { k4: 'Positivt', rader: pr.map((p) => ({ navn: nv(p), n: p.rec, snitt: pnum(p.recAvg), celler: [pct(p.recErr || 0, p.rec), esc(p.recPos ?? '–'), esc(p.recPerf ?? '–')], tag: tg(p, exR) })),
+        tot: recTot ? { n: recTot, snitt: pnum(T.recAvg), celler: [pct(recErr, recTot), esc(T.recPos ?? '–'), esc(T.recPerf ?? '–')] } : null,
+        legend: pr.length ? (pr.some((p) => p.recAvg != null) ? 'Snitt (0–2) regnet ut fra NVBF-tallene: perfekt = 2, feil = 0, resten = 1. ' : '') + 'Positivt = perfekt og godt mottak slik NVBF teller det.' : '' },
+      att: { rader: pa.map((p) => ({ navn: nv(p), n: p.att || 0, snitt: aS(p), pos: erVaar ? posByNr(p.nr) : '', celler: p.att ? [p.kills || 0, p.attErr || 0, p.blocked || 0, p.blocks || 0, esc(p.kp ?? pct(p.kills || 0, p.att))] : ['–', '–', '–', p.blocks || 0, '–'], tag: tg(p, exA) })),
+        tot: pa.length ? { n: attTot, snitt: attTot ? 1 + (kills - aErr - blkd) / attTot : null, celler: [kills, aErr, blkd, blocks, pct(kills, attTot)] } : null },
+      srv: { rader: ps.map((p) => ({ navn: nv(p), n: p.srv, snitt: sS(p), celler: [p.aces || 0, p.srvErr || 0, pct(p.aces || 0, p.srv), pct(p.srvErr || 0, p.srv)] })),
+        tot: nS ? { n: nS, snitt: 1 + (ess - sF) / nS, celler: [ess, sF, pct(ess, nS), pct(sF, nS)] } : null, n: nS || null, E: ess, F: sF } };
+  }
+  // Nøkkeltall: én rad for begge lag, samme ruter for egen føring og NVBF
+  function stdKpis(m, teams) {
+    return '<div class="kpis det-kpis">' + teams.map((t) => { const T = t.totals || {}, side = t.name === usName(m) ? '' : ' mot';
+      return [['Angrep uttelling', T.kp], ['Angrep snitt (0–2)', T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null, 'att'], ['Mottak snitt (0–2)', T.recAvg, 'rec'], ['Perfekt mottak', T.recPerf], ['Ess / servefeil', T.aces != null ? T.aces + ' / ' + T.srvErr : null], ['Blokkpoeng', T.blocks]]
+        .filter((x) => x[1] != null && x[1] !== '').map((x) => '<div class="kpi' + side + '"><div class="display num">' + esc(x[1]) + '</div>' + (x[2] ? avgBarOnly(x[1], 'wide', x[2]) : '') + '<div class="k">' + esc(shortName(t.name)) + ' · ' + esc(x[0]) + '</div></div>').join(''); }).join('') + '</div>';
   }
 
   function legacyBlock(L) {
@@ -5624,34 +5701,20 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     // Egen føring etter kamp (07.11.2026): samme visning som Løpende statistikk (leggefordeling, vår side til venstre, motstanderen til høyre)
     if (egen && own && ours && ownEvs.length) {
       const oppNavn = m.home === usName(m) ? m.away : m.home;
-      h += '<div class="kpis det-kpis">' + n.teams.map((t) => { const T = t.totals || {}, side = t.name === usName(m) ? '' : ' mot';
-        return [['Angrep uttelling', T.kp], ['Angrep snitt (0–2)', T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null, 'att'], ['Mottak snitt (0–2)', T.recAvg, 'rec'], ['Ess / servefeil', T.aces != null ? T.aces + ' / ' + T.srvErr : null], ['Blokkpoeng', T.blocks]]
-          .filter((x) => x[1] != null && x[1] !== '').map((x) => '<div class="kpi' + side + '"><div class="display num">' + esc(x[1]) + '</div>' + (x[2] ? avgBarOnly(x[1], 'wide', x[2]) : '') + '<div class="k">' + esc(shortName(t.name)) + ' · ' + esc(x[0]) + '</div></div>').join(''); }).join('') + '</div>';
+      h += stdKpis(m, n.teams);
       h += '<div class="col stats det-stats">' + statsPanel(m, ownEvs, oppNavn, { fast: true, leggEtter: true, tittel: helKamp ? 'Kampstatistikk' : 'Sett ' + S.detSett }) + '</div>';
       return h;
     }
-    h += '<div class="rounds">' + n.teams.map((t) => {
-      const T = t.totals || {};
-      let s = '<section class="panel"><div class="panel-head"><h2>' + esc(t.name) + '</h2></div>';
-      if (t.missing) s += '<div class="empty">' + esc(t.missing) + '</div>';
-      const k = [['Angrep uttelling', T.kp], ['Angrep snitt (0–2)', T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null], [egen ? 'Mottak snitt (0–2)' : 'Mottak snitt (0–2) · ' + srcName(n) + '-tall', T.recAvg], ['Positivt mottak', egen ? null : T.recPos], ['Perfekt mottak', T.recPerf], ['Ess / servefeil', T.aces != null ? T.aces + ' / ' + T.srvErr : null], ['Blokkpoeng', T.blocks]].filter((x) => x[1] != null);
-      if (k.length) s += '<div class="kpis">' + k.map((x) => '<div class="kpi"><div class="display num">' + esc(x[1]) + '</div>' + (/snitt/.test(x[0]) ? avgBarOnly(x[1], 'wide', /Angrep/.test(x[0]) ? 'att' : 'rec') : '') + '<div class="k">' + esc(x[0]) + '</div></div>').join('') + '</div>';
-      const pr = (t.players || []).filter((p) => p.rec != null).sort((a, b) => b.rec - a.rec);
-      const recTot = pr.reduce((a, p) => a + p.rec, 0), minRec = Math.max(8, Math.round(recTot * 0.15));
-      const pnum = (v) => v == null ? 0 : parseFloat(String(v).replace(',', '.')) || 0;
-      const pick = (arr, cnt, f, minN) => { const el = arr.filter((p) => cnt(p) >= minN).sort((a, b) => f(a) - f(b) || cnt(b) - cnt(a)); return el.length > 1 && f(el[0]) !== f(el[el.length - 1]) ? { lo: el[0], hi: el[el.length - 1] } : {}; };
-      const exR = pick(pr, (p) => p.rec, (p) => pnum(p.recAvg), minRec);
-      if (pr.length) s += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mottak</th><th>Ant.</th><th>Snitt' + (egen ? '' : ' (' + srcName(n) + ')') + '</th><th>Feil</th>' + (egen ? '<th>Spillb.</th>' : '<th>Pos.</th>') + '<th>Perf.</th></tr></thead><tbody>' + pr.map((p) => '<tr' + loHi(p, exR)[0] + '>' + navnCelle(p.nr ? '#' + p.nr + ' ' : '', utenL(p.name), nvLib(p.name, p.nr, t.name) + loHi(p, exR)[1], pr.map((x) => utenL(x.name))) + '<td>' + p.rec + '</td><td class="key">' + avgBar(p.recAvg, esc(p.recAvg ?? '–')) + '</td><td>' + (p.recErr ?? '–') + '</td>' + (egen ? '<td>' + esc(p.recPlay ?? '–') + '</td>' : '<td>' + esc(p.recPos ?? '–') + '</td>') + '<td>' + esc(p.recPerf ?? '–') + '</td></tr>').join('') + '</tbody></table></div>';
-      const pa = (t.players || []).filter((p) => p.att != null).sort((a, b) => b.att - a.att);
-      const attTot = pa.reduce((a, p) => a + (p.att || 0), 0), minAtt = Math.max(5, Math.round(attTot * 0.1));
-      const exA = pick(pa, (p) => p.att || 0, (p) => 1 + (p.kills - p.attErr - p.blocked) / p.att, minAtt);
-      if (pa.length) s += '<div class="tbl-wrap"><table class="tbl t-att"><thead><tr><th>Angrep</th><th>Fors.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th title="Angrepet ble blokkert"><span class="nv-l">Blokkert</span><span class="nv-k">Blk.</span></th><th>Utt.</th></tr></thead><tbody>' + pa.map((p) => '<tr' + loHi(p, exA)[0] + '>' + navnCelle(p.nr ? '#' + p.nr + ' ' : '', utenL(p.name), nvLib(p.name, p.nr, t.name) + loHi(p, exA)[1], pa.map((x) => utenL(x.name))) + '<td>' + p.att + '</td><td class="key">' + (p.att ? avgBar(1 + (p.kills - p.attErr - p.blocked) / p.att, null, 'att', t.name === OUR ? posByNr(p.nr) : '') : '–') + '</td><td>' + p.kills + '</td><td>' + p.attErr + '</td><td>' + p.blocked + '</td><td>' + esc(p.kp ?? pct(p.kills, p.att)) + '</td></tr>').join('') + '</tbody></table></div>';
-      if (!egen && pr.some((p) => p.recAvg != null)) s += '<div class="code-legend">Mottakssnitt (0–2) er regnet ut fra ' + srcName(n) + '-tallene: perfekt = 2, feil = 0, resten = 1. Ikke egen føring fra benken.</div>';
-      if (exR.lo || exA.lo) s += '<div class="code-legend"><span class="weak-tag">Lav</span> <span class="weak-tag strong">Høy</span> lavest og høyest snitt blant spillere med minst ' + minRec + ' mottak eller ' + minAtt + ' angrep.</div>';
-      const ps = (t.players || []).filter((p) => p.srv != null || p.pts != null || p.blocks != null);
-      if (ps.length) s += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Poeng og serve</th><th>Poeng</th><th>Serve</th><th>Ess</th><th>Feil</th><th>Blokk</th></tr></thead><tbody>' + ps.slice().sort((a, b) => (b.pts || 0) - (a.pts || 0) || (b.srv || 0) - (a.srv || 0)).map((p) => '<tr><td class="key">' + esc(p.nr ? '#' + p.nr + ' ' : '') + esc(utenL(p.name)) + nvLib(p.name, p.nr, t.name) + '</td><td class="key">' + (p.pts ?? '–') + '</td><td>' + (p.srv ?? '–') + '</td><td>' + (p.aces ?? '–') + '</td><td>' + (p.srvErr ?? '–') + '</td><td>' + (p.blocks ?? '–') + '</td></tr>').join('') + (T.pts != null ? '<tr class="total"><td>Lag</td><td>' + T.pts + '</td><td>' + (T.srv ?? '–') + '</td><td>' + (T.aces ?? '–') + '</td><td>' + (T.srvErr ?? '–') + '</td><td>' + (T.blocks ?? '–') + '</td></tr>' : '') + '</tbody></table></div>';
-      return s + '</section>';
-    }).join('') + '</div>';
+    // NVBF (og egen føring uten registreringer her): samme oppsett, navn og kolonner (08.11.2026)
+    if (n.teams.length) {
+      const vt = n.teams.find((t) => t.name === usName(m)), mt = n.teams.find((t) => t !== vt);
+      const tomLag = (navn) => ({ navn, rec: { rader: [] }, att: { rader: [] }, srv: { rader: [] } });
+      const L = (t, v) => (t ? (t.missing ? Object.assign(tomLag(t.name), { rec: { rader: [], tom: t.missing }, att: { rader: [], tom: t.missing }, srv: { rader: [], tom: t.missing } }) : stdFraNvbf(m, t, v)) : null);
+      const a = vt ? L(vt, true) : L(n.teams[0], false), b2 = mt ? L(mt, false) : tomLag('Motstander');
+      h += stdKpis(m, n.teams) + '<div class="col stats det-stats"><section class="panel" aria-label="Kampstatistikk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Kampstatistikk</h2></div>'
+        + stdRader(Object.assign(a, { navn: a.navn }), b2) + '<div class="code-legend">' + (egen ? 'Egenført 0–1–2-score.' : 'Offisielle tall fra ' + srcName(n) + '.') + ' Angrep: feil og blokkert = 0, i spill = 1, poeng = 2. ' + legendLink() + '</div></section></div>';
+      return h;
+    }
     return h;
   }
 
@@ -6330,12 +6393,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const dirSnitt = (L) => L.length ? (2 * L.filter((e) => e.c === 'K').length + L.filter((e) => e.c === 'D').length) / L.length : null;
   function dirTable(evs, nums, only, opt) {
     opt = opt || {};
-    let h = '<thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Kill</th><th>Feil</th><th>Blokk</th><th>Forsv.</th><th>Kill %</th><th title="Diagonal / linje / dip">D/L/Dip</th></tr></thead><tbody>';
+    let h = '<thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Poeng</th><th>Feil</th><th title="Vi blokket angrepet">Blokkert</th><th title="Ballen ble forsvart / i spill">I spill</th><th>Uttelling</th><th title="Diagonal / linje / dip">D/L/Dip</th></tr></thead><tbody>';
     const rows = nums.filter((n) => !only || n === only).map((n) => [n, evs.filter((e) => String(e.p) === n)]).filter(([, L]) => L.length);
     const row = (lab, L, dot) => { const c = (r) => L.filter((e) => e.c === r).length, k = (x) => L.filter((e) => dirKind(e) === x).length;
       return '<tr' + (dot === null ? ' class="total"' : '') + '><td class="key">' + (dot ? '<span class="dir-dot" style="background:' + dot + ';vertical-align:-2px"></span> ' : '') + lab + '</td><td>' + L.length + '</td><td class="key">' + avgBar(dirSnitt(L), null, 'att') + '</td><td>' + c('K') + '</td><td>' + c('F') + '</td><td>' + c('B') + '</td><td>' + c('D') + '</td><td class="key">' + pct(c('K'), L.length) + '</td><td>' + k('diagonal') + '/' + k('linje') + '/' + k('dip') + '</td></tr>'; };
-    rows.forEach(([n, L]) => { h += row(opt.navn ? opt.navn(n) : '#' + esc(n), L, opt.utenFarge ? '' : dirColor(n)); });
-    if (!only && rows.length > 1) h += row('Totalt', rows.flatMap(([, L]) => L), null);
+    rows.forEach(([n, L]) => { h += row(opt.navn ? opt.navn(n) : spNavn(n, oppName(cur(), n), oppLib(cur(), n)), L, opt.utenFarge ? '' : dirColor(n)); });
+    if (!only && rows.length > 1) h += row('Lag', rows.flatMap(([, L]) => L), null);
     if (!rows.length) h += '<tr><td colspan="9" class="muted" style="text-align:left">Ingen slag i dette utvalget.</td></tr>';
     return h + '</tbody>';
   }
