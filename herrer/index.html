@@ -4153,12 +4153,38 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const set = poengSett(m), st = (m.lineups && m.lineups.sets && m.lineups.sets[String(set)] && m.lineups.sets[String(set)].start) || null;
     const a = poengAlle(set), base = a.base ? { oss: a.base.so, dem: a.base.sd, server: a.base.ss } : null;
     const t = { set, oss: base ? base.oss : 0, dem: base ? base.dem : 0, server: base ? base.server : (st && st.firstServe === 'motstander' ? 'dem' : 'oss'), rot: (st && st.rotation) || null, auto: 0, n: 0, egne: egneSistePoeng(set) >= 0, kjentStart: !!st };
-    a.poeng.forEach((x) => {
-      t.n++; if (x.k === 'auto') t.auto++;
+    // Rotasjon (07.11.2026, variant C): vår serve er fasit. Serveren står i posisjon 1, så serven forteller rotasjonen.
+    // Poengene brukes mellom servene (vinner vi poeng på deres serve, roterer vi). En manuell rotasjon i Oppstilling er også et ankerpunkt.
+    const sett = window.Oppstilling ? Oppstilling.settFor(m, set) : null, o = sett ? Oppstilling.aktuelt(sett) : null, baseT = a.base ? a.base.t : 0;
+    const tl = a.poeng.map((x) => ({ t: x.t, x }));
+    if (o) {
+      allEvents().forEach((e) => { if (e.type === 'srv' && String(e.set) === String(set) && (!baseT || e.t >= baseT)) tl.push({ t: e.t, srv: e.p }); });
+      const manuell = (sett.endringer || []).filter((e) => e.type === 'rotasjon').pop();
+      if (manuell) { const mt = Date.parse(manuell.t); if (isFinite(mt) && (!baseT || mt >= baseT)) tl.push({ t: mt, rotTil: Oppstilling.rotasjonAv(o.positions, o.roles) }); }
+    }
+    tl.sort((p, q) => p.t - q.t);
+    t.serveAnker = 0; t.ukjentServer = null;
+    tl.forEach((y) => {
+      if (y.rotTil) { if (y.rotTil) t.rot = y.rotTil; return; }
+      if (y.srv != null) { const R = rotFraServer(o, y.srv); if (R) { t.rot = R; t.serveAnker++; t.ukjentServer = null; } else t.ukjentServer = y.srv; t.server = 'oss'; return; }
+      const x = y.x; t.n++; if (x.k === 'auto') t.auto++;
       if (x.v === 'oss') { t.oss++; if (t.server === 'dem' && t.rot && window.Oppstilling) t.rot = Oppstilling.rotasjonEtter(t.rot, 1); t.server = 'oss'; }
       else { t.dem++; t.server = 'dem'; }
     });
     return t;
+  }
+  // Rotasjonen der serveren står i posisjon 1 (null hvis serveren ikke står i oppstillingen, f.eks. et bytte som ikke er registrert)
+  function rotFraServer(o, id) {
+    if (!o || !o.positions || !window.Oppstilling) return null;
+    const p = Oppstilling.plassAv(o.positions, id); if (!p) return null;
+    return Oppstilling.rotasjonAv(Oppstilling.roter(o.positions, Number(p) - 1), o.roles);
+  }
+  // Oppstillingen flyttet til rotasjonen appen regner ut (serve/poeng), så «På banen» og leggefordelingen følger kampen uten manuell rotering
+  function effektivOppstilling(m, o) {
+    if (!o || !o.positions || !poengPaa(m) || !window.Oppstilling) return o;
+    const t = poengTilstand(m), R0 = Oppstilling.rotasjonAv(o.positions, o.roles);
+    if (!t.rot || !R0 || R0 === t.rot) return o;
+    return Object.assign({}, o, { positions: Oppstilling.settRotasjon(o.positions, o.roles, t.rot) });
   }
   function poengLagre(m) {
     const t = poengTilstand(m), hjemme = m.home === usName(m);
@@ -4544,7 +4570,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const oppName = m.home === usName(m) ? m.away : m.home;
     const receivers = (m.receivers || []).map(player).filter((p) => p && !p.archived);
     // Angrep og serve: grunnspillerne. Med bekreftet oppstilling hentes de fra oppstillingen (liberoen er aldri med; midten står der).
-    const opsO = window.Oppstilling && opsBekreftet(m) ? Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1)) : null;
+    const opsO = window.Oppstilling && opsBekreftet(m) ? effektivOppstilling(m, Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1))) : null;
     const onCourt = (opsO ? Oppstilling.ider(opsO.positions) : (m.onCourt || [])).map(player).filter((p) => p && !p.archived);
     const oppNums = m.oppNumbers || [];
     const evs = allEvents();
@@ -4625,7 +4651,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
   }
   function liveSig(m) {
-    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], poengPaa(m) ? poengTilstand(m).rot : '', teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {
@@ -4790,7 +4816,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const LEGG = [['4', '4', '#5B8DEF'], ['P', 'Pipe', '#F07167'], ['M', 'Midt', '#F0A13A'], ['X', 'X', '#C77DFF'], ['2', '2', '#4CD08A']];
   function angrepPlass(m, id) {
     if (!m || modus(m) !== 'avansert' || !window.Oppstilling || !opsBekreftet(m)) return null;
-    const o = Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1)); if (!o || !o.positions) return null;
+    const o = effektivOppstilling(m, Oppstilling.aktuelt(Oppstilling.settFor(m, (m.current && m.current.set) || 1))); if (!o || !o.positions) return null;
     const plass = Oppstilling.plassAv(o.positions, id); if (!plass) return null;
     const rolle = (o.roles || {})[id] || '';
     return { rad: Oppstilling.BAK.includes(Number(plass)) ? 'b' : 'f', rolle };
@@ -6261,7 +6287,14 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       if (b.dataset.confirm !== '1') { b.dataset.confirm = '1'; b.textContent = 'Bekreft'; return; }
       const n = b.dataset.nr, tm = b.dataset.team || oppTeam(m); saveOpp(m, rosterOf(tm).filter((p) => String(p.nr) !== n), tm); if (tm === oppTeam(m)) setOppNumbers(m, (m.oppNumbers || []).filter((x) => String(x) !== n));
     }
-    else if (a === 'log') { logEvent(b.dataset.t, b.dataset.p, b.dataset.c, b.dataset.t === 'att' ? angrepPlass(m, b.dataset.p) : null); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 300); }
+    else if (a === 'log') {
+      const serve = b.dataset.t === 'srv' && poengPaa(m), rotFor = serve ? poengTilstand(m).rot : null, fikk = serve ? (poengTilstand(m).server === 'oss') : false;
+      logEvent(b.dataset.t, b.dataset.p, b.dataset.c, b.dataset.t === 'att' ? angrepPlass(m, b.dataset.p) : null);
+      if (serve) { const t = poengTilstand(m), nr = (player(b.dataset.p) || {}).nr || '?';
+        const msg = t.ukjentServer != null ? 'Serveren #' + nr + ' står ikke i oppstillingen. Registrer byttet, så følger rotasjonen serven.'
+          : (rotFor && t.rot && rotFor !== t.rot && !(fikk === false && Oppstilling.rotasjonEtter(rotFor, 1) === t.rot) ? 'Rotasjon rettet til ' + t.rot + ' etter serve av #' + nr + '.' : null);
+        if (msg) { S.info = msg; render(); setTimeout(() => { if (S.info === msg) { S.info = null; render(); } }, 5000); } }
+      b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 300); }
     else if (a === 'undo') { undo(); }
     else if (a === 'statset') { S.statSet = b.dataset.v; render(); }
     else if (a === 'kpiscope') { S.kpiScope = S.kpiScope === 'kamp' ? 'sett' : 'kamp'; render(); }
