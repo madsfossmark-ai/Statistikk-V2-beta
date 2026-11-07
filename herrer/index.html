@@ -4552,7 +4552,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
 
   const REC = [['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'Spillbart'], ['2', 'c-good', '2', 'Perfekt']];
-  const SRV = [['F', 'c-bad', 'F', 'Feil'], ['I', 'c-mid', 'I', 'I spill'], ['E', 'c-good', 'E', 'Ess']];
+  // Serve vises på 0–2 som mottak og angrep (07.11.2026). Kodene i databasen er uendret: F = 0, I = 1, E = 2.
+  const SRV = [['F', 'c-bad', '0', 'Feil'], ['I', 'c-mid', '1', 'I spill'], ['E', 'c-good', '2', 'Ess']];
   // Rekkefølge i Angrep (07.11.2026): blokkert, feil, i spill, poeng (grønn B for egen blokk kommer til slutt)
   const ATT = [['B', 'c-block', 'B', 'Blokk'], ['0', 'c-bad', '0', 'Feil'], ['1', 'c-mid', '1', 'I spill'], ['2', 'c-good', '2', 'Poeng']];
 
@@ -4597,7 +4598,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     h += '<div class="live-grid">'
       + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
       + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">B blokkert · 0 feil · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
-      + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
+      + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">0 feil · 1 i spill · 2 ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
       + '<form class="addopp" id="oppform"><label for="opp-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="opp-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
@@ -4616,7 +4617,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return '<button class="kpi2 scope" data-a="kpiscope" aria-label="Bytt mellom tall for settet og hele kampen"><b>' + (sett ? 'Sett ' + set : 'Hele kampen') + '</b><span>Trykk for ' + (sett ? 'hele kampen' : 'settet') + ' ⇄</span></button>'
       + tile('Mottak 0–2', ra == null ? '–' : dec(ra), lvl(ra, 'rec'), st.tRec.n + ' mottak')
       + tile('Angrep 0–2', aa == null ? '–' : dec(aa), lvl(aa, 'att'), st.tAtt.n + ' angrep')
-      + tile('Serve i spill', st.tSrv.n ? pct(st.tSrv.n - st.tSrv.F, st.tSrv.n) : '–', lvl(sa, 'srv'), 'E ' + st.tSrv.E + ' · F ' + st.tSrv.F)
+      + tile('Serve i spill', st.tSrv.n ? pct(st.tSrv.n - st.tSrv.F, st.tSrv.n) : '–', lvl(sa, 'srv'), 'ess ' + st.tSrv.E + ' · feil ' + st.tSrv.F)
       + tile(esc(shortName(oppName)) + ' mottak', oa == null ? '–' : dec(oa), lvl(oa, 'rec'), st.tOpp.n + ' mottak')
       + tile('Server på', weak ? '#' + esc(weak[0]) : '–', weak ? lvl(weak[1].s / weak[1].n, 'rec') : 'na', weak ? 'snitt ' + dec(weak[1].s / weak[1].n) + ' · n ' + weak[1].n : 'minst 3 mottak');
   }
@@ -4754,7 +4755,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       if (r && r.n) {
         if (t === 'rec' || t === 'opp') txt = avgBarOnly(r.s / r.n, 'blk') + '<span class="mt">' + r.n + ' · snitt ' + lv(r.s / r.n) + '</span>';
         else if (t === 'att') txt = avgBarOnly(attAvg(r), 'blk', 'att', posOf(id)) + '<span class="mt">' + r.n + ' · snitt ' + lv(attAvg(r), 'att', posOf(id)) + '</span>';
-        else txt = avgBarOnly(srvAvg(r), 'blk', 'srv') + '<span class="mt">' + r.n + ' · ' + lv(srvAvg(r), 'srv') + ' · E ' + r.E + ' F ' + r.F + '</span>';
+        else txt = avgBarOnly(srvAvg(r), 'blk', 'srv') + '<span class="mt">' + r.n + ' · ' + lv(srvAvg(r), 'srv') + ' · ess ' + r.E + ' · feil ' + r.F + '</span>';
       }
       if (t === 'opp') txt = scoutMarks(id, txt);
       const weak = t === 'opp' ? id === weakOpp : !!ex[t] && id === ex[t].lo, strong = t !== 'opp' && !!ex[t] && id === ex[t].hi;
@@ -5174,7 +5175,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<tr><td class="sk-res" colspan="' + (sets.length + 4) + '">Resultat: ' + esc(res) + '</td></tr>'
       + block('Mottak', 'rec', recIds, pname, ['Antall', 'Poeng', 'Snitt'], sumAvg)
       + block('Angrep', 'att', attIds, pname, ['Antall', 'Poeng', 'Snitt'], sumAvg)
-      + block('Serve <span class="sk-sub">(F feil · I i spill · E ess)</span>', 'srv', srvIds, pname, ['Antall', 'Ess', 'Feil'], (mine) => [mine.length, mine.filter((e) => e.c === 'E').length, mine.filter((e) => e.c === 'F').length])
+      + block('Serve <span class="sk-sub">(0 feil · 1 i spill · 2 ess)</span>', 'srv', srvIds, pname, ['Antall', 'Ess', 'Feil'], (mine) => [mine.length, mine.filter((e) => e.c === 'E').length, mine.filter((e) => e.c === 'F').length])
       + block(esc(oppName) + ' mottak', 'opp', oppIds, (n) => oppLabel(m, n), ['Antall', 'Poeng', 'Snitt'], sumAvg)
       + '</tbody></table>';
 
@@ -5233,7 +5234,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<span><span class="rp-k cF">F</span><span class="rp-k cI">I</span><span class="rp-k cE">E</span>serve feil · i spill · ess</span><span><span class="rp-k cP">B</span>blokkpoeng</span></div>';
     if (rec.length) a += seksjon('Mottak', '', rec, ids(rec), navn, ['Ant.', 'Snitt', 'Perf.', 'Feil'], mottak, [140, 40, 72, 52, 40], null, 'rec');
     if (att.length || blk.length) a += seksjon('Angrep og blokk', 'mørkerød B = blokkert angrep · grønn B = blokkpoeng', att, ids(att.concat(blk)), navn, ['Ant.', 'Snitt', 'Poeng', 'Feil', 'Blokkert', 'Blokkp.'], angrep, [140, 40, 72, 44, 38, 52, 50], blk, 'att');
-    const serveDel = srv.length ? seksjon('Serve', 'F feil · I i spill · E ess', srv, ids(srv), navn, ['Ant.', 'Ess', 'Feil'], serve, Object.assign([124, 34, 30, 30], { kort: true })) : '';
+    const serveDel = srv.length ? seksjon('Serve', '0 feil · 1 i spill · 2 ess', srv, ids(srv), navn, ['Ant.', 'Ess', 'Feil'], serve, Object.assign([124, 34, 30, 30], { kort: true })) : '';
     const motDel = visMot ? seksjon(esc(shortName(oppName)) + ' mottak', '', opp, [...new Set(opp.map((e) => String(e.p)))].sort((x, y) => Number(x) - Number(y)), (n) => esc(oppLabel(m, n)), ['Ant.', 'Snitt'], motMottak, Object.assign([90, 30, 72], { kort: true }), null, 'opp') : '';
     if (serveDel || motDel) a += '<div class="rp-to' + (serveDel && motDel ? '' : ' en') + '">' + (serveDel ? '<div>' + serveDel + '</div>' : '') + (motDel ? '<div>' + motDel + '</div>' : '') + '</div>';
     if (!evs.length) a += '<p>Ingen registreringer' + (valg === 'all' ? '' : ' i sett ' + valg) + '.</p>';
@@ -5290,7 +5291,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       const sections = [
         { title: 'Mottak', type: 'rec', ids: order([...new Set(byType('rec').map((e) => e.p).concat(m.receivers || []))]), label: pname, heads: ['Antall', 'Poeng', 'Snitt'], kind: 'num' },
         { title: 'Angrep', type: 'att', ids: order([...new Set(byType('att').map((e) => e.p).concat(m.onCourt || []))]), label: pname, heads: ['Antall', 'Poeng', 'Snitt'], kind: 'num' },
-        { title: 'Serve (F feil · I i spill · E ess)', type: 'srv', ids: order([...new Set(byType('srv').map((e) => e.p).concat(m.onCourt || []))]), label: pname, heads: ['Antall', 'Ess', 'Feil'], kind: 'srv' },
+        { title: 'Serve (0 feil · 1 i spill · 2 ess)', type: 'srv', ids: order([...new Set(byType('srv').map((e) => e.p).concat(m.onCourt || []))]), label: pname, heads: ['Antall', 'Ess', 'Feil'], kind: 'srv' },
         { title: oppName + ' mottak', type: 'opp', ids: [...new Set(byType('opp').map((e) => String(e.p)).concat(m.oppNumbers || []))].sort((a, b) => Number(a) - Number(b)), label: (n) => oppLabel(m, n), heads: ['Antall', 'Poeng', 'Snitt'], kind: 'num' }
       ];
       // Felles kolonnebredde per sett: flest koder én spiller har i det settet, minst 6, pluss to ledige for manuell føring
