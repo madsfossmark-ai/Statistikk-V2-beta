@@ -5954,8 +5954,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     document.body.appendChild(el);
     const svg = el.querySelector('svg'), live = el.querySelector('#oa-live');
     live.setAttribute('stroke', dirColor(nr));
+    // Bane C som i Slagretning: motstanderens side forbi 3-meterlinjen (minst 4 m), så treffpunktet kan settes der de slår fra
+    const bfs = window.BaneFS ? BaneFS.monter(svg, { lag: OUR, logo: (S.logos || {})[OUR] }) : null;
+    const tilpass = () => { if (!bfs) return; const b = el.querySelector('.oa-bane').getBoundingClientRect(); bfs.tilpass(BaneFS.oppsett(b.width, b.height + BaneFS.oppsett(1, 1, false).linjeH, false).D); };
+    tilpass(); window.addEventListener('resize', tilpass);
     let pts = null;
-    const lukk = () => { document.removeEventListener('keydown', tast); el.remove(); if (fokus && fokus.isConnected) try { fokus.focus(); } catch (e) {} };
+    const lukk = () => { document.removeEventListener('keydown', tast); window.removeEventListener('resize', tilpass); el.remove(); if (fokus && fokus.isConnected) try { fokus.focus(); } catch (e) {} };
     const tast = (ev) => { if (ev.key === 'Escape') lukk(); };
     const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; const q = p.matrixTransform(svg.getScreenCTM().inverse()); return [Math.round(q.x), Math.round(q.y)]; };
     svg.addEventListener('pointerdown', (ev) => { ev.preventDefault(); try { svg.setPointerCapture(ev.pointerId); } catch (e) {} pts = [pt(ev)]; live.setAttribute('d', ''); });
@@ -6015,7 +6019,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   function dirOpen(opts) {
     const m = cur(); if (!m) return;
-    opts = opts || {}; DIR.ro = !!opts.ro; DIR.pres = !!(opts.pres || opts.ro);
+    // Slagretning er bare visning (07.11.2026): angrep registreres i panelet «… angrep» i registreringen. Spillerknappene er filter, med Hele laget først.
+    opts = opts || {}; DIR.ro = !!opts.ro; DIR.pres = true;
     if (DIR.ro) { DIR.who = 'all'; DIR.set = 'all'; }
     const nums = dirNums(m);
     if (!DIR.active || !nums.includes(DIR.active)) DIR.active = nums[0] || null;
@@ -6023,7 +6028,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const el = document.createElement('div');
     el.className = 'dir-ov'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Slagretning');
     el.innerHTML = '<header class="bar"><div class="title"><span class="display">Slagretning</span><span class="sub" id="dir-sub"></span></div><span class="spacer"></span>'
-      + '<div class="bar-actions"><button class="barbtn" data-d="undo">Angre siste</button>' + (DIR.ro ? '' : '<button class="barbtn" data-d="pres" id="dir-presbtn"></button>')
+      + '<div class="bar-actions">'
       + (window.BaneFS ? '<button class="barbtn" data-d="stor" id="dir-storbtn">Fullskjerm</button>' : fsOk() ? '<button class="barbtn" data-d="fs" id="dir-fsbtn"></button>' : '') + '<button class="barbtn" data-d="print">Skriv ut</button><button class="barbtn" data-d="printall">Skriv ut alle</button>'
       + '<button class="barbtn primary-bar" data-d="close">' + (DIR.ro ? 'Lukk' : 'Ferdig') + '</button></div></header>'
       + '<div class="dir-pick" id="dir-pick"><div class="dir-pl" id="dir-pick-pl"></div><div class="seg" id="dir-pview"></div><div class="seg" id="dir-pkind"></div><div class="seg" id="dir-psets"></div></div>'
@@ -6130,7 +6135,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       { key: 'kind', navn: 'Type', verdi: DIR.kind, standard: 'all', valg: [['all', 'Slag og dip'], ['hit', 'Bare slag'], ['dip', 'Bare dip']] },
     ];
     const ekstra = '<span class="bfs-seg" role="group" aria-label="Visning"><button data-d="view" data-v="lines" aria-pressed="' + (DIR.view === 'lines') + '">Piler</button><button data-d="view" data-v="heat" aria-pressed="' + (DIR.view === 'heat') + '">Soner</button></span>'
-      + (DIR.ro ? '' : '<button class="bfs-chip ingen-pil' + (DIR.pres ? ' aktiv' : '') + '" data-d="pres" aria-pressed="' + !!DIR.pres + '">' + (DIR.pres ? 'Registrer' : 'Bare se') + '</button>');
+      ;
     BaneFS.linje(q('#dir-fslinje'), brikker, ekstra, (key, v) => {
       if (key === 'spiller') { if (v === '*') DIR.who = 'all'; else { DIR.who = 'active'; DIR.active = v; } }
       else DIR[key] = v;
@@ -6247,7 +6252,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     // Visningsmodus: velger som i registreringen (hele laget eller én spiller), tittel og knappetekster
     const withEv = nums.filter((n) => all.some((e) => String(e.p) === n));
     q('#dir-pick-pl').innerHTML = '<button class="team" data-d="pick" data-v="*" aria-pressed="' + (DIR.who === 'all') + '">Hele laget</button>'
-      + (DIR.ro ? withEv : nums).map((n) => '<button data-d="pick" data-v="' + esc(n) + '" aria-pressed="' + (DIR.who !== 'all' && n === DIR.active) + '"><span class="dir-dot" style="background:' + dirColor(n) + '"></span>' + esc(n) + '</button>').join('');
+      + withEv.map((n) => '<button data-d="pick" data-v="' + esc(n) + '" aria-pressed="' + (DIR.who !== 'all' && n === DIR.active) + '"><span class="dir-dot" style="background:' + dirColor(n) + '"></span>' + esc(n) + '</button>').join('');
     seg('#dir-pview', 'view', [['lines', 'Piler'], ['heat', 'Soner']], DIR.view);
     seg('#dir-pkind', 'kind', [['all', 'Slag og dip'], ['hit', 'Bare slag'], ['dip', 'Bare dip']], DIR.kind);
     seg('#dir-psets', 'set', [['all', 'Kamp']].concat(sets.map((s) => [s, 'Sett ' + s])), DIR.set);
