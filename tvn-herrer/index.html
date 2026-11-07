@@ -181,6 +181,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .sa-grp { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .stat-block { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stats-body { display: flex; flex-direction: column; gap: 14px; }
+.stats-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .who { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "nr nm" "nr mini"; column-gap: 10px; align-items: center; min-width: 0; }
@@ -4781,7 +4782,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const recRows = Object.entries(st.rec).sort((a, b) => b[1].n - a[1].n);
     const exRec = extremes(st.rec, (r) => r.s / r.n, 5);
     const avgCell = (v) => avgBar(v);
-    h += '<div class="stats-body"><div class="stat-block"><div class="label" style="color:var(--accent)">Mottak</div>';
+    // Vår statistikk i venstre kolonne, motstanderens i høyre (07.11.2026). Stables på smal skjerm.
+    h += '<div class="stats-body"><div class="stats-col"><div class="stat-block"><div class="label" style="color:var(--accent)">Mottak</div>';
     if (!recRows.length) h += '<div class="empty">Ingen mottak registrert.</div>';
     else h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Spiller</th><th>Ant.</th><th>Snitt</th><th>Feil</th><th>Spillbart</th><th>Perfekt</th></tr></thead><tbody>'
       + recRows.map(([id, r]) => '<tr' + loHi(id, exRec)[0] + '>' + navnCelle('', pname(id), libTag(id) + loHi(id, exRec)[1], recRows.map(([x]) => pname(x))) + '<td>' + r.n + '</td><td class="key">' + avgCell(r.s / r.n) + '</td><td>' + pct(r.c0, r.n) + '</td><td>' + pct(r.c1, r.n) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
@@ -4810,13 +4812,13 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
     const oppRows = Object.entries(st.opp).sort((a, b) => (a[1].s / a[1].n) - (b[1].s / b[1].n) || b[1].n - a[1].n);
     const weakOpp = (oppRows.find(([, r]) => r.n >= 5) || [])[0];
-    h += '</div><div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' mottak · svakest først</div>';
+    h += '</div></div><div class="stats-col mot"><div class="stat-block"><div class="label" style="color:var(--opp)">' + esc(oppName) + ' mottak · svakest først</div>';
     if (!oppRows.length) h += '<div class="empty">Ingen motstandermottak registrert.</div>';
     else h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nr</th><th>Ant.</th><th>Snitt</th><th>Feil</th><th>Spillbart</th><th>Perfekt</th></tr></thead><tbody>'
       + oppRows.map(([n, r]) => '<tr' + (r.n < 5 ? ' class="small-n"' : (n === weakOpp ? ' class="weakest"' : '')) + '><td class="key">' + esc(oppLabel(m, n)) + (n === weakOpp ? ' <span class="weak-tag">Server hit</span>' : '') + '</td><td>' + r.n + '</td><td class="key">' + avgCell(r.s / r.n) + '</td><td>' + pct(r.c0, r.n) + '</td><td>' + pct(r.c1, r.n) + '</td><td>' + pct(r.c2, r.n) + '</td></tr>').join('')
       + '<tr class="total"><td>Lag</td><td>' + st.tOpp.n + '</td><td>' + avgBar(st.tOpp.s / st.tOpp.n) + '</td><td>' + pct(st.tOpp.c0, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c1, st.tOpp.n) + '</td><td>' + pct(st.tOpp.c2, st.tOpp.n) + '</td></tr></tbody></table></div>'
       + '<div class="code-legend">Grå rader: under 5 mottak, lite utvalg.</div>';
-    h += '</div>' + angrepMotBlokk(m, filt, oppName) + '</div>';   // motstanderens angrep fra Slagretning, så lukkes stats-body
+    h += '</div>' + angrepMotBlokk(m, filt, oppName) + '</div></div>';   // motstanderens angrep, så lukkes motstanderkolonnen og stats-body
     if (m.legacy) h += legacyBlock(m.legacy);
     // Kampark og CSV-eksport samlet nederst i statistikken (01.11.2026: Kampark flyttet hit fra topplinjen i registreringen)
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">' + (S.view === 'live' && !S.dash && !window.PUBLIC ? '<button class="secondary" data-a="sheet">Kampark</button>' : '') + (S.dl ? '<button class="secondary" data-a="export">Eksporter til regneark (CSV)</button>' : '') + '</div>';
