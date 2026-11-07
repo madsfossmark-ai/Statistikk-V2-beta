@@ -4565,6 +4565,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       : '<div class="empty" style="margin-top:6px">Ingen spillere ennå. Legg til draktnummer under.</div>';
     return h + '</div>';
   }
+  // Rekkefølgen i Angrep (07.11.2026): K1, K2, diagonal, M1, M2, opplegger. Rollen fra oppstillingen, ellers posisjonen i troppen.
+  function angrepRekkefolge(spillere, o) {
+    const ROLLE = { K1: 0, K2: 1, D: 2, M1: 3, M2: 4, O: 5 }, POS = [[/^kant/i, 0], [/^diag/i, 2], [/^midt/i, 3], [/^oppl/i, 5]];
+    const plass = (p) => { const ro = o && o.roles ? o.roles[p.id] : null; if (ro && ROLLE[ro] != null) return ROLLE[ro]; const f = POS.find(([re]) => re.test(p.pos || '')); return f ? f[1] : 6; };
+    return spillere.slice().sort((a, b) => plass(a) - plass(b) || (Number(a.nr) || 99) - (Number(b.nr) || 99));
+  }
   function liveView() {
     const m = cur();
     const oppName = m.home === usName(m) ? m.away : m.home;
@@ -4587,7 +4593,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const courtBtn = '<button class="textbtn" data-a="squad">' + onCourt.length + ' på banen · endre</button>';
     h += '<div class="live-grid">'
       + '<section class="panel p-rec" aria-label="Eget mottak"><div class="panel-head"><h2><span class="step">1</span>Eget mottak</h2><button class="textbtn" data-a="squad">' + receivers.length + ' i mottak · endre</button></div>' + playerRows(receivers.map((p) => p.id), 'rec', REC) + (receivers.length && (receivers.length < 4 || receivers.length > 6) && !opsBekreftet(m) ? '<div class="code-legend warn">Velg 4–6 mottakere.</div>' : '') + '</section>'
-      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
+      + '<section class="panel p-att" aria-label="Angrep"><div class="panel-head"><h2><span class="step">2</span>Angrep</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(angrepRekkefolge(onCourt, opsO).map((p) => p.id), 'att', ATT) + '<div class="code-legend">0 feil · B blokkert · 1 i spill · 2 poeng · <b style="color:var(--good)">grønn B</b> = egen blokk (blokkpoeng)</div>' : noCourt) + '</section>'
       + '<section class="panel p-srv" aria-label="Vår serve"><div class="panel-head"><h2><span class="step">3</span>Vår serve</h2>' + courtBtn + '</div>' + (onCourt.length ? playerRows(onCourt.map((p) => p.id), 'srv', SRV) + '<div class="code-legend">F feil · I i spill · E ess</div>' : noCourt) + '</section>'
       + '<section class="panel opp p-opp" aria-label="Motstanderens mottak"><div class="panel-head"><h2><span class="step">4</span>' + esc(oppName) + ' mottak</h2><span style="display:flex;gap:14px"><button class="textbtn" data-a="scout" style="color:var(--accent)">Serveplan ›</button><button class="textbtn" data-a="dir" style="color:var(--opp)">Slagretning ›</button></span></div>' + oppMottakVelger(m, oppNums)
       + (oppNums.length ? oppNums.map((n) => '<div class="row"><div class="who"><span class="nr opp">' + esc(n) + '</span>' + ((oppP(m, n) || {}).name ? '<span class="nm">' + esc(oppP(m, n).name.split(' ')[0]) + oppLib(m, n) + '</span>' : (oppLib(m, n) ? '<span class="nm">(L)</span>' : '')) + '<span class="mini" data-mini="opp|' + esc(n) + '"></span></div><div class="codes">' + REC.map((c) => codeBtn('opp', n, c[0], c[1], c[2], c[3])).join('') + '</div></div>').join('') : '<div class="empty">Legg til draktnummer på mottakerne deres.</div>')
@@ -4614,7 +4620,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Spillerne på banen øverst (fra bekreftet oppstilling): forrekke 4-3-2, bakrekke 5-6-1, liberoen der hun står
   function courtChips(m, o) {
     if (!o) return '';
-    const L = o.libero || {}, inne = Oppstilling.liberoInne(o);
+    // Liberoen kan ikke serve: står spilleren hun erstatter i posisjon 1 mens vi server, vises spilleren selv (07.11.2026)
+    const L = o.libero || {}, server1 = poengPaa(m) && poengTilstand(m).server === 'oss' && String(o.positions[1]) === String(L.erstatter);
+    const inne = Oppstilling.liberoInne(o) && !server1;
     return '<button class="court-chips" data-a="lineup-chips" aria-label="Spillerne på banen. Trykk for å åpne oppstillingen">' + [4, 3, 2, 5, 6, 1].map((pl) => {
       let id = o.positions[pl], rolle = (o.roles || {})[id] || '';
       if (inne && String(L.erstatter) === String(id)) { id = L.aktiv; rolle = 'L'; }
@@ -4651,7 +4659,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     saveMatch(m.id, { onCourt, receivers: m.receivers, lineups: lu });
   }
   function liveSig(m) {
-    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], poengPaa(m) ? poengTilstand(m).rot : '', teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
+    return JSON.stringify([S.kpiScope, S.bytte, opsBekreftet(m), opsKnapp(m), oppRoster(m), !!fsEl(), m.id, m.status, (m.current || {}).set, (m.setScores || []).length, S.endingSet, modus(m), S.modusBytt || '', S.mbServe || '', m.receivers, m.onCourt, m.oppNumbers, !!S.oppVelg, m.dirNumbers || [], poengPaa(m) ? poengTilstand(m).rot + '|' + poengTilstand(m).server : '', teamRoster(m).map((p) => [p.id, p.nr, p.name])]);
   }
   function ownCount() { return Object.entries(S.logs).filter(([k]) => k.startsWith(deviceId + '-')).reduce((a, [, v]) => a + v.length, 0); }
   function lastChips(evs, oppName) {

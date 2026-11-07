@@ -1198,6 +1198,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
  * (kampens lineups.sets[n].start: rotasjon og hvem som server først).
  *  * Sideout = vi vinner poenget når motstanderen server. Breakpoint = vi vinner poenget når vi server.
  *  * Rotasjonen følges som i appen: vinner vi poenget mens vi mottar, roterer vi (R1 → R6 → R5 …).
+ *  * Vår serve er fasit (07.11.2026): serveren står i posisjon 1, så hver serve setter rotasjonen. Poengene fyller ut mellom servene.
  *  * Visning A (godkjent 01.11.2026): per rotasjon med snitt og svakeste rotasjon. Kampforløp som egen fane.
  * Leser bare data. Ren beregning (ballvekslinger, stat, rekker) er eksportert og testes i Node.
  */
@@ -1210,7 +1211,16 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 
   // ---------- Beregning ----------
   // kamper: [{ id, dato, motstander, lineups }], poeng: rader fra stats.poeng. Gir én rad per ballveksling i tidsrekkefølge.
-  function ballvekslinger(kamper, poeng) {
+  // Rotasjonen (oppleggerens plass) når serveren står i posisjon 1. null hvis serveren ikke står i oppstillingen.
+  function rotFraServer(o, id) {
+    if (!o || !o.positions || id == null) return null;
+    const P = [1, 2, 3, 4, 5, 6], p = P.find((x) => String(o.positions[x]) === String(id)); if (!p) return null;
+    let pos = Object.assign({}, o.positions);
+    for (let i = 0; i < p - 1; i++) { const f = pos; pos = {}; P.forEach((q) => { pos[q] = f[(q % 6) + 1]; }); }
+    return P.find((q) => ((o.roles || {})[pos[q]] || '') === 'O') || null;
+  }
+  // serves (valgfri): [{ match_id, set_no, recorded_at, spiller }] for våre server, spiller med samme id som i oppstillingen
+  function ballvekslinger(kamper, poeng, serves) {
     const ut = [], angret = new Set(poeng.filter((r) => r.type === 'angre').map((r) => r.angrer));
     kamper.forEach((k) => {
       const egne = poeng.filter((r) => r.match_id === k.id && r.type !== 'angre' && !angret.has(r.id));
@@ -1221,8 +1231,14 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         let rot = st ? rNr(st.rotation) : null;
         let server = start ? start.start_server : (st && st.firstServe === 'motstander' ? 'dem' : 'oss');
         let oss = start ? start.start_oss : 0, dem = start ? start.start_dem : 0;
-        l.filter((r) => r.type === 'poeng' && (!start || Date.parse(r.recorded_at) >= Date.parse(start.recorded_at))).forEach((r) => {
-          const mottak = server === 'dem', vinn = r.vinner === 'oss';
+        const ops = (k.lineups && k.lineups.sets && k.lineups.sets[String(sett)]) || null, o = ops && ops.confirmed ? (ops.naa || ops.start) : null;
+        const fra = start ? Date.parse(start.recorded_at) : -Infinity;
+        const tl = l.filter((r) => r.type === 'poeng' && Date.parse(r.recorded_at) >= fra).map((r) => ({ t: Date.parse(r.recorded_at), r }));
+        if (o) (serves || []).forEach((s) => { if (s.match_id === k.id && s.set_no === sett && Date.parse(s.recorded_at) >= fra) tl.push({ t: Date.parse(s.recorded_at), srv: s.spiller }); });
+        tl.sort((a, b) => a.t - b.t);
+        tl.forEach((y) => {
+          if (y.srv != null) { const R = rotFraServer(o, y.srv); if (R) rot = R; server = 'oss'; return; }
+          const r = y.r, mottak = server === 'dem', vinn = r.vinner === 'oss';
           if (vinn) oss++; else dem++;
           ut.push({ kamp: k.id, sett, rot, mottak, vinn, oss, dem, kilde: r.kilde, grunn: r.grunn || null });
           if (vinn) { if (mottak && rot) rot = nesteRot(rot); server = 'oss'; } else server = 'dem';
@@ -1286,7 +1302,15 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     const m = ids.length ? kast(await db.from('matches').select('id,home,away,starts_at,focus_team,legacy').in('id', ids)) : [];
     const kamper = m.map((k) => { const vi = k.focus_team || c.our_team; return { id: k.id, dato: k.starts_at, motstander: k.home === vi ? k.away : k.home, lineups: (k.legacy && k.legacy.lineups) || null }; })
       .sort((a, b) => String(b.dato).localeCompare(String(a.dato)));
-    return { kamper, poeng };
+    // Våre server (rotasjonen følger serven). Spiller-id oversettes til samme id som i oppstillingen (legacy_id når den finnes).
+    let serves = [];
+    if (ids.length) {
+      const ev = kast(await db.from('events').select('id,match_id,set_no,type,squad_player_id,undoes,recorded_at').in('match_id', ids).in('type', ['srv', 'undo']));
+      const sp = kast(await db.from('squad_players').select('id,legacy_id').eq('context_id', c.id)), idv = {}; sp.forEach((x) => { idv[x.id] = x.legacy_id || x.id; });
+      const angret = new Set(ev.filter((e) => e.type === 'undo').map((e) => e.undoes));
+      serves = ev.filter((e) => e.type === 'srv' && !angret.has(e.id)).map((e) => ({ match_id: e.match_id, set_no: e.set_no, recorded_at: e.recorded_at, spiller: idv[e.squad_player_id] || e.squad_player_id }));
+    }
+    return { kamper, poeng, serves };
   }
 
   // ---------- Visning ----------
@@ -1335,7 +1359,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     if (!document.getElementById('sr-css')) { const s = document.createElement('style'); s.id = 'sr-css'; s.textContent = CSS; document.head.appendChild(s); }
     const S = { data: null, kamp: '', sett: 'alle', fane: 'rot', fsett: null };
     el.innerHTML = '<div class="sr"><p class="liten">Henter poeng …</p></div>';
-    (opt.demo ? Promise.resolve(demoData()) : hent(opt.klient, opt.slug)).then((d) => { d.kamper.sort((a, b) => String(b.dato).localeCompare(String(a.dato))); S.data = d; S.alle = ballvekslinger(d.kamper, d.poeng); tegn(); })
+    (opt.demo ? Promise.resolve(demoData()) : hent(opt.klient, opt.slug)).then((d) => { d.kamper.sort((a, b) => String(b.dato).localeCompare(String(a.dato))); S.data = d; S.alle = ballvekslinger(d.kamper, d.poeng, d.serves); tegn(); })
       .catch((e) => { el.innerHTML = '<div class="sr"><p class="liten">Kunne ikke hente poengene: ' + esc(e.message) + '</p></div>'; });
 
     const seg = (id, valg, aktiv) => '<div class="sr-seg" role="group" id="' + id + '">' + valg.map(([v, t]) => '<button type="button" data-v="' + esc(v) + '" aria-pressed="' + (String(v) === String(aktiv)) + '">' + esc(t) + '</button>').join('') + '</div>';
@@ -1417,7 +1441,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
     }
   }
 
-  const eksport = { ballvekslinger, stat, rekker, demoData, vis };
+  const eksport = { ballvekslinger, rotFraServer, stat, rekker, demoData, vis };
   if (typeof module !== 'undefined' && module.exports) module.exports = eksport; else root.ServeRotasjon = eksport;
 })(typeof window !== 'undefined' ? window : globalThis);
 
