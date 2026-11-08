@@ -4587,6 +4587,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Hamburgermeny med det som brukes sjeldnere: ny kamp, tilgang, publisering, deling og fullskjerm
   function menuHtml() {
     const items = (!S.dash ? '<button class="menu-item" role="menuitem" data-a="new-toggle">Ny kamp</button>' : '')
+      + (!window.PUBLIC ? '<button class="menu-item" role="menuitem" data-a="tavle">Tavle</button>' : '')
       + (S.canAdmin && !S.dash ? '<button class="menu-item" role="menuitem" data-a="access">Tilgang</button>' : '')
       + (hasSite() ? '<button class="menu-item" role="menuitem" data-a="publish">Publiser åpen side</button>' : '')
       + (siteUrl() ? '<a class="menu-item" role="menuitem" href="' + esc(siteUrl()) + '" target="_blank" rel="noopener">Åpen side ↗</a><button class="menu-item" role="menuitem" data-a="share">Del lenke til åpen side</button>' : '')
@@ -6670,7 +6671,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (a === 'kkpick') { SEASON.player = b.dataset.id; render(); const c = document.getElementById('h-kurve'); if (c) c.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     else if (a === 'psort') { const k = b.dataset.k; if (SEASON.sortK === k) SEASON.sortDir = -SEASON.sortDir; else { SEASON.sortK = k; SEASON.sortDir = k === 'name' ? 1 : -1; } render(); }
     else if (a === 'dir' && m) { dirOpen(S.view === 'detail' ? { ro: true } : null); }
-    else if (a === 'tavle') { tavleOpen(); }
+    else if (a === 'tavle') { if (S.menuOpen) { S.menuOpen = false; render(); } tavleOpen(); }
     else if (a === 'squad') { S.view = 'squad'; render(); toTop(); }
     else if ((a === 'lineup' || a === 'lineup-chips') && m) { opsAapne(m, true); }
     else if (a === 'to-live') { S.view = S.view === 'sheet' && S.sheetBack === 'detail' ? 'detail' : 'live'; render(); toTop(); }
