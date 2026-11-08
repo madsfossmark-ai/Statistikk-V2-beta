@@ -784,6 +784,18 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
 .tavle .tb-status { width: 150px; text-align: center; white-space: nowrap; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
 .tavle .tb-skille { width: 2px; align-self: stretch; background: var(--t-fg); opacity: .25; margin: 4px 2px; }
 .tavle.staa .tb-skille { display: none; }
+/* iPhone stående (08.11.2026): modusene på én rad over hele bredden, de fem knappene på raden under. Ingenting legger seg over banen. */
+@media (max-width: 600px) {
+  .tavle .tb-v { width: auto; left: 8px; right: 8px; transform: none; max-width: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.5fr); gap: 6px; }
+  .tavle.staa .tb-v { width: auto; }
+  .tavle .tb-flate .tb-brikke text { font-size: 50px; }
+  .tavle .tb-v .tb-seg { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tavle .tb-v .tb-status, .tavle .tb-v .tb-skille { display: none; }
+  .tavle .tb-v .tb-k { min-width: 0; padding: 0 2px; font-size: 14px; letter-spacing: .02em; }
+  .tavle.staa .tb-flate, .tavle .tb-flate { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 108px); }
+  .tavle .t-modus button, .tavle .tb-topp .tb-k { min-height: 44px; padding: 0 12px; }
+}
+body.tavle-apen #v2-tilgang, body.tavle-apen #v2-loggut { display: none !important; }
 .tavle .tb-brikke text { font: 700 34px var(--font-display); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .tavle .m-flytt .tb-brikke { cursor: grab; } .tavle .m-penn, .tavle .m-penn * { cursor: crosshair; }
 .tavle .m-penn .tb-brikke, .tavle .m-visk .tb-brikke { pointer-events: none; }
@@ -6220,7 +6232,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const vis = () => { el.classList.toggle('sort', sort); el.classList.toggle('bane', TB.modus === 'bane'); el.querySelectorAll('[data-tm]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tm === TB.modus))); if (TB.modus === 'bane') banen(); el.querySelector('.t-tall').textContent = tavleN; el.querySelectorAll('[data-n]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === tavleN))); };
     const snu = () => { if (el.isConnected && TB.modus === 'bane') banen(); };
     const lukk = () => {
-      el.remove(); document.removeEventListener('fullscreenchange', vedFs); window.removeEventListener('resize', snu);
+      el.remove(); document.body.classList.remove('tavle-apen'); document.removeEventListener('fullscreenchange', vedFs); window.removeEventListener('resize', snu);
       try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* ikke støttet */ }
       try { if (las) las.release(); } catch (e) { /* ikke støttet */ }
       if (fokus && fokus.focus) fokus.focus();
@@ -6243,7 +6255,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       else if (e.key === 'ArrowLeft') { tavleN = (tavleN + 4) % 6 + 1; vis(); }
       else if (e.key === 'Escape') lukk();
     });
-    document.body.appendChild(el); vis(); el.focus(); window.addEventListener('resize', snu);
+    document.body.appendChild(el); document.body.classList.add('tavle-apen'); vis(); el.focus(); window.addEventListener('resize', snu);
     try { const r = el.requestFullscreen && el.requestFullscreen(); if (r && r.then) r.then(() => document.addEventListener('fullscreenchange', vedFs)).catch(() => {}); } catch (e) { /* ikke støttet (f.eks. iPhone) */ }
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((l) => { las = l; }).catch(() => {}); } catch (e) { /* ikke støttet */ }
   }
@@ -6301,7 +6313,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const sti = (p) => p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(0) + ',' + q[1].toFixed(0)).join(' ');
     TB.streker.forEach((x, i) => mk('path', { d: sti(x.p), fill: 'none', stroke: 'var(--t-fg)', 'stroke-width': 8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': x.stiplet ? '22 18' : '', 'marker-end': x.pil ? 'url(#tb-pil)' : '', 'data-s': i }, gS));
     TB.brikker.forEach((b) => { const g = mk('g', { class: 'tb-brikke', 'data-b': b.id, transform: 'translate(' + b.x + ',' + b.y + ')', role: 'img', 'aria-label': (b.lag === 'oss' ? 'Vår ' : 'Motstanderens ') + b.r }, gB);
-      mk('circle', { r: 44, fill: b.lag === 'oss' ? 'var(--t-fg)' : 'var(--t-bg)', stroke: 'var(--t-fg)', 'stroke-width': 6 }, g);
+      mk('circle', { r: innerWidth < 600 ? 64 : 44, fill: b.lag === 'oss' ? 'var(--t-fg)' : 'var(--t-bg)', stroke: 'var(--t-fg)', 'stroke-width': 6 }, g);
       mk('text', Object.assign({ fill: b.lag === 'oss' ? 'var(--t-bg)' : 'var(--t-fg)' }, st ? { transform: 'rotate(90)' } : {}), g).textContent = b.r; });
     const pt = (e) => { const p = s0.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(s.getScreenCTM().inverse()); return [q.x, q.y]; };   // liggende koordinater også når banen står
     let dra = null, strek = null;
