@@ -5156,8 +5156,15 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
         tot: nS ? { n: nS, snitt: 1 + (ess - sF) / nS, celler: [ess, sF, pct(ess, nS), pct(sF, nS)] } : null, n: nS || null, E: ess, F: sF } };
   }
   // Nøkkeltall: én rad for begge lag, samme ruter for egen føring og NVBF
+  const lagNorm = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/\b(vbk|vk|ik|il|volleyball|volley|sk)\b/g, '').replace(/[^a-z0-9æøå]/g, '');
+  function erVaartLag(m, navn) {
+    const a = lagNorm(navn), b = lagNorm(usName(m)), o = lagNorm(typeof OUR !== 'undefined' ? OUR : '');
+    if (!a) return false;
+    return a === b || (b && (a.startsWith(b) || b.startsWith(a))) || (o && (a === o || a.startsWith(o)));
+  }
   function stdKpis(m, teams) {
-    return '<div class="kpis det-kpis">' + teams.map((t) => { const T = t.totals || {}, side = t.name === usName(m) ? '' : ' mot';
+    const vaar = teams.find((t) => lagNorm(t.name) === lagNorm(usName(m))) || teams.find((t) => erVaartLag(m, t.name));
+    return '<div class="kpis det-kpis">' + teams.map((t) => { const T = t.totals || {}, side = t === vaar ? '' : ' mot';
       return [['Angrep uttelling', T.kp], ['Angrep snitt (0–2)', T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null, 'att'], ['Mottak snitt (0–2)', T.recAvg, 'rec'], ['Perfekt mottak', T.recPerf], ['Ess / servefeil', T.aces != null ? T.aces + ' / ' + T.srvErr : null], ['Blokkpoeng', T.blocks]]
         .filter((x) => x[1] != null && x[1] !== '').map((x) => '<div class="kpi' + side + '"><div class="display num">' + esc(x[1]) + '</div>' + (x[2] ? avgBarOnly(x[1], 'wide', x[2]) : '') + '<div class="k">' + esc(shortName(t.name)) + ' · ' + esc(x[0]) + '</div></div>').join(''); }).join('') + '</div>';
   }
@@ -5714,7 +5721,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const own = ours ? ownStats(m, ownEvs.concat(fill.extra)) : null; const hasNvbf = !!(m.nvbf && m.nvbf.teams && m.nvbf.teams.length);
     // Motstanderens angrep, serve og poeng føres aldri fra benken, så de hentes fra NVBF når statistikken finnes
     if (own && hasNvbf && m.status === 'ferdig' && helKamp) {
-      const nOpp = m.nvbf.teams.find((t) => t.name !== usName(m)), oOpp = own.teams[1], F = ['att', 'attErr', 'blocked', 'kills', 'kp', 'eff', 'srv', 'srvErr', 'aces', 'blocks', 'pts'];
+      const nVaar = m.nvbf.teams.find((t) => lagNorm(t.name) === lagNorm(usName(m))) || m.nvbf.teams.find((t) => erVaartLag(m, t.name)), nOpp = m.nvbf.teams.find((t) => t !== nVaar && nVaar), oOpp = own.teams[1], F = ['att', 'attErr', 'blocked', 'kills', 'kp', 'eff', 'srv', 'srvErr', 'aces', 'blocks', 'pts'];
       if (nOpp && oOpp && (nOpp.players || []).some((p) => F.some((f) => p[f] != null))) {
         (nOpp.players || []).forEach((p) => {
           if (!F.some((f) => p[f] != null)) return;
@@ -5756,10 +5763,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     }
     // NVBF (og egen føring uten registreringer her): samme oppsett, navn og kolonner (08.11.2026)
     if (n.teams.length) {
-      const vt = n.teams.find((t) => t.name === usName(m)), mt = n.teams.find((t) => t !== vt);
+      // Vårt lag finnes med tolerant navnesammenligning (NVBF skriver ofte navnet annerledes). Finnes det ikke
+      // (kamp mellom to andre lag), vises lagene i rekkefølgen fra kilden. Aldri samme lag på begge sider (09.11.2026).
+      const vt = n.teams.find((t) => lagNorm(t.name) === lagNorm(usName(m))) || n.teams.find((t) => erVaartLag(m, t.name)) || null, mt = vt ? n.teams.find((t) => t !== vt) : n.teams[1];
       const tomLag = (navn) => ({ navn, rec: { rader: [] }, att: { rader: [] }, srv: { rader: [] } });
       const L = (t, v) => (t ? (t.missing ? Object.assign(tomLag(t.name), { rec: { rader: [], tom: t.missing }, att: { rader: [], tom: t.missing }, srv: { rader: [], tom: t.missing } }) : stdFraNvbf(m, t, v)) : null);
-      const a = vt ? L(vt, true) : L(n.teams[0], false), b2 = mt ? L(mt, false) : tomLag('Motstander');
+      const a = vt ? L(vt, true) : L(n.teams[0], false), b2 = mt && mt !== (vt || n.teams[0]) ? L(mt, false) : tomLag('Motstander');
       h += stdKpis(m, n.teams) + '<div class="col stats det-stats"><section class="panel" aria-label="Kampstatistikk"><div class="panel-head"><h2 style="color:var(--fg);font-family:var(--font-display);font-size:22px;letter-spacing:0;text-transform:none">Kampstatistikk</h2></div>'
         + stdRader(Object.assign(a, { navn: a.navn }), b2) + '<div class="code-legend">' + (egen ? 'Egenført 0–1–2-score.' : 'Offisielle tall fra ' + srcName(n) + '.') + ' Angrep: feil og blokkert = 0, i spill = 1, poeng = 2. ' + legendLink() + '</div></section></div>';
       return h;
