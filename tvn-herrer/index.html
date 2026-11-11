@@ -1013,6 +1013,12 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .pl-imp { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
 .pl-imp ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--soft); }
 @media (max-width: 700px) { .pl-liste { max-width: none; } .pl-foto { width: 130px; height: 165px; } .pl-foto .stor-nr { font-size: 44px; } .pl-info h2 { font-size: 30px; } .pl-kpi b { font-size: 26px; } }
+/* Nullstill demokamp (11.11.2026) */
+.nullstill { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--demo-bg); border: 1px solid var(--demo-kant); color: var(--demo); border-radius: 14px; padding: 8px 12px; font-size: 13px; }
+.nullstill b { font-weight: 700; letter-spacing: .04em; }
+.nullstill .spacer { flex: 1; }
+.nullstill button { min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--demo-kant); background: transparent; color: var(--demo); font-weight: 600; font-size: 14px; }
+.nullstill button.bekreft { background: var(--demo); color: var(--demo-bg); border-color: var(--demo); }
 </style>
 
 <div class="app" id="app">
@@ -3837,12 +3843,31 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const r = await db.from('liga_tropper').select('sesong,lag,spillere').eq('liga', k.liga);
     return r.error ? null : { liga: k.liga, sesong: k.sesong, tropper: r.data || [] };
   }
+  // Nullstill demo-/testkamp (stats.nullstill_testkamp: bare is_test, fører eller mer). Demo: samme i den falske databasen.
+  async function nullstillTestkamp(ctx, kampId) {
+    const db = v2().client.schema ? v2().client.schema('stats') : v2().client;
+    const c = await db.from('contexts').select('id').eq('slug', demo() ? 'main' : slugFor(ctx));
+    const ctxId = c.data && c.data[0] && c.data[0].id;
+    const k = await db.from('matches').select('id,legacy,is_test').eq('context_id', ctxId).eq('legacy_id', kampId);
+    const m = k.data && k.data[0];
+    if (!m) throw new Error('Fant ikke kampen');
+    if (!m.is_test) throw new Error('Bare demokamper kan nullstilles');
+    if (demo()) {
+      for (const t of ['events', 'poeng', 'observasjoner', 'match_sets']) await db.from(t).delete().eq('match_id', m.id);
+      await db.from('matches').update({ status: 'kommende', sets_home: 0, sets_away: 0, current_set: 1, current_home: 0, current_away: 0,
+        legacy: { oppNumbers: (m.legacy && m.legacy.oppNumbers) || ['1', '2', '3', '4', '5', '6'] } }).eq('id', m.id);
+      return { ok: true };
+    }
+    const r = await db.rpc('nullstill_testkamp', { p_match: m.id });
+    if (r.error) throw new Error(r.error.message);
+    return r.data;
+  }
   async function erEier(ctx) {
     if (demo()) return true;
     const r = await v2().client.schema('stats').rpc('troppimport_kan_godkjenne', { p_slug: slugFor(ctx) });
     return !r.error && r.data === true;
   }
-  window.SpillerV2 = { bildeUrl, andreLag, utkast, godkjenn, avvis, erEier, historikk, liga };
+  window.SpillerV2 = { bildeUrl, andreLag, utkast, godkjenn, avvis, erEier, historikk, liga, nullstillTestkamp };
 })();
 </script>
 <style>
@@ -4595,6 +4620,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (S.view === 'logos' && !S.dash) html = logosView();
     else if (S.view === 'watch' && cur()) html = cur().status === 'ferdig' ? detailView() : watchView();
     else html = listView();
+    // Demo-/testkamper kan nullstilles og startes på nytt fra valget Enkel/Avansert (11.11.2026)
+    if ((S.view === 'live' || S.view === 'detail' || S.view === 'sheet') && cur() && isTest(cur()) && !S.dash && !window.PUBLIC && window.SpillerV2 && SpillerV2.nullstillTestkamp) html = nullstillHtml(cur()) + html;
     app.innerHTML = '<div id="err">' + errHtml() + '</div>' + html;
     if (S.view === 'live') fillMini();
     dirSync();
@@ -6117,6 +6144,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return h;
   }
 
+  function nullstillHtml(m) {
+    const vent = S.nullstillVent === m.id;
+    return '<div class="nullstill" role="region" aria-label="Demokamp"><b>DEMOKAMP</b><span>' + (vent ? 'Alle registreringer, poeng og settresultater i kampen slettes, og kampen starter på nytt fra valget Enkel/Avansert.' : 'Teller ikke i statistikken.') + '</span><span class="spacer"></span>'
+      + (vent ? '<button type="button" data-a="nullstill-avbryt">Avbryt</button><button type="button" class="bekreft" data-a="nullstill-ok">Nullstill nå</button>' : '<button type="button" data-a="nullstill">Nullstill og start på nytt</button>') + '</div>';
+  }
   // ---------- Spilleroversikt (variant C2, godkjent 11.11.2026) ----------
   // Liste per posisjon til venstre, spillerkort med bilde, fakta og statistikk til høyre. Vårt lag og motstanderne.
   // Bilder og troppimport kommer fra window.SpillerV2 (moduler/spillere/spillere_v2.js, bare i V2-siden); uten den vises silhuett.
@@ -7051,6 +7083,14 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     }
     else if (a === 'back') { S.view = 'list'; S.matchId = null; openLogs(null); closeSeasonLogs(); render(); }
     else if (a === 'season') { S.view = 'season'; S.matchId = null; openLogs(null); openSeasonLogs(); render(); toTop(); }
+    // Føringen tegnes delvis på nytt (updateLive), så stripen byttes direkte
+    else if (a === 'nullstill' || a === 'nullstill-avbryt') { S.nullstillVent = a === 'nullstill' ? S.matchId : null; const el = app.querySelector('.nullstill'); if (el && cur()) el.outerHTML = nullstillHtml(cur()); else render(); }
+    else if (a === 'nullstill-ok' && window.SpillerV2 && cur() && isTest(cur())) {
+      const m = cur(); b.disabled = true;
+      SpillerV2.nullstillTestkamp(CTX, m.id).then(() => {
+        S.nullstillVent = null; S.modusValg = null; S.endingSet = false; S.view = 'live'; const r0 = document.getElementById('live-root'); if (r0) r0.dataset.sig = ''; openLogs(m.id); render(); toTop();
+      }).catch((e) => { S.nullstillVent = null; S.error = 'Kunne ikke nullstille demokampen: ' + (e && e.message || e); render(); });
+    }
     else if (a === 'players') { S.view = 'players'; S.matchId = null; PL.melding = ''; openLogs(null); openSeasonLogs(); render(); toTop(); }
     else if (a === 'pl-lag') { PL.lag = b.dataset.v; PL.valgt = null; render(); }
     else if (a === 'pl-pick') { PL.valgt = b.dataset.id; PL.kilde = null; render(); }
