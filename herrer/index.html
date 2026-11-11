@@ -5934,7 +5934,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   // ---------- Sesong: kamp for kamp etter terminplanen ----------
   // Spilleroversikten (variant C2): valgt lag, spiller, kilde, bildelenker og troppimport
-  const PL = { eier: false, omfang: 'sesong', hist: {}, liga: {}, sesong: null, lag: 'our', valgt: null, kilde: null, urls: {}, ber: {}, andre: {}, utkast: null, visImport: false, arkiver: false, melding: '' };
+  const PL = { motKilde: null, eier: false, omfang: 'sesong', hist: {}, liga: {}, sesong: null, lag: 'our', valgt: null, kilde: null, urls: {}, ber: {}, andre: {}, utkast: null, visImport: false, arkiver: false, melding: '' };
   const SEASON = { logs: {}, unsubs: {}, inclTest: false, metric: 'recAvg', sortK: 'recN', sortDir: -1, player: 'team' };
   try { SEASON.inclTest = localStorage.getItem('rv-incltest') === '1'; } catch (e) {}
   const isTest = (m) => String(m.round || '').toLowerCase() === 'test';
@@ -6190,14 +6190,35 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       rec: snitt(sum.rec, 'rec'), att: snitt(sum.att, 'att'), srv: snitt(sum.srv, 'srv'), n: { rec: sum.rec.n, att: sum.att.n, srv: sum.srv.n } };
   }
   // Motstanderspiller: mottak på vår serve (egen føring og offisiell samlet, som i kampvisningen)
+  // Speiding av motstanderspiller (11.11.2026): offisiell statistikk (NVBF/CEV) fra ALLE lagets kamper i sesongen,
+  // også mot andre lag, og egen føring fra våre kamper mot dem (mottak på vår serve, slagretninger). Kildene holdes adskilt.
+  const plPc = (v) => { const x = parseFloat(String(v ?? '').replace('%', '').replace(',', '.')); return isNaN(x) ? 0 : x; };
   function plMotStat(p) {
-    const navn = ((S.opps || {})[PL.lag] || {}).name, nr = String(p.nr), kamper = [];
-    plRader().filter((m) => oppTeam(m) === navn).forEach((m) => {
-      const evs = withNvbf(m, SEASON.logs[m.id] || []).filter((e) => e.type === 'opp' && String(e.p) === nr);
-      if (evs.length) kamper.push({ m, n: evs.length, s: evs.reduce((a, e) => a + Number(e.c), 0) });
+    const navn = p.team || ((S.opps || {})[PL.lag] || {}).name, nr = String(p.nr), nv = String(p.name || '').toLowerCase().replace(/ \(l\)$/, '');
+    const off = [], egen = [];
+    S.matches.filter((m) => !isTest(m) && m.status === 'ferdig' && (lagNorm(m.home) === lagNorm(navn) || lagNorm(m.away) === lagNorm(navn))).sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach((m) => {
+      const mot = lagNorm(m.home) === lagNorm(navn) ? m.away : '@ ' + m.home;
+      const t = m.nvbf && (m.nvbf.teams || []).find((x) => lagNorm(x.name) === lagNorm(navn));
+      const pl = t && (t.players || []).find((x) => String(x.nr) === nr) || (t && nv && (t.players || []).find((x) => String(x.name || '').toLowerCase().replace(/ \(l\)$/, '') === nv));
+      if (pl) {
+        const rn = pl.rec || 0, c2 = Math.round(rn * plPc(pl.recPerf) / 100), c0 = Math.min(rn - c2, pl.recErr || 0);
+        const an = pl.att || 0, sn = pl.srv || ((pl.aces || 0) + (pl.srvErr || 0));
+        off.push({ m, mot, delvis: !!m.nvbf.partial, kilde: srcName(m.nvbf), rn, rs: 2 * c2 + (rn - c2 - c0), an, ak: pl.kills || 0, af: pl.attErr || 0, ab: pl.blocked || 0, sn, se: pl.aces || 0, sf: pl.srvErr || 0 });
+      }
+      if (isOurs(m)) {
+        const evs = (SEASON.logs[m.id] || []).filter((e) => String(e.p) === nr);
+        const opp = evs.filter((e) => e.type === 'opp'), dir = evs.filter((e) => e.type === 'dir');
+        if (opp.length || dir.length) egen.push({ m, mot, rn: opp.length, rs: opp.reduce((a, e) => a + Number(e.c), 0), slag: dir.length });
+      }
     });
-    const n = kamper.reduce((a, k) => a + k.n, 0), s = kamper.reduce((a, k) => a + k.s, 0);
-    return { kamper, n, rec: n ? s / n : null };
+    const tell = off.filter((k) => !k.delvis), sum = (L, k) => L.reduce((a, x) => a + (x[k] || 0), 0);
+    const snitt = (n, v) => n ? v / n : null;
+    return {
+      off: { kamper: off, rec: snitt(sum(tell, 'rn'), sum(tell, 'rs')), att: sum(tell, 'an') ? 1 + (sum(tell, 'ak') - sum(tell, 'af') - sum(tell, 'ab')) / sum(tell, 'an') : null,
+        srv: sum(tell, 'sn') ? (sum(tell, 'sn') + sum(tell, 'se') - sum(tell, 'sf')) / sum(tell, 'sn') : null, n: { rec: sum(tell, 'rn'), att: sum(tell, 'an'), srv: sum(tell, 'sn') }, kills: sum(tell, 'ak') },
+      egen: { kamper: egen, rec: snitt(sum(egen, 'rn'), sum(egen, 'rs')), n: sum(egen, 'rn'), slag: sum(egen, 'slag') },
+      rec: snitt(sum(tell, 'rn'), sum(tell, 'rs')) ?? snitt(sum(egen, 'rn'), sum(egen, 'rs'))
+    };
   }
   function playersView() {
     plUtkast();
@@ -6247,10 +6268,30 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       return h + '<div class="pl-tom">Tropp for ' + esc(PL.sesong) + ' fra ligatroppene. Kampstatistikk for denne sesongen er ikke i appen.</div>';
     }
     if (!p.ours) {
-      const s = plMotStat(p);
-      h = h.replace(fakta('Kamper', null), fakta('Kamper', s.kamper.length || '0'));
-      h += '<div class="pl-kpi" style="grid-template-columns:minmax(0,1fr)"><div><span class="label">Mottak på vår serve</span><b>' + d2(s.rec) + ' <small>' + s.n + ' mottak</small></b>' + (s.rec != null ? avgBarOnly(s.rec, 'wide', 'rec') : '') + '</div></div>';
-      if (!s.n) h += '<div class="pl-tom">Ingen kamper mot ' + esc(p.team) + ' med registreringer ennå. Mottak, slagretning og offisielle tall vises her etter første kamp.</div>';
+      const s = plMotStat(p), kildeN = (s.off.kamper[0] || {}).kilde || kildeNavn;
+      const brukOff = PL.motKilde !== 'egen' ? !!(s.off.kamper.length || !s.egen.kamper.length) : false;
+      h = h.replace(fakta('Kamper', null), fakta('Kamper', String(brukOff ? s.off.kamper.filter((k) => !k.delvis).length : s.egen.kamper.length)));
+      h += '<div class="pl-src" role="group" aria-label="Kilde"><button type="button" data-a="pl-motkilde" data-v="off" aria-pressed="' + brukOff + '">' + esc(kildeN) + ' (alle kamper)</button><button type="button" data-a="pl-motkilde" data-v="egen" aria-pressed="' + !brukOff + '">Egen føring mot oss</button></div>';
+      const kpi = (l, v, n, ord, kind) => '<div><span class="label">' + l + '</span><b>' + d2(v) + ' <small>' + n + ' ' + ord + '</small></b>' + (v != null ? avgBarOnly(v, 'wide', kind, p.pos) : '') + '</div>';
+      const cell = (v, kind) => '<td>' + avgBar(v, d2(v), kind, p.pos) + '</td>';
+      const dato = (m) => esc(m.date ? new Date(m.date).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' }) : '');
+      if (brukOff) {
+        const o = s.off;
+        h += '<div class="pl-kpi">' + kpi('Mottak snitt', o.rec, o.n.rec, 'mottak', 'rec') + kpi('Angrep snitt', o.att, o.n.att, 'angrep · ' + o.kills + ' poeng', 'att') + kpi('Serve snitt', o.srv, o.n.srv, 'serve', 'srv') + '</div>';
+        if (!o.kamper.length) return h + '<div class="pl-tom">Ingen offisiell statistikk for spilleren i sesongen ennå.</div>';
+        h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l-al">Kamp</th><th>Dato</th><th>Mottak</th><th>Angrep</th><th>Serve</th></tr></thead><tbody>'
+          + o.kamper.map((k) => '<tr class="clickrow" data-a="open" data-id="' + esc(k.m.id) + '"><td class="key l-al">' + esc(shortName(k.mot.replace(/^@ /, ''))) + (k.mot.startsWith('@') ? ' (borte)' : '') + (k.delvis ? '<br><span class="status">delvis, ikke med i snittet</span>' : '') + '</td><td>' + dato(k.m) + '</td>'
+            + cell(k.rn ? k.rs / k.rn : null, 'rec') + cell(k.an ? 1 + (k.ak - k.af - k.ab) / k.an : null, 'att') + cell(k.sn ? (k.sn + k.se - k.sf) / k.sn : null, 'srv') + '</tr>').join('')
+          + '</tbody></table></div><div class="code-legend">Offisiell statistikk (' + esc(kildeN) + ') fra alle lagets kamper i sesongen, omregnet til 0–2. Til speiding. ' + legendLink() + '</div>';
+        return h;
+      }
+      const e = s.egen;
+      h += '<div class="pl-kpi" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><span class="label">Mottak på vår serve</span><b>' + d2(e.rec) + ' <small>' + e.n + ' mottak</small></b>' + (e.rec != null ? avgBarOnly(e.rec, 'wide', 'rec') : '') + '</div>'
+        + '<div><span class="label">Slagretninger</span><b>' + e.slag + ' <small>registrert</small></b></div></div>';
+      if (!e.kamper.length) return h + '<div class="pl-tom">Ingen kamper mot ' + esc(p.team) + ' med registreringer ennå.</div>';
+      h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l-al">Kamp</th><th>Dato</th><th>Mottak</th><th>Slag</th></tr></thead><tbody>'
+        + e.kamper.map((k) => '<tr class="clickrow" data-a="open" data-id="' + esc(k.m.id) + '"><td class="key l-al">' + esc(shortName(k.m.home === OUR ? 'mot oss' : '@ oss')) + '</td><td>' + dato(k.m) + '</td>' + cell(k.rn ? k.rs / k.rn : null, 'rec') + '<td>' + k.slag + '</td></tr>').join('')
+        + '</tbody></table></div><div class="code-legend">Egen føring fra benken i våre kamper mot ' + esc(p.team) + '. Slagretningene ligger i Analyse › Blokk/forsvar.</div>';
       return h;
     }
     const hist = plHist(p.personId), gruppe = !!(hist && hist.sesonger.some((x) => x !== hist.her));   // tall fra minst én annen sesong i gruppen
@@ -7014,6 +7055,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (a === 'pl-lag') { PL.lag = b.dataset.v; PL.valgt = null; render(); }
     else if (a === 'pl-pick') { PL.valgt = b.dataset.id; PL.kilde = null; render(); }
     else if (a === 'pl-kilde') { PL.kilde = b.dataset.v; render(); }
+    else if (a === 'pl-motkilde') { PL.motKilde = b.dataset.v; render(); }
     else if (a === 'pl-omfang') { PL.omfang = b.dataset.v; render(); }
     else if (a === 'pl-sesong') { PL.sesong = b.dataset.v || null; PL.lag = PL.sesong ? OUR : 'our'; PL.valgt = null; render(); }
     else if (a === 'pl-import') { PL.visImport = !PL.visImport; PL.utkast = null; PL.melding = ''; render(); }
