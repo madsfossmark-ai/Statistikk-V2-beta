@@ -968,6 +968,51 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .chk { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--fg); }
 .chk input { width: 22px; height: 22px; accent-color: var(--accent); }
+/* Spilleroversikt (variant C2, 11.11.2026): liste til venstre, spillerkort med bilde til høyre */
+.pl { display: flex; flex-direction: column; gap: 12px; }
+.pl-lag { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pl-lag button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--soft); font-weight: 600; font-size: 14px; }
+.pl-lag button[aria-pressed="true"] { background: var(--hero); border-color: var(--hero); color: #fff; }
+.pl-lag button.mot[aria-pressed="true"] { background: var(--opp-strong); border-color: var(--opp-strong); }
+.pl-lag button span { opacity: .7; font-weight: 500; margin-left: 4px; }
+.pl-main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.pl-liste { flex: 1 1 280px; max-width: 320px; background: var(--surface); border-radius: 18px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.pl-liste h3 { margin: 4px 6px 2px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pl-rad { display: flex; align-items: center; gap: 10px; min-height: 46px; width: 100%; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--fg); text-align: left; }
+.pl-rad[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.pl-rad .nr { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 16px; flex: none; background: var(--hero); color: #fff; }
+.pl-rad .nr.mot { background: var(--opp-nr); color: #FFE2B8; }
+.pl-rad .nv { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-rad .avgbar { width: 40px; flex: none; }
+.pl-kort { flex: 999 1 520px; min-width: 0; background: var(--surface); border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.pl-topp { display: flex; gap: 18px; background: var(--sunk); border-radius: 18px; padding: 14px; flex-wrap: wrap; }
+.pl-foto { position: relative; width: 190px; height: 240px; border-radius: 14px; background: var(--row); border: 1px solid var(--line); overflow: hidden; flex: none; display: flex; align-items: center; justify-content: center; }
+.pl-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-foto svg { width: 58%; height: 58%; }
+.pl-foto .stor-nr { position: absolute; left: 10px; bottom: 6px; font-family: var(--font-display); font-weight: 700; font-size: 64px; line-height: 1; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.pl-foto .kilde { position: absolute; right: 6px; top: 6px; font-size: 9px; font-weight: 700; letter-spacing: .08em; color: #fff; background: rgba(0,0,0,.55); border-radius: 4px; padding: 2px 5px; }
+.pl-info { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.pl-info .pos { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.pl-info h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 40px; line-height: 1; }
+.pl-info .lag { font-size: 14px; color: var(--muted); }
+.pl-fakta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: auto; }
+.pl-fakta div { background: var(--surface); border-radius: 12px; padding: 8px 12px; }
+.pl-fakta .label { font-size: 10px; }
+.pl-fakta b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 700; }
+.pl-ogsa { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+.pl-ogsa span.chip { min-height: 30px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.pl-kpi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pl-kpi > div { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.pl-kpi b { font-family: var(--font-display); font-size: 34px; line-height: 1; }
+.pl-kpi small { font-size: 12px; color: var(--muted); }
+.pl-src { display: flex; gap: 4px; background: var(--sunk); border-radius: 10px; padding: 4px; align-self: flex-start; }
+.pl-src button { min-height: 36px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--soft); font-weight: 600; font-size: 13px; }
+.pl-src button[aria-pressed="true"] { background: var(--hero); color: #fff; }
+.pl-merk { font-size: 12px; color: var(--amber); background: var(--opp-soft); border-radius: 8px; padding: 8px 10px; }
+.pl-tom { color: var(--muted); font-size: 14px; padding: 18px 4px; }
+.pl-imp { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+.pl-imp ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--soft); }
+@media (max-width: 700px) { .pl-liste { max-width: none; } .pl-foto { width: 130px; height: 165px; } .pl-foto .stor-nr { font-size: 44px; } .pl-info h2 { font-size: 30px; } .pl-kpi b { font-size: 26px; } }
 </style>
 
 <div class="app" id="app">
@@ -1351,10 +1396,21 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     return { rad, sett };
   }
 
+  // Spillerprofil (spilleroversikten, 11.11.2026): høyde, fødselsår, slag/blokk, bilde og flagg fra troppimporten.
+  // Bare lesing: rosterTilRader skriver ikke disse feltene, så redigering av troppen i appen rører dem ikke.
+  function profil(p, r) {
+    if (r.person_id) p.personId = String(r.person_id);
+    if (r.height_cm) p.h = r.height_cm; if (r.birth_year) p.by = r.birth_year;
+    if (r.spike_reach_cm) p.spike = r.spike_reach_cm; if (r.block_reach_cm) p.block = r.block_reach_cm;
+    if (r.photo_path) { p.photo = r.photo_path; p.photoMeta = r.photo_meta || {}; }
+    const f = r.profile_meta && r.profile_meta.flags; if (f && f.length) p.flags = f;
+    return p;
+  }
   function rosterTilClaude(rader) {
     return { players: rader.slice().sort((a, b) => (+a.jersey || 999) - (+b.jersey || 999)).map((r) => {
       const p = { id: r.legacy_id || r.id, nr: r.jersey || '', name: r.name, pos: r.position || '' };
       if (r.archived) p.archived = true;
+      profil(p, r);
       return p;
     }) };
   }
@@ -1740,7 +1796,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           if (String(sti) === 'config/contexts') {
             return lytt('ctx', [['contexts']], async () => {
               const rader = await hentKontekster();
-              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined, gender: c.gender || undefined, nvbfFyll: c.innstillinger && c.innstillinger.nvbf_fyll === false ? false : undefined })) };
+              return { list: rader.filter((c) => c.slug !== mainSlug).map((c) => ({ id: c.slug, name: c.name, our: c.our_team, prefix: 'ctx/' + c.slug + '/', teams: c.teams || [], theme: c.theme || undefined, gender: c.gender || undefined, liga: c.liga || undefined, sesong: c.sesong || undefined, gruppe: c.stats_group || undefined, nvbfFyll: c.innstillinger && c.innstillinger.nvbf_fyll === false ? false : undefined })) };
             }, (d) => cb(dokSnap(d)), feil);
           }
           if (String(sti) === 'config/access') { setTimeout(() => cb(dokSnap(null)), 0); return () => {}; }
@@ -1829,7 +1885,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
               av = lytt('motst', [['opponents', 'context_id=eq.' + c.id], ['opponent_players']], async () => {
                 const o = kast(await db.from('opponents').select('*').eq('context_id', c.id));
                 const pl = o.length ? kast(await db.from('opponent_players').select('*').in('opponent_id', o.map((x) => x.id))) : [];
-                return o.map((x) => [x.slug, { name: x.name, players: pl.filter((p) => p.opponent_id === x.id).map((p) => ({ nr: p.jersey, name: p.name || undefined, pos: p.position || undefined, id: p.person_id || undefined })) }]);
+                return o.map((x) => [x.slug, { name: x.name, players: pl.filter((p) => p.opponent_id === x.id).map((p) => profil({ nr: p.jersey, name: p.name || undefined, pos: p.position || undefined, id: p.person_id || undefined }, Object.assign({}, p, { person_id: null }))) }]);
               }, (x) => cb(samSnap(x)), feil);
             else setTimeout(() => cb(samSnap([])), 0);
           }).catch((e) => feil && feil(e));
@@ -2017,6 +2073,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const DEMO_FULL = JSON.parse(JSON.stringify(DEMO));
   DEMO_FULL.squad_players = navn.map((x, i) => ({ id: '30000000-0000-0000-0000-0000000000' + String(i + 1).padStart(2, '0'), context_id: C, legacy_id: 'd-' + String(i + 1).padStart(2, '0'), jersey: x[0], name: x[1], position: x[2] }));
   DEMO_FULL.opponent_players = ['3', '5', '9', '11', '14', '17'].map((nr) => ({ opponent_id: '40000000-0000-0000-0000-000000000001', jersey: nr, name: 'Motspiller ' + nr }));
+  // Spillerprofil for spilleroversikten (syntetisk): høyde, fødselsår, slag/blokk. Ingen bilder i demo (silhuett vises)
+  DEMO_FULL.squad_players.forEach((r, i) => Object.assign(r, { height_cm: 172 + (i * 7) % 19, birth_year: 2000 + (i % 7), spike_reach_cm: 280 + (i * 11) % 30, block_reach_cm: 230 + (i * 5) % 25 }));
+  DEMO_FULL.squad_players[0].person_id = '900001';
+  DEMO_FULL.opponent_players.forEach((r, i) => Object.assign(r, { height_cm: 178 + (i * 5) % 15, birth_year: 2001 + (i % 5), spike_reach_cm: 285 + (i * 9) % 25, block_reach_cm: 235 + (i * 4) % 20 }));
+  DEMO_FULL.opponent_players[1].profile_meta = { flags: ['duplikat_draktnummer'] };
   DEMO_FULL.matches[0].legacy = { round: '1', receivers: ['d-01', 'd-03', 'd-05'], onCourt: ['d-01', 'd-02', 'd-03', 'd-04', 'd-05', 'd-06', 'd-07'], oppNumbers: ['3', '5', '9', '11', '14', '17'] };
   DEMO_FULL.matches[0].starts_at = '2026-11-07T17:00:00Z';
 
@@ -3702,6 +3763,88 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   window.BaneFS = { farger, monter, oppsett, linje, lukkValg, nettleser, laasZoom, STYRKE, MIN_D, MAKS_D, VANLIG_D };
 })();
 </script>
+<script>/* Spilleroversikt (variant C2, 11.11.2026): bilder, «spiller også for» og troppimport for V2-siden.
+ * Appen bruker window.SpillerV2 når den finnes; uten den (Claude-appen, åpne sider) vises silhuett og ingen import.
+ * Bildene ligger i den private bøtta «spillerbilder» og hentes med signerte lenker (1 time). Bare medlemmer av laget får lenke.
+ * De åpne sidene (anon) laster aldri denne filen og kan heller ikke lese bøtta. */
+(function () {
+  const v2 = () => window.__v2 || {};
+  const demo = () => !!v2().demo;
+  const slugFor = (ctx) => (!ctx || ctx.id === 'main') ? ((v2().cfg || {}).mainSlug || 'main') : ctx.id;
+  const cache = {};
+  const DEMO_UTKAST = [{ id: 'demo-utkast', file_path: 'imports/rosters/roster-test/2026-11-12-demo.json', received_at: new Date().toISOString(), warnings: ['Motlag #11: samme nummer to ganger i kilden'],
+    payload: { competition: { name: 'DEMO – syntetisk tropp' }, teams: [
+      { team_name: 'Randaberg', is_our_team: true, players: [{ jersey: '99', name: 'Ny Demospiller', photo: { file: 'bilder/demo.jpg' } }] },
+      { team_name: 'Motlag', is_our_team: false, players: [{ jersey: '11', name: 'Motspiller Elleve', photo: null }, { jersey: '11', name: 'Motspiller Annen', photo: null }] }] } }];
+  async function bildeUrl(path) {
+    if (demo() || !path) return null;
+    if (cache[path] && cache[path].til > Date.now()) return cache[path].url;
+    const r = await v2().client.storage.from('spillerbilder').createSignedUrl(path, 3600);
+    if (r.error) return null;
+    cache[path] = { url: r.data.signedUrl, til: Date.now() + 50 * 60 * 1000 };
+    return r.data.signedUrl;
+  }
+  async function andreLag(personId) {
+    if (demo() || !personId) return [];
+    const r = await v2().client.schema('stats').rpc('spiller_andre_lag', { p_person: String(personId) });
+    return r.error ? [] : (r.data || []);
+  }
+  async function utkast(ctx) {
+    if (demo()) return DEMO_UTKAST.slice();
+    const db = v2().client.schema('stats');
+    const c = await db.from('contexts').select('id').eq('slug', slugFor(ctx));
+    if (c.error || !c.data || !c.data.length) return [];
+    const r = await db.from('roster_imports').select('id,file_path,received_at,payload,warnings,status').eq('context_id', c.data[0].id).eq('status', 'utkast').order('received_at', { ascending: false });
+    return r.error ? [] : (r.data || []);
+  }
+  async function godkjenn(id, arkiver) {
+    if (demo()) { DEMO_UTKAST.length = 0; return { ok: true, nye: 1, oppdatert: 0, arkivert: 0, lag: 2 }; }
+    const r = await v2().client.schema('stats').rpc('troppimport_godkjenn', { p_import: id, p_arkiver: !!arkiver });
+    if (r.error) throw new Error(r.error.message);
+    return r.data;
+  }
+  async function avvis(id) {
+    if (demo()) { DEMO_UTKAST.length = 0; return { ok: true }; }
+    const r = await v2().client.schema('stats').rpc('troppimport_avvis', { p_import: id });
+    if (r.error) throw new Error(r.error.message);
+    return r.data;
+  }
+  // Personlig statistikk i statistikkgruppen (f.eks. Norge U20: NEVZA → EM-kvalik). Klubblag har ingen gruppe og får bare sin egen sesong.
+  const DEMO_HIST = [
+    { context_slug: 'demo-nevza', context_name: 'DEMO · NEVZA', starts_at: '2026-10-23T12:00:00Z', home: 'Randaberg', away: 'Naboland', our_team: 'Randaberg', kilde: 'egen', delvis: false, rec_n: 12, rec_sum: 17, att_n: 9, att_k: 4, att_f: 1, att_b: 1, srv_n: 6, srv_e: 1, srv_f: 1 },
+    { context_slug: 'demo-nevza', context_name: 'DEMO · NEVZA', starts_at: '2026-10-23T12:00:00Z', home: 'Randaberg', away: 'Naboland', our_team: 'Randaberg', kilde: 'CEV', delvis: false, rec_n: 14, rec_sum: 19, att_n: 10, att_k: 4, att_f: 2, att_b: 1, srv_n: 7, srv_e: 1, srv_f: 2 }];
+  async function historikk(personId, ctx) {
+    if (!personId) return null;
+    if (demo()) return { her: 'main', sesonger: ['main', 'demo-nevza'], rader: DEMO_HIST.slice() };
+    const db = v2().client.schema('stats');
+    const c = await db.from('contexts').select('id').eq('slug', slugFor(ctx));
+    if (c.error || !c.data || !c.data.length) return null;
+    const r = await db.rpc('spiller_kamper', { p_person: String(personId), p_context: c.data[0].id });
+    if (r.error) return null;
+    const rader = r.data || [];
+    return { her: slugFor(ctx), sesonger: [...new Set(rader.map((x) => x.context_slug))], rader };
+  }
+  // Mizunoligaen: troppene for alle lag og alle sesonger i ligaen (stats.liga_tropper). Landslag har ingen liga.
+  const DEMO_LIGA = { liga: 'mizunoligaen-kvinner', sesong: '2026/27', tropper: [
+    { sesong: '2025/26', lag: 'Randaberg', spillere: [{ jersey: '1', name: 'Spiller En', position: 'Kant', height_cm: 172, birth_year: 2000 }, { jersey: '12', name: 'Tidligere Spiller', position: 'Midt', height_cm: 186, birth_year: 1999 }] },
+    { sesong: '2025/26', lag: 'Motlag', spillere: [{ jersey: '9', name: 'Motspiller Ni', position: 'Midt', height_cm: 188, birth_year: 2001 }] }] };
+  async function liga(ctx) {
+    if (demo()) return JSON.parse(JSON.stringify(DEMO_LIGA));
+    const db = v2().client.schema('stats');
+    const c = await db.from('contexts').select('liga,sesong').eq('slug', slugFor(ctx));
+    const k = c.data && c.data[0];
+    if (c.error || !k || !k.liga) return null;
+    const r = await db.from('liga_tropper').select('sesong,lag,spillere').eq('liga', k.liga);
+    return r.error ? null : { liga: k.liga, sesong: k.sesong, tropper: r.data || [] };
+  }
+  async function erEier(ctx) {
+    if (demo()) return true;
+    const r = await v2().client.schema('stats').rpc('troppimport_kan_godkjenne', { p_slug: slugFor(ctx) });
+    return !r.error && r.data === true;
+  }
+  window.SpillerV2 = { bildeUrl, andreLag, utkast, godkjenn, avvis, erEier, historikk, liga };
+})();
+</script>
 <style>
 #v2-login { position: fixed; inset: 0; z-index: 9999; background: var(--bg, #f4f2ee); display: flex; align-items: center; justify-content: center; padding: 16px; }
 #v2-login form { background: var(--surface, #fff); color: var(--fg, #16181D); border: 1px solid var(--line, transparent); border-radius: 14px; padding: 22px; width: min(380px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
@@ -3726,7 +3869,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Én side per lag/sesong: config.main gir navn, vårt lag og klasse (kvinner/menn) for laget siden gjelder.
   // config.locked skjuler lagvelgeren. Brukeren på siden har bare tilgang til denne konteksten i databasen.
   if (cfg.main) window.PUBLIC_CTX = Object.assign({ id: 'main', prefix: '', teams: [] }, cfg.main);
-  if (cfg.locked) { const st = document.createElement('style'); st.textContent = '.ctx-pick{display:none!important}'; document.head.appendChild(st); }
+  // Lagvelgeren vises på alle sider når brukeren har flere lag (11.11.2026). cfg.locked skjuler bare «+ Ny sesong eller lag».
   let klar; const ferdig = new Promise((r) => { klar = r; });
   let deviceId = null; try { deviceId = localStorage.getItem('rv-device'); } catch (e) {}
   if (!deviceId) { deviceId = 'd' + Math.random().toString(36).slice(2, 10); try { localStorage.setItem('rv-device', deviceId); } catch (e) {} }
@@ -4104,7 +4247,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 
   let ctxUnsubs = [];
   // Fanene Tabell/Dashboard på Analyse lenker hit med ?vis=; gjelder bare første lag som lastes
-  let startVis = ({ tabell: 'table', dashboard: 'season' })[new URLSearchParams(location.search).get('vis')] || null;
+  let startVis = ({ tabell: 'table', dashboard: 'season', spillere: 'players' })[new URLSearchParams(location.search).get('vis')] || null;
   let startSpiller = new URLSearchParams(location.search).get('spiller');
   function applyCtx(id) {
     CTX = S.contexts.find((c) => c.id === id) || MAIN_CTX;
@@ -4113,7 +4256,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     ctxUnsubs.forEach((u) => { try { u(); } catch (e) {} }); ctxUnsubs = [];
     closeSeasonLogs(); openLogs(null);
     applyTheme(); S.logos = {};
-    S.roster = []; S.matches = []; S.opps = {}; S.ready = false; S.view = startVis || 'list'; startVis = null; S.matchId = null; S.showNew = false; S.showNewCtx = false; S.showShare = false;
+    S.roster = []; S.matches = []; S.opps = {}; S.ready = false; Object.assign(PL, { eier: false, omfang: 'sesong', hist: {}, sesong: null, utkast: null, lag: 'our', valgt: null, kilde: null, visImport: false, melding: '' }); S.view = startVis || 'list'; startVis = null; S.matchId = null; S.showNew = false; S.showNewCtx = false; S.showShare = false;
     SEASON.player = 'team';
     render(); toTop();
     subscribeCtx();
@@ -4134,7 +4277,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     keep(S.db.collection(PFX + 'matches').onSnapshot((snap) => {
       S.matches = snap.docs.map((d) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }));
       S.matches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      S.ready = true; if (S.view === 'season' || S.view === 'table') openSeasonLogs(); render();
+      S.ready = true; if (S.view === 'season' || S.view === 'table' || S.view === 'players') openSeasonLogs(); render();
     }, (e) => { S.error = 'Kunne ikke laste kamper (' + e.code + ').'; render(); }));
   }
 
@@ -4145,14 +4288,26 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const tab = (k, a, l) => '<button class="navtab" data-a="' + a + '"' + (aktiv === k ? ' aria-current="page"' : '') + '>' + l + '</button>';
     const an = analyseHref();
     return '<nav class="topnav" aria-label="Hovedmeny"><div class="tn-id">' + crest(OUR, 'md') + ctxPicker() + '</div>'
-      + '<div class="navtabs">' + tab('kamper', 'back', 'Kamper') + tab('tabell', 'table', 'Tabell') + tab('dashboard', 'season', 'Dashboard')
+      + '<div class="navtabs">' + tab('kamper', 'back', 'Kamper') + tab('tabell', 'table', 'Tabell') + tab('dashboard', 'season', 'Dashboard') + (window.PUBLIC ? '' : tab('spillere', 'players', 'Spillere'))
       + (an ? '<a class="navtab" href="' + an + '">Analyse</a>' : '') + '</div><span class="spacer"></span>' + menuHtml() + '</nav>';
   }
+  // Lagvelger på alle sider (Mads 11.11.2026): alle lag og sesonger brukeren har tilgang til, gruppert på
+  // Mizunoligaen kvinner, Mizunoligaen herrer og landslag. Nyeste sesong først. Med bare ett lag vises navnet.
+  const CTX_GRUPPER = ['Mizunoligaen kvinner', 'Mizunoligaen herrer', 'Landslag', 'Test'];
+  function ctxGruppe(c) {
+    if (c.liga) return c.liga === 'mizunoligaen-herrer' ? 'Mizunoligaen herrer' : 'Mizunoligaen kvinner';
+    if (c.gruppe || c.our === 'Norge' || /^u\d/.test(c.id || '')) return 'Landslag';
+    if (/test|demo|beta/.test(c.id || '')) return 'Test';
+    return c.gender === 'menn' ? 'Mizunoligaen herrer' : 'Mizunoligaen kvinner';
+  }
   function ctxPicker() {
-    if (window.PUBLIC || S.offline || S.dash) return '<span class="label">' + esc(CTX.name) + '</span>';
-    return '<label class="ctx-pick" for="ctx-pick"><span class="sr">Sesong eller lag</span><select id="ctx-pick" data-a="ctx">'
-      + S.contexts.map((c) => '<option value="' + esc(c.id) + '"' + (c.id === CTX.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')
-      + '<option value="__new">+ Ny sesong eller lag …</option></select></label>';
+    if (window.PUBLIC || S.offline || S.dash || S.contexts.length <= 1) return '<span class="label">' + esc(CTX.name) + '</span>';
+    const låst = !!(window.V2_CONFIG && window.V2_CONFIG.locked);
+    const grupper = CTX_GRUPPER.map((g) => ({ g, c: S.contexts.filter((c) => ctxGruppe(c) === g).sort((a, b) => String(b.sesong || '').localeCompare(String(a.sesong || '')) || a.name.localeCompare(b.name, 'nb')) })).filter((x) => x.c.length);
+    const opt = (c) => '<option value="' + esc(c.id) + '"' + (c.id === CTX.id ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+    return '<label class="ctx-pick" for="ctx-pick"><span class="sr">Lag og sesong</span><select id="ctx-pick" data-a="ctx">'
+      + (grupper.length > 1 ? grupper.map((x) => '<optgroup label="' + esc(x.g) + '">' + x.c.map(opt).join('') + '</optgroup>').join('') : S.contexts.map(opt).join(''))
+      + (låst ? '' : '<option value="__new">+ Ny sesong eller lag …</option>') + '</select></label>';
   }
   function newCtxForm() {
     return '<form class="panel" id="ctxform" aria-label="Ny sesong eller lag"><div class="panel-head"><h2>Ny sesong eller lag</h2><span class="status">Får egne kamper, egen tropp og egen sesongstatistikk. Det du har nå, ligger urørt og kan velges i menyen.</span></div><div class="form">'
@@ -4433,6 +4588,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (S.view === 'sheet' && cur()) html = sheetView();
     else if (S.view === 'rapport' && cur()) html = rapportView();
     else if (S.view === 'season') html = seasonView();
+    else if (S.view === 'players' && !window.PUBLIC) html = playersView();
     else if (S.view === 'table') html = tableView();
     else if (S.view === 'access' && S.canAdmin) html = accessView();
     else if (S.view === 'legend') html = legendView();
@@ -5777,6 +5933,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
 
   // ---------- Sesong: kamp for kamp etter terminplanen ----------
+  // Spilleroversikten (variant C2): valgt lag, spiller, kilde, bildelenker og troppimport
+  const PL = { eier: false, omfang: 'sesong', hist: {}, liga: {}, sesong: null, lag: 'our', valgt: null, kilde: null, urls: {}, ber: {}, andre: {}, utkast: null, visImport: false, arkiver: false, melding: '' };
   const SEASON = { logs: {}, unsubs: {}, inclTest: false, metric: 'recAvg', sortK: 'recN', sortDir: -1, player: 'team' };
   try { SEASON.inclTest = localStorage.getItem('rv-incltest') === '1'; } catch (e) {}
   const isTest = (m) => String(m.round || '').toLowerCase() === 'test';
@@ -5793,7 +5951,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
         snap.docs.forEach((d) => evs.push(...(d.data().events || []))); learnNames(evs, null);
         evs.sort((a, b) => a.t - b.t);
         SEASON.logs[m.id] = evs;
-        if (S.view === 'season' || S.view === 'table') render();
+        if (S.view === 'season' || S.view === 'table' || S.view === 'players') render();
       }, (e) => { S.error = 'Registreringene kunne ikke lastes (' + e.code + ').'; render(); });
     });
   }
@@ -5957,6 +6115,183 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       ? 'Egenført 0–1–2-koding fra benken. Der vi ikke har ført selv, brukes NVBF-tall (' + medNv + ' kamp' + (medNv === 1 ? '' : 'er') + ', merket NVBF i terminplanen). Mottakssnitt fra NVBF er regnet ut fra prosentene: perfekt = 2, feil = 0, resten = 1. '
       : 'Egenført 0–1–2-koding fra benken. Kamper som ikke er ført i appen telles i resultatet, men ikke i snittene. Ikke det samme som NVBF/DataProject-tallene. ') + legendLink() + '</div></div>';
     return h;
+  }
+
+  // ---------- Spilleroversikt (variant C2, godkjent 11.11.2026) ----------
+  // Liste per posisjon til venstre, spillerkort med bilde, fakta og statistikk til høyre. Vårt lag og motstanderne.
+  // Bilder og troppimport kommer fra window.SpillerV2 (moduler/spillere/spillere_v2.js, bare i V2-siden); uten den vises silhuett.
+  const POS_REKKE = ['Opplegger', 'Kant', 'Diagonal', 'Midt', 'Libero', ''];
+  function plFoto(path) {
+    if (!path || !window.SpillerV2) return null;
+    if (PL.urls[path] !== undefined) return PL.urls[path];
+    if (!PL.ber[path]) { PL.ber[path] = true; SpillerV2.bildeUrl(path).then((u) => { PL.urls[path] = u || null; if (S.view === 'players') render(); }).catch(() => { PL.urls[path] = null; }); }
+    return null;
+  }
+  function plAndre(pid) {
+    if (!pid || !window.SpillerV2) return [];
+    if (PL.andre[pid] === undefined) { PL.andre[pid] = []; SpillerV2.andreLag(pid).then((r) => { PL.andre[pid] = r || []; if (S.view === 'players') render(); }).catch(() => {}); }
+    return PL.andre[pid].filter((c) => c.context_name !== CTX.name);
+  }
+  function plUtkast() {
+    if (!window.SpillerV2 || S.dash || window.PUBLIC || PL.utkast !== null) return;
+    PL.utkast = []; const ctx = CTX;
+    // Bare eier i laget kan godkjenne (sjekkes i databasen); andre ser ikke knappen
+    SpillerV2.erEier(ctx).then((e) => { PL.eier = e; if (!e) return; return SpillerV2.utkast(ctx).then((u) => { PL.utkast = u || []; }); })
+      .then(() => { if (S.view === 'players') render(); }).catch(() => { PL.utkast = []; });
+  }
+  // Personlig statistikk i statistikkgruppen (Norge U20: NEVZA → EM-kvalik). Klubblag har ingen gruppe: bare egen sesong, aldri landslaget.
+  function plHist(pid) {
+    if (!pid || !window.SpillerV2 || !SpillerV2.historikk) return null;
+    if (PL.hist[pid] === undefined) { PL.hist[pid] = null; SpillerV2.historikk(pid, CTX).then((h) => { PL.hist[pid] = h || false; if (S.view === 'players') render(); }).catch(() => { PL.hist[pid] = false; }); }
+    return PL.hist[pid] || null;
+  }
+  function plLiga() {
+    if (!window.SpillerV2 || !SpillerV2.liga) return null;
+    const k = CTX.id;
+    if (PL.liga[k] === undefined) { PL.liga[k] = null; SpillerV2.liga(CTX).then((l) => { PL.liga[k] = l || false; if (S.view === 'players') render(); }).catch(() => { PL.liga[k] = false; }); }
+    return PL.liga[k] || null;
+  }
+  function plFraHist(rader, kilde) {
+    const valgt = rader.filter((r) => kilde === 'egen' ? r.kilde === 'egen' : r.kilde !== 'egen');
+    const tell = valgt.filter((r) => !r.delvis), sum = (k) => tell.reduce((a, r) => a + (r[k] || 0), 0);
+    const sn = (n, v) => n ? v / n : null;
+    const rec = sn(sum('rec_n'), sum('rec_sum')), att = sum('att_n') ? 1 + (sum('att_k') - sum('att_f') - sum('att_b')) / sum('att_n') : null, srv = sum('srv_n') ? (sum('srv_n') + sum('srv_e') - sum('srv_f')) / sum('srv_n') : null;
+    return { rec, att, srv, n: { rec: sum('rec_n'), att: sum('att_n'), srv: sum('srv_n') }, sesonger: [...new Set(valgt.map((r) => r.context_name))],
+      kamper: valgt.map((r) => ({ hist: r, delvis: r.delvis, sesong: r.context_name, rec: r.rec_n ? r.rec_sum / r.rec_n : null, att: r.att_n ? 1 + (r.att_k - r.att_f - r.att_b) / r.att_n : null, srv: r.srv_n ? (r.srv_n + r.srv_e - r.srv_f) / r.srv_n : null })) };
+  }
+  const plSil = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="17" r="8" fill="none" stroke="var(--faint)" stroke-width="2"></circle><path d="M8 44c2-9 8-13 16-13s14 4 16 13" fill="none" stroke="var(--faint)" stroke-width="2"></path></svg>';
+  // Spiller fra ligatroppene (annen sesong): samme form som troppen i appen, uten statistikk fra appen
+  const plFraLiga = (x, lag) => ({ nr: x.jersey, name: x.name, pos: x.position || '', h: x.height_cm, by: x.birth_year, spike: x.spike_reach_cm, block: x.block_reach_cm,
+    personId: x.person_id, photo: x.photo_path, photoMeta: x.photo_meta || {}, flags: x.flags || [], key: 'l:' + lag + ':' + x.jersey + ':' + x.name, ours: false, vaar: lag === OUR, liga: true, team: lag });
+  function plSpillere() {
+    if (PL.sesong) { const l = plLiga(), t = l && l.tropper.find((x) => x.sesong === PL.sesong && x.lag === PL.lag); return t ? (t.spillere || []).map((x) => plFraLiga(x, t.lag)) : []; }
+    if (PL.lag === 'our') return (S.roster || []).filter((p) => !p.archived).map((p) => ({ ...p, key: String(p.id), ours: true }));
+    const o = (S.opps || {})[PL.lag]; if (!o) return [];
+    return (o.players || []).map((p) => ({ ...p, key: 'o:' + PL.lag + ':' + p.nr, ours: false, team: o.name }));
+  }
+  function plRader() {
+    return S.matches.filter(isOurs).filter((m) => !isTest(m) && m.inSeason !== false && (m.status === 'ferdig' || m.status === 'pågår'))
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  }
+  // Statistikk for én av våre spillere fra én kilde: «egen» = føring fra benken, «off» = offisiell (NVBF/CEV)
+  function plStat(p, kilde) {
+    const id = String(p.id), kamper = [];
+    plRader().forEach((m) => {
+      const evs = (kilde === 'egen' ? (SEASON.logs[m.id] || []) : withNvbf(m, [])).filter((e) => String(e.p) === id && (e.type === 'rec' || e.type === 'att' || e.type === 'srv'));
+      if (evs.length) kamper.push({ m, st: computeStats(evs) });
+    });
+    const sum = { rec: { n: 0, s: 0 }, att: { n: 0, c2: 0, c0: 0, B: 0 }, srv: { n: 0, E: 0, F: 0 } };
+    kamper.forEach((k) => {
+      const r = k.st.rec[id], a = k.st.att[id], s = k.st.srv[id];
+      if (r) { sum.rec.n += r.n; sum.rec.s += r.s; } if (a) { sum.att.n += a.n; sum.att.c2 += a.c2; sum.att.c0 += a.c0; sum.att.B += a.B; } if (s) { sum.srv.n += s.n; sum.srv.E += s.E; sum.srv.F += s.F; }
+    });
+    const snitt = (o, t) => !o || !o.n ? null : t === 'rec' ? o.s / o.n : t === 'att' ? 1 + (o.c2 - o.c0 - o.B) / o.n : (o.n + o.E - o.F) / o.n;
+    return { kamper: kamper.map((k) => ({ m: k.m, rec: snitt(k.st.rec[id], 'rec'), att: snitt(k.st.att[id], 'att'), srv: snitt(k.st.srv[id], 'srv') })),
+      rec: snitt(sum.rec, 'rec'), att: snitt(sum.att, 'att'), srv: snitt(sum.srv, 'srv'), n: { rec: sum.rec.n, att: sum.att.n, srv: sum.srv.n } };
+  }
+  // Motstanderspiller: mottak på vår serve (egen føring og offisiell samlet, som i kampvisningen)
+  function plMotStat(p) {
+    const navn = ((S.opps || {})[PL.lag] || {}).name, nr = String(p.nr), kamper = [];
+    plRader().filter((m) => oppTeam(m) === navn).forEach((m) => {
+      const evs = withNvbf(m, SEASON.logs[m.id] || []).filter((e) => e.type === 'opp' && String(e.p) === nr);
+      if (evs.length) kamper.push({ m, n: evs.length, s: evs.reduce((a, e) => a + Number(e.c), 0) });
+    });
+    const n = kamper.reduce((a, k) => a + k.n, 0), s = kamper.reduce((a, k) => a + k.s, 0);
+    return { kamper, n, rec: n ? s / n : null };
+  }
+  function playersView() {
+    plUtkast();
+    const alle = plSpillere();
+    const liga = plLiga(), sesonger = liga ? [...new Set(liga.tropper.map((t) => t.sesong))].filter((x) => x !== liga.sesong).sort().reverse() : [];
+    if (PL.sesong && !sesonger.includes(PL.sesong)) PL.sesong = null;
+    const lagene = PL.sesong
+      ? liga.tropper.filter((t) => t.sesong === PL.sesong).map((t) => ({ k: t.lag, navn: t.lag, n: (t.spillere || []).length, vaar: t.lag === OUR })).sort((a, b) => (b.vaar - a.vaar) || a.navn.localeCompare(b.navn, 'nb'))
+      : [{ k: 'our', navn: OUR, n: (S.roster || []).filter((p) => !p.archived).length }]
+        .concat(Object.entries(S.opps || {}).filter(([, o]) => o && (o.players || []).length).map(([k, o]) => ({ k, navn: o.name, n: o.players.length })).sort((a, b) => a.navn.localeCompare(b.navn, 'nb')));
+    if (PL.sesong) { if (!lagene.some((l) => l.k === PL.lag)) PL.lag = (lagene[0] || {}).k || null; }
+    else if (PL.lag !== 'our' && !(S.opps || {})[PL.lag]) PL.lag = 'our';
+    let p = alle.find((x) => x.key === PL.valgt) || alle[0] || null;
+    if (p) PL.valgt = p.key;
+    const grupper = POS_REKKE.map((pos) => ({ pos, sp: alle.filter((x) => (POS_REKKE.includes(x.pos || '') ? (x.pos || '') : '') === pos).sort((a, b) => (+a.nr || 999) - (+b.nr || 999)) })).filter((g) => g.sp.length);
+    const kildeNavn = (() => { const m = plRader().find((x) => x.nvbf); return m ? srcName(m.nvbf) : 'NVBF'; })();
+    const listeSnitt = (x) => { if (x.liga) return null; if (!x.ours) { const s = plMotStat(x); return s.rec; } const s = plStat(x, 'egen'); return s.rec != null ? s.rec : plStat(x, 'off').rec; };
+
+    let h = '<div class="pl">' + navHtml('spillere') + '<header class="bar"><div class="title"><span class="display">Spillere</span><span class="sub">' + esc(CTX.name) + ' · ' + alle.length + ' spillere' + (PL.sesong ? ' hos ' + esc(PL.lag || '') + ' · ' + esc(PL.sesong) : PL.lag === 'our' ? '' : ' hos ' + esc(((S.opps || {})[PL.lag] || {}).name || '')) + '</span></div><span class="spacer"></span>'
+      + (window.SpillerV2 && PL.eier ? '<div class="bar-actions"><button class="barbtn' + ((PL.utkast || []).length ? ' primary-bar' : '') + '" data-a="pl-import" aria-expanded="' + PL.visImport + '">Importer tropp' + ((PL.utkast || []).length ? ' (' + PL.utkast.length + ')' : '') + '</button></div>' : '') + '</header>';
+    if (PL.melding) h += '<div class="notice" role="status">' + esc(PL.melding) + '</div>';
+    if (PL.visImport) h += plImportHtml();
+    if (sesonger.length) h += '<div class="pl-lag" role="group" aria-label="Sesong"><button type="button" data-a="pl-sesong" data-v="" aria-pressed="' + !PL.sesong + '">' + esc(liga.sesong ? liga.sesong + ' (denne)' : 'Denne sesongen') + '</button>'
+      + sesonger.map((x) => '<button type="button" data-a="pl-sesong" data-v="' + esc(x) + '" aria-pressed="' + (PL.sesong === x) + '">' + esc(x) + '</button>').join('') + '</div>';
+    h += '<div class="pl-lag" role="group" aria-label="Lag">' + lagene.map((l) => '<button type="button" class="' + (l.k === 'our' || l.vaar ? '' : 'mot') + '" data-a="pl-lag" data-v="' + esc(l.k) + '" aria-pressed="' + (PL.lag === l.k) + '">' + esc(l.navn) + '<span>' + l.n + '</span></button>').join('') + '</div>';
+    if (!alle.length) return h + '<div class="panel"><div class="empty">Ingen spillere i troppen ennå. ' + (PL.lag === 'our' ? 'Legg dem inn under «Spillere» i en kamp, eller importer troppen fra Work.' : 'Motstanderens tropp kommer når den er importert eller ført i en kamp.') + '</div></div></div>';
+
+    h += '<div class="pl-main"><nav class="pl-liste" aria-label="Spillere">' + grupper.map((g) => '<div><h3>' + esc(g.pos || 'Uten posisjon') + '</h3>'
+      + g.sp.map((x) => { const v = listeSnitt(x); return '<button type="button" class="pl-rad" data-a="pl-pick" data-id="' + esc(x.key) + '" aria-current="' + (p && x.key === p.key) + '"><span class="nr' + (x.ours || x.vaar ? '' : ' mot') + '">' + esc(x.nr || '–') + '</span><span class="nv">' + esc(x.name || '#' + x.nr) + '</span>' + (v != null ? avgBarOnly(v, '', 'rec') : '<span class="avgbar" aria-hidden="true"></span>') + '</button>'; }).join('') + '</div>').join('') + '</nav>';
+    h += '<section class="pl-kort" aria-label="Spillerkort">' + (p ? plKort(p, kildeNavn) : '<div class="pl-tom">Velg en spiller i listen</div>') + '</section></div></div>';
+    return h;
+  }
+  function plKort(p, kildeNavn) {
+    const url = plFoto(p.photo), meta = p.photoMeta || {};
+    const fakta = (l, v) => '<div><span class="label">' + l + '</span><b>' + (v == null || v === '' ? '–' : esc(String(v))) + '</b></div>';
+    let h = '<div class="pl-topp"><div class="pl-foto">' + (url ? '<img src="' + esc(url) + '" alt="' + esc(p.name || '') + '">' : plSil)
+      + '<span class="stor-nr" aria-hidden="true">' + esc(p.nr || '') + '</span>' + (url && meta.source ? '<span class="kilde">' + esc(meta.source) + '-FOTO</span>' : '') + '</div>'
+      + '<div class="pl-info"><span class="pos">' + esc(p.pos || 'Uten posisjon') + '</span><h2>' + esc(p.name || '#' + p.nr) + '</h2><span class="lag">' + esc((p.ours ? OUR : p.team) + (p.liga ? ' · ' + PL.sesong : '')) + ' · #' + esc(p.nr || '–') + '</span>'
+      + '<div class="pl-fakta">' + fakta('Høyde', p.h ? p.h + ' cm' : null) + fakta('Slag / blokk', p.spike || p.block ? (p.spike || '–') + ' / ' + (p.block || '–') : null) + fakta('Født', p.by) + fakta('Kamper', null) + '</div></div></div>';
+    const flagg = (p.flags || []);
+    if (flagg.includes('duplikat_draktnummer')) h += '<div class="pl-merk">Kilden oppgir samme draktnummer for to spillere i denne troppen. Avklares før kamp.</div>';
+    if (flagg.includes('blokk_over_slag')) h += '<div class="pl-merk">Kilden oppgir høyere blokk enn slaghøyde. Tallene er vist slik kilden har dem.</div>';
+    const andre = p.ours ? plAndre(p.personId) : [];
+    if (andre.length) h += '<div class="pl-ogsa">Spiller også for ' + andre.map((c) => '<span class="chip">' + esc(c.context_name) + (c.jersey ? ' · #' + esc(c.jersey) : '') + '</span>').join('') + '</div>';
+    if (p.liga) {
+      h = h.replace(fakta('Kamper', null), fakta('Sesong', PL.sesong));
+      return h + '<div class="pl-tom">Tropp for ' + esc(PL.sesong) + ' fra ligatroppene. Kampstatistikk for denne sesongen er ikke i appen.</div>';
+    }
+    if (!p.ours) {
+      const s = plMotStat(p);
+      h = h.replace(fakta('Kamper', null), fakta('Kamper', s.kamper.length || '0'));
+      h += '<div class="pl-kpi" style="grid-template-columns:minmax(0,1fr)"><div><span class="label">Mottak på vår serve</span><b>' + d2(s.rec) + ' <small>' + s.n + ' mottak</small></b>' + (s.rec != null ? avgBarOnly(s.rec, 'wide', 'rec') : '') + '</div></div>';
+      if (!s.n) h += '<div class="pl-tom">Ingen kamper mot ' + esc(p.team) + ' med registreringer ennå. Mottak, slagretning og offisielle tall vises her etter første kamp.</div>';
+      return h;
+    }
+    const hist = plHist(p.personId), gruppe = !!(hist && hist.sesonger.some((x) => x !== hist.her));   // tall fra minst én annen sesong i gruppen
+    if (!gruppe) PL.omfang = 'sesong';
+    const egen = PL.omfang === 'gruppe' ? plFraHist(hist.rader, 'egen') : plStat(p, 'egen'), off = PL.omfang === 'gruppe' ? plFraHist(hist.rader, 'off') : plStat(p, 'off');
+    if (!PL.kilde) PL.kilde = egen.kamper.length || !off.kamper.length ? 'egen' : 'off';
+    const s = PL.kilde === 'off' ? off : egen;
+    h = h.replace(fakta('Kamper', null), fakta('Kamper', String(s.kamper.filter((k) => !k.delvis).length)));
+    if (gruppe) h += '<div class="pl-src" role="group" aria-label="Omfang"><button type="button" data-a="pl-omfang" data-v="sesong" aria-pressed="' + (PL.omfang === 'sesong') + '">Denne sesongen</button><button type="button" data-a="pl-omfang" data-v="gruppe" aria-pressed="' + (PL.omfang === 'gruppe') + '">Alle landslagssesonger</button></div>'
+      + (PL.omfang === 'gruppe' ? '<div class="status">' + esc([...new Set(hist.rader.map((r) => r.context_name))].join(' + ')) + '. Klubbstatistikk er aldri med.</div>' : '');
+    h += '<div class="pl-src" role="group" aria-label="Kilde"><button type="button" data-a="pl-kilde" data-v="egen" aria-pressed="' + (PL.kilde === 'egen') + '">Egen føring</button><button type="button" data-a="pl-kilde" data-v="off" aria-pressed="' + (PL.kilde === 'off') + '">' + esc(kildeNavn) + '</button></div>';
+    const kpi = (l, v, n, ord, kind) => '<div><span class="label">' + l + '</span><b>' + d2(v) + ' <small>' + n + ' ' + ord + '</small></b>' + (v != null ? avgBarOnly(v, 'wide', kind, p.pos) : '') + '</div>';
+    h += '<div class="pl-kpi">' + kpi('Mottak snitt', s.rec, s.n.rec, 'mottak', 'rec') + kpi('Angrep snitt', s.att, s.n.att, 'angrep', 'att') + kpi('Serve snitt', s.srv, s.n.srv, 'serve', 'srv') + '</div>';
+    if (!s.kamper.length) return h + '<div class="pl-tom">' + (PL.kilde === 'egen' ? 'Ingen egenførte registreringer for spilleren ennå.' : 'Ingen offisiell statistikk for spilleren ennå.') + '</div>';
+    const cell = (v, kind) => '<td>' + avgBar(v, d2(v), kind, p.pos) + '</td>';
+    h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l-al">Kamp</th><th>Dato</th><th>Mottak</th><th>Angrep</th><th>Serve</th></tr></thead><tbody>'
+      + s.kamper.map((k) => {
+        if (k.hist) { const r = k.hist, mot = r.home === r.our_team ? r.away : '@ ' + r.home;
+          return '<tr><td class="key l-al">' + esc(shortName(mot)) + '<br><span class="status">' + esc(k.sesong + (k.delvis ? ' · delvis, ikke med i snittet' : '') + (r.kilde !== 'egen' ? ' · ' + r.kilde : '')) + '</span></td><td>' + esc(r.starts_at ? new Date(r.starts_at).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: '2-digit' }) : '') + '</td>' + cell(k.rec, 'rec') + cell(k.att, 'att') + cell(k.srv, 'srv') + '</tr>'; }
+        return '<tr class="clickrow" data-a="open" data-id="' + esc(k.m.id) + '"><td class="key l-al">' + (k.m.home === OUR ? '' : '@ ') + esc(shortName(oppTeam(k.m))) + '</td><td>' + esc(k.m.date ? new Date(k.m.date).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' }) : '') + '</td>' + cell(k.rec, 'rec') + cell(k.att, 'att') + cell(k.srv, 'srv') + '</tr>'; }).join('')
+      + '</tbody></table></div><div class="code-legend">' + (PL.kilde === 'egen' ? 'Egenført 0–1–2-koding fra benken.' : 'Offisiell statistikk (' + esc(kildeNavn) + '), omregnet til 0–2.') + ' Trykk en kamp for å åpne den. ' + legendLink() + '</div>';
+    return h;
+  }
+  function plImportHtml() {
+    const u = PL.utkast;
+    if (u === null) return '<div class="pl-imp">Henter utkast …</div>';
+    if (!u.length) return '<div class="pl-imp"><b>Ingen tropper venter på godkjenning</b><span class="status">Work leverer tropper og spillerbilder til GitHub (imports/rosters/). De dukker opp her noen minutter etter levering.</span></div>';
+    return u.map((x) => {
+      const d = x.payload || {}, lag = d.teams || [];
+      const vårt = lag.find((t) => t.is_our_team), ros = (S.roster || []).filter((r) => !r.archived);
+      const finn = (pl) => ros.find((r) => (pl.person_id && r.personId === pl.person_id) || (String(r.nr) === String(pl.jersey) && String(r.name).toLowerCase() === String(pl.name).toLowerCase()));
+      const nye = vårt ? vårt.players.filter((pl) => !finn(pl)).map((pl) => '#' + pl.jersey + ' ' + pl.name) : [];
+      const borte = vårt ? ros.filter((r) => !vårt.players.some((pl) => finn(pl) === r)).map((r) => '#' + r.nr + ' ' + r.name) : [];
+      const bilder = lag.reduce((a, t) => a + t.players.filter((pl) => pl.photo).length, 0);
+      return '<div class="pl-imp"><b>' + esc((d.competition || {}).name || 'Tropp') + '</b><span class="status">Levert ' + esc(new Date(x.received_at).toLocaleString('nb-NO')) + ' · ' + esc(x.file_path) + '</span><ul>'
+        + lag.map((t) => { const nb = t.players.filter((pl) => pl.photo).length; return '<li>' + esc(t.team_name) + (t.is_our_team ? ' (vårt lag)' : '') + ': ' + t.players.length + ' spiller' + (t.players.length === 1 ? '' : 'e') + ', ' + nb + ' bilde' + (nb === 1 ? '' : 'r') + '</li>'; }).join('')
+        + (nye.length ? '<li>Nye i vår tropp: ' + esc(nye.join(', ')) + '</li>' : '') + (borte.length ? '<li>Ikke med i leveringen: ' + esc(borte.join(', ')) + '</li>' : '')
+        + (x.warnings || []).map((w) => '<li>Advarsel: ' + esc(w) + '</li>').join('') + '</ul>'
+        + (borte.length ? '<label class="chk"><input type="checkbox" data-a="pl-arkiver"' + (PL.arkiver ? ' checked' : '') + '> Arkiver de ' + borte.length + ' som ikke er med (statistikken deres beholdes)</label>' : '')
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" data-a="pl-godkjenn" data-id="' + esc(x.id) + '">Godkjenn' + (bilder ? ' med ' + bilder + ' bilde' + (bilder === 1 ? '' : 'r') : '') + '</button><button class="secondary" data-a="pl-avvis" data-id="' + esc(x.id) + '">Avvis</button></div></div>';
+    }).join('');
   }
 
   let resizeT = null;
@@ -6675,6 +7010,21 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     }
     else if (a === 'back') { S.view = 'list'; S.matchId = null; openLogs(null); closeSeasonLogs(); render(); }
     else if (a === 'season') { S.view = 'season'; S.matchId = null; openLogs(null); openSeasonLogs(); render(); toTop(); }
+    else if (a === 'players') { S.view = 'players'; S.matchId = null; PL.melding = ''; openLogs(null); openSeasonLogs(); render(); toTop(); }
+    else if (a === 'pl-lag') { PL.lag = b.dataset.v; PL.valgt = null; render(); }
+    else if (a === 'pl-pick') { PL.valgt = b.dataset.id; PL.kilde = null; render(); }
+    else if (a === 'pl-kilde') { PL.kilde = b.dataset.v; render(); }
+    else if (a === 'pl-omfang') { PL.omfang = b.dataset.v; render(); }
+    else if (a === 'pl-sesong') { PL.sesong = b.dataset.v || null; PL.lag = PL.sesong ? OUR : 'our'; PL.valgt = null; render(); }
+    else if (a === 'pl-import') { PL.visImport = !PL.visImport; PL.utkast = null; PL.melding = ''; render(); }
+    else if (a === 'pl-arkiver') { PL.arkiver = !!b.checked; }
+    else if ((a === 'pl-godkjenn' || a === 'pl-avvis') && window.SpillerV2) {
+      b.disabled = true;
+      (a === 'pl-godkjenn' ? SpillerV2.godkjenn(b.dataset.id, PL.arkiver) : SpillerV2.avvis(b.dataset.id)).then((r) => {
+        PL.melding = a === 'pl-avvis' ? 'Troppen er avvist. Ingenting er endret.' : 'Troppen er godkjent: ' + (r.nye || 0) + ' nye og ' + (r.oppdatert || 0) + ' oppdaterte spillere i vår tropp' + (r.arkivert ? ', ' + r.arkivert + ' arkivert' : '') + ', ' + Math.max(0, (r.lag || 1) - 1) + ' motstandertropper.';
+        PL.utkast = null; PL.visImport = false; PL.urls = {}; PL.ber = {}; render();
+      }).catch((e) => { PL.melding = 'Kunne ikke lagre: ' + (e && e.message || e); render(); });
+    }
     else if (a === 'incltest') { SEASON.inclTest = !SEASON.inclTest; try { localStorage.setItem('rv-incltest', SEASON.inclTest ? '1' : '0'); } catch (e) {} render(); }
     else if (a === 'metric') { SEASON.metric = b.dataset.v; render(); }
     else if (a === 'kkpick') { SEASON.player = b.dataset.id; render(); const c = document.getElementById('h-kurve'); if (c) c.scrollIntoView({ block: 'start', behavior: 'smooth' }); }

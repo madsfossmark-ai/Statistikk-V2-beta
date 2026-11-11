@@ -105,6 +105,10 @@ h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-t
 .crest.md { width: 34px; height: 40px; font-size: 15px; }
 .crest.img { background: #FFFFFF; border-radius: 50%; box-shadow: 0 0 0 1px rgba(22,24,29,.14); width: 42px; height: 42px; }
 .crest.img img { width: 76%; height: 76%; object-fit: contain; display: block; border-radius: 3px; }
+/* Flagg for landslag, som i appen (11.11.2026) */
+.flag { flex: none; position: relative; overflow: hidden; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0,0,0,.18); display: inline-block; }
+.flag i { position: absolute; display: block; }
+.flag.md { width: 42px; height: 28px; }
 @media (max-width: 640px) {
   .topnav .tn-id { flex: 1 1 0; min-width: 0; }
   .topnav .tn-id .crest:not(.img) { width: 30px; height: 35px; font-size: 13px; }
@@ -234,7 +238,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
       <label class="ctx-pick" for="kontekst" hidden><span class="tn-sr">Lag og sesong</span><select id="kontekst" hidden></select></label>
       <span class="label" id="kontekst-navn"></span></div>
     <div class="navtabs">
-      <a class="navtab" id="tilbake" href="../">Kamper</a><a class="navtab" id="til-tabell" href="../?vis=tabell">Tabell</a><a class="navtab" id="til-dashboard" href="../?vis=dashboard">Dashboard</a><a class="navtab" aria-current="page" href="#">Analyse</a>
+      <a class="navtab" id="tilbake" href="../">Kamper</a><a class="navtab" id="til-tabell" href="../?vis=tabell">Tabell</a><a class="navtab" id="til-dashboard" href="../?vis=dashboard">Dashboard</a><a class="navtab" id="til-spillere" href="../?vis=spillere">Spillere</a><a class="navtab" aria-current="page" href="#">Analyse</a>
     </div>
     <span class="spacer"></span>
     <div class="menu-wrap"><button class="secondary menu-btn" id="meny-knapp" aria-haspopup="true" aria-expanded="false" aria-label="Meny"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Meny</span></button>
@@ -3634,6 +3638,8 @@ window.V3Moduler = (function (root) {
   // ---------- Datakilde ----------
   function demoKilde() {
     const kontekster = [{ id: 'demo-ctx', slug: 'demo', name: 'Randaberg (demo)', our_team: 'Randaberg' }];
+    // Landslag i demo bare med ?lag=u20-demo (lagfarge og flagg, 11.11.2026)
+    if (new URLSearchParams(location.search).get('lag') === 'u20-demo') kontekster.push({ id: 'demo-u20', slug: 'u20-demo', name: 'Norge U20 (demo)', our_team: 'Norge' });
     const lagene = {
       'Oslo Volley': { kamper: [['o1', '2026-09-26T14:00:00Z'], ['o2', '2026-10-17T14:00:00Z'], ['o3', '2026-11-07T15:30:00Z']],
         spillere: [['d501', ['4', '4', '14'], 'Oslo-kant A', 'kryss'], ['d502', ['9', '9', '9'], 'Oslo-diagonal B', 'linje'], ['d503', ['12', '12', '12'], 'Oslo-midt C', 'kort'], ['d504', ['3', '3', '3'], 'Oslo-kant D', 'kryss']] },
@@ -3667,7 +3673,7 @@ window.V3Moduler = (function (root) {
     const db = client.schema('stats');
     const kast = (r) => { if (r.error) throw new Error(r.error.message); return r.data; };
     return {
-      async kontekster() { return kast(await db.from('contexts').select('id,slug,name,our_team').order('name')); },
+      async kontekster() { return kast(await db.from('contexts').select('id,slug,name,our_team,theme,gender,liga,sesong,stats_group').order('name')); },
       async logo(ktx) { const r = kast(await db.from('logos').select('team,data_url').eq('context_id', ktx.id).eq('team', ktx.our_team)); return r && r[0] ? r[0].data_url : null; },
       async motstandere(ktx, medTest) {
         const o = kast(await db.from('opponents').select('id,slug,name').eq('context_id', ktx.id).order('name'));
@@ -3734,13 +3740,18 @@ window.V3Moduler = (function (root) {
     kilde = k;
     try {
       S.kontekster = await kilde.kontekster();
-      const ønsket = cfg.locked ? cfg.mainSlug : (q.get('lag') || cfg.mainSlug);
+      const ønsket = q.get('lag') || cfg.mainSlug;
       S.ktx = S.kontekster.find((c) => c.slug === ønsket) || S.kontekster[0];
       if (!S.ktx) return visFeil('Du har ikke tilgang til noe lag ennå.');
       tilbakeLenke();
-      if (!cfg.locked && S.kontekster.length > 1) {
+      if (S.kontekster.length > 1) {
+        // Lagvelger som i appen (11.11.2026): gruppert på Mizunoligaen kvinner/herrer og landslag, nyeste sesong først
+        const gruppe = (c) => c.liga ? (c.liga === 'mizunoligaen-herrer' ? 'Mizunoligaen herrer' : 'Mizunoligaen kvinner')
+          : (c.stats_group || c.our_team === 'Norge' || /^u\d/.test(c.slug || '')) ? 'Landslag' : /test|demo|beta/.test(c.slug || '') ? 'Test' : (c.gender === 'menn' ? 'Mizunoligaen herrer' : 'Mizunoligaen kvinner');
+        const opt = (c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>';
+        const G = ['Mizunoligaen kvinner', 'Mizunoligaen herrer', 'Landslag', 'Test'].map((g) => [g, S.kontekster.filter((c) => gruppe(c) === g).sort((a, b) => String(b.sesong || '').localeCompare(String(a.sesong || '')) || a.name.localeCompare(b.name, 'nb'))]).filter((x) => x[1].length);
         const v = $('kontekst'); v.hidden = false; v.parentNode.hidden = false;
-        v.innerHTML = S.kontekster.map((c) => '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>').join('');
+        v.innerHTML = G.length > 1 ? G.map(([g, cs]) => '<optgroup label="' + esc(g) + '">' + cs.map(opt).join('') + '</optgroup>').join('') : S.kontekster.map(opt).join('');
         v.value = S.ktx.slug;
         v.addEventListener('change', () => { S.ktx = S.kontekster.find((c) => c.slug === v.value); lastKontekst(); v3Lag(); tilbakeLenke(); });
       } else $('kontekst-navn').textContent = S.ktx.name + (erDemo ? ' · oppdiktede data' : '');
@@ -3966,18 +3977,50 @@ window.V3Moduler = (function (root) {
   window.addEventListener('resize', () => { if (S.fs) requestAnimationFrame(storOppsett); });
   // «Til appen» tar med laget som er valgt her (01.11.2026)
   function tilbakeLenke() {
-    const l = S.ktx && !cfg.locked ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
+    const l = S.ktx && !(cfg.locked && S.ktx.slug === cfg.mainSlug) ? 'lag=' + encodeURIComponent(S.ktx.slug) : '';
     const url = (vis) => { const d = [demo ? 'demo=1' : '', l, vis ? 'vis=' + vis : ''].filter(Boolean); return '../' + (d.length ? '?' + d.join('&') : ''); };
-    $('tilbake').href = url(''); $('til-tabell').href = url('tabell'); $('til-dashboard').href = url('dashboard');
+    $('tilbake').href = url(''); $('til-tabell').href = url('tabell'); $('til-dashboard').href = url('dashboard'); if ($('til-spillere')) $('til-spillere').href = url('spillere');
     merke(); menyLenker();
     if (S.ktx && S.baneFor !== S.ktx.slug) { S.baneFor = S.ktx.slug; monterBane(); }   // ny lagfarge og logo ved lagbytte
   }
-  // Lagmerket som i appen: lagets logo fra databasen, ellers forbokstaver
+  // Lagfarge og flagg som i appen (11.11.2026): landslag får landslagsrødt og flagg, klubber blått og logo/forbokstaver.
+  // Verdiene er de samme som THEMES og FLAGS i app/index.html.
+  const TEMA = {
+    blue: { a: '#1D4ED8', soft: '#DFE8FD', ink: '#1E3A8A', aD: '#8FB3FF', softD: '#1E2A44', inkD: '#C9D6F0', fg: '#FFFFFF', fgD: '#0D1117' },
+    red: { a: '#B0162E', soft: '#F6D5DA', ink: '#7E0F21', aD: '#F4A0AD', softD: '#3E1B22', inkD: '#F6D5DA', fg: '#FFFFFF', fgD: '#0D1117' }
+  };
+  const FLAGG = {
+    Norge: ['#BA0C2F', ['#FFFFFF', 8.2, 5.5, 7.5, 5], ['#00205B', 9.5, 2.75, 8.75, 2.5]],
+    Sverige: ['#006AA7', ['#FECC00', 9.4, 3.75, 8, 4]],
+    Danmark: ['#C8102E', ['#FFFFFF', 9.7, 3.2, 8.6, 2.9]],
+    Finland: ['#FFFFFF', ['#002F6C', 8.3, 5, 7.3, 5.5]],
+    England: ['#FFFFFF', ['#CE1124', 13.5, 3, 8, 4]],
+    Island: ['#02529C', ['#FFFFFF', 7.9, 5, 7.5, 5], ['#DC1E35', 9.1, 2.5, 8.75, 2.5]],
+    'Færøyene': ['#FFFFFF', ['#0065BD', 7.9, 5, 7.5, 5], ['#EF303E', 9.1, 2.5, 8.75, 2.5]]
+  };
+  const erLandslag = (k) => !!k && (k.theme === 'red' || (k.theme !== 'blue' && (FLAGG[k.our_team] || /^u\d/.test(k.slug || ''))));
+  function tema() {
+    if (!S.ktx) return;
+    const t = TEMA[erLandslag(S.ktx) ? 'red' : 'blue'];
+    let el = document.getElementById('ktx-tema'); if (!el) { el = document.createElement('style'); el.id = 'ktx-tema'; document.head.appendChild(el); }
+    el.textContent = 'html:root{--accent:' + t.aD + ';--accent-soft:' + t.softD + ';--accent-ink:' + t.inkD + ';--accent-fg:' + t.fgD + '}'
+      + 'html:root[data-theme="light"]{--accent:' + t.a + ';--accent-soft:' + t.soft + ';--accent-ink:' + t.ink + ';--accent-fg:' + t.fg + '}';
+  }
+  function flaggHtml(f) {
+    const striper = (c) => '<i style="background:' + c[0] + ';left:' + (c[1] / 30 * 100) + '%;width:' + (c[2] / 30 * 100) + '%;top:0;bottom:0"></i><i style="background:' + c[0] + ';top:' + (c[3] / 20 * 100) + '%;height:' + (c[4] / 20 * 100) + '%;left:0;right:0"></i>';
+    return striper(f[1]) + (f[2] ? striper(f[2]) : '');
+  }
+  // Lagmerket som i appen: lagets logo fra databasen, flagg for landslag, ellers forbokstaver
   const logoer = {};
   function merke() {
     const el = $('tn-merke'); if (!el || !S.ktx) return;
+    tema();
     const lag = S.ktx.our_team || '', logo = logoer[S.ktx.slug];
-    if (logo) { el.className = 'crest img md'; el.innerHTML = '<img src="' + esc(logo) + '" alt="">'; return; }
+    if (logo) { el.className = 'crest img md'; el.removeAttribute('style'); el.innerHTML = '<img src="' + esc(logo) + '" alt="">'; return; }
+    if (FLAGG[lag]) { el.className = 'flag md'; el.style.background = FLAGG[lag][0]; el.innerHTML = flaggHtml(FLAGG[lag]);
+      if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) { merke(); monterBane(); } } }).catch(() => {}); }
+      return; }
+    el.removeAttribute('style'); el.innerHTML = '';
     el.className = 'crest sh md'; el.textContent = lag === 'Randaberg' ? 'RB' : lag === 'Norge' ? 'NO' : lag.split(/\s+/).filter(Boolean).slice(0, 2).map((o) => o[0]).join('').toUpperCase();
     if (!(S.ktx.slug in logoer) && kilde && kilde.logo) { logoer[S.ktx.slug] = null; const k = S.ktx; kilde.logo(k).then((u) => { if (u) { logoer[k.slug] = u; if (S.ktx === k) { merke(); monterBane(); } } }).catch(() => {}); }
   }
