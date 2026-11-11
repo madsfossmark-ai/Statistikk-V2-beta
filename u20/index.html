@@ -4051,9 +4051,15 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     Finland: ['#FFFFFF', ['#002F6C', 8.3, 5, 7.3, 5.5]],
     England: ['#FFFFFF', ['#CE1124', 13.5, 3, 8, 4]],
     Island: ['#02529C', ['#FFFFFF', 7.9, 5, 7.5, 5], ['#DC1E35', 9.1, 2.5, 8.75, 2.5]],
-    'Færøyene': ['#FFFFFF', ['#0065BD', 7.9, 5, 7.5, 5], ['#EF303E', 9.1, 2.5, 8.75, 2.5]]
+    'Færøyene': ['#FFFFFF', ['#0065BD', 7.9, 5, 7.5, 5], ['#EF303E', 9.1, 2.5, 8.75, 2.5]],
+    'Ungarn': { svg: '<rect width="30" height="20" fill="#477050"/><rect width="30" height="13.34" fill="#FFFFFF"/><rect width="30" height="6.67" fill="#CE2939"/>' },
+    'Hviterussland': { svg: '<rect width="30" height="20" fill="#4AA657"/><rect width="30" height="13.34" fill="#C8313E"/><rect width="3.6" height="20" fill="#FFFFFF"/><path fill="#C8313E" d="M1.8 0.6l1.2 1.9-1.2 1.9-1.2-1.9zM1.8 5.6l1.2 1.9-1.2 1.9-1.2-1.9zM1.8 10.6l1.2 1.9-1.2 1.9-1.2-1.9zM1.8 15.6l1.2 1.9-1.2 1.9-1.2-1.9z"/>' },
+    'Nord-Makedonia': { svg: '<rect width="30" height="20" fill="#D20000"/><g fill="#FFE600"><path d="M15 10L0 8.3V11.7zM15 10L30 8.3V11.7zM15 10L13.3 0H16.7zM15 10L13.3 20H16.7zM15 10L0 2.6V0H3.9zM15 10L30 2.6V0H26.1zM15 10L0 17.4V20H3.9zM15 10L30 17.4V20H26.1z"/><circle cx="15" cy="10" r="3.7"/></g><circle cx="15" cy="10" r="3.1" fill="#D20000"/><circle cx="15" cy="10" r="2.6" fill="#FFE600"/>' }
   };
+  // Flagg som ikke er kors tegnes som SVG i samme 30×20-ramme
+  const flagSvg = (f) => '<svg viewBox="0 0 30 20" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;display:block">' + f.svg + '</svg>';
   function flagHtml(f, size) {
+    if (f.svg) return '<span class="flag ' + size + '" aria-hidden="true">' + flagSvg(f) + '</span>';
     const bars = (c) => '<i style="background:' + c[0] + ';left:' + (c[1] / 30 * 100) + '%;width:' + (c[2] / 30 * 100) + '%;top:0;bottom:0"></i><i style="background:' + c[0] + ';top:' + (c[3] / 20 * 100) + '%;height:' + (c[4] / 20 * 100) + '%;left:0;right:0"></i>';
     return '<span class="flag ' + size + '" style="background:' + f[0] + '" aria-hidden="true">' + bars(f[1]) + (f[2] ? bars(f[2]) : '') + '</span>';
   }
