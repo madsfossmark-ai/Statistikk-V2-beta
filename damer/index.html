@@ -795,7 +795,7 @@ html.is-fs .app { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: to
   .tavle.staa .tb-flate, .tavle .tb-flate { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 108px); }
   .tavle .t-modus button, .tavle .tb-topp .tb-k { min-height: 44px; padding: 0 12px; }
 }
-body.tavle-apen #v2-tilgang, body.tavle-apen #v2-loggut { display: none !important; }
+body.tavle-apen #v2-tilgang, body.tavle-apen #v2-passord, body.tavle-apen #v2-loggut { display: none !important; }
 .tavle .tb-brikke text { font: 700 34px var(--font-display); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .tavle .m-flytt .tb-brikke { cursor: grab; } .tavle .m-penn, .tavle .m-penn * { cursor: crosshair; }
 .tavle .m-penn .tb-brikke, .tavle .m-visk .tb-brikke { pointer-events: none; }
@@ -922,7 +922,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .rp-to.en { grid-template-columns: minmax(0, 1fr); }
 .rp-fot { margin-top: auto; display: flex; justify-content: space-between; gap: 12px; font-size: 9.5px; color: var(--bs); border-top: 1px solid var(--pl); padding-top: 5px; }
 @media print {
-  html.rp-printing .rp-ikke-utskrift, html.rp-printing #v2-status, html.rp-printing #v2-demo, html.rp-printing #v2-loggut, html.rp-printing #v2-tilgang, html.rp-printing .hn-kvitt, html.rp-printing .pub-foot { display: none !important; }
+  html.rp-printing .rp-ikke-utskrift, html.rp-printing #v2-status, html.rp-printing #v2-demo, html.rp-printing #v2-loggut, html.rp-printing #v2-passord, html.rp-printing #v2-tilgang, html.rp-printing .hn-kvitt, html.rp-printing .pub-foot { display: none !important; }
   html.rp-printing, html.rp-printing body { background: #FFFFFF !important; height: auto !important; overflow: visible !important; }
   html.rp-printing .app { padding: 0 !important; margin: 0 !important; max-width: none !important; }
   html.rp-printing body { margin: 0 !important; padding: 0 !important; }
@@ -3882,7 +3882,10 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 #v2-status.feil { background: #fde8e8; color: #9b1c1c; }
 #v2-status.ok { background: #e7f6ec; color: #17603a; }
 #v2-demo { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9999; font: 700 12px system-ui, sans-serif; padding: 4px 12px; border-radius: 0 0 10px 10px; background: #b45309; color: #fff; }
-#v2-tilgang { position: fixed; right: 100px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
+#v2-tilgang { position: fixed; right: 196px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
+#v2-passord { position: fixed; right: 100px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; border: 0; cursor: pointer; }
+#v2-login.dialog { background: rgba(0,0,0,.45); }
+#v2-login .ok { color: #17603a; font-size: 14px; }
 #v2-loggut { position: fixed; right: 12px; bottom: 12px; z-index: 9998; font: 600 13px system-ui, sans-serif; padding: 8px 12px; border-radius: 999px; background: rgba(127,127,127,.18); color: inherit; text-decoration: none; }
 </style>
 <script>
@@ -3904,6 +3907,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (demo) { const d = document.createElement('div'); d.id = 'v2-demo'; d.textContent = 'DEMO – lagres ikke, vises ikke på live-siden'; document.body.appendChild(d); }
     if (!demo && cfg.autoLogin) { const d = document.createElement('div'); d.id = 'v2-demo'; d.style.background = '#1d4ed8'; d.textContent = cfg.badge || 'ÅPEN BETA – testdata'; document.body.appendChild(d); }
     if (!demo && !cfg.autoLogin) { const ut = document.createElement('a'); ut.href = '?loggut'; ut.textContent = 'Logg ut'; ut.id = 'v2-loggut'; document.body.appendChild(ut); }
+    if (!demo && !cfg.autoLogin) { const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Passord'; b.id = 'v2-passord'; b.onclick = byttPassord; document.body.appendChild(b); }
     let skjul = null;
     store.påStatus((s) => {
       clearTimeout(skjul);
@@ -3912,10 +3916,34 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       el.className = 'ok'; el.textContent = 'Alt lagret'; el.style.display = 'block'; skjul = setTimeout(() => { el.style.display = 'none'; }, 1500);
     });
   }
+  // Bytt passord for innlogget bruker (12.11.2026): samme skjema som invitasjon/nytt passord, åpnet som dialog
+  function byttPassord() {
+    const client = window.__v2 && window.__v2.client; if (!client) return;
+    const v = document.createElement('div'); v.id = 'v2-login'; v.className = 'dialog';
+    v.innerHTML = '<form><h2 style="margin:0">Bytt passord</h2><div style="color:#666;font-size:14px">Du logger inn med e-posten din og det nye passordet neste gang.</div>'
+      + '<input type="password" name="p" autocomplete="new-password" placeholder="Nytt passord (minst 8 tegn)" minlength="8" required aria-label="Nytt passord">'
+      + '<input type="password" name="p2" autocomplete="new-password" placeholder="Gjenta passordet" minlength="8" required aria-label="Gjenta passordet">'
+      + '<button type="submit">Lagre passord</button><button type="button" class="lenke" data-lukk>Avbryt</button><div class="feil"></div></form>';
+    document.body.appendChild(v);
+    const f = v.querySelector('form'), feil = v.querySelector('.feil'), lukk = () => v.remove();
+    v.querySelector('[data-lukk]').onclick = lukk;
+    v.addEventListener('click', (e) => { if (e.target === v) lukk(); });
+    f.p.focus();
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault(); feil.textContent = '';
+      if (f.p.value !== f.p2.value) { feil.textContent = 'Passordene er ikke like.'; return; }
+      const knapp = f.querySelector('button[type=submit]'); knapp.disabled = true;
+      const u = await client.auth.updateUser({ password: f.p.value });
+      knapp.disabled = false;
+      if (u.error) { feil.textContent = 'Ikke lagret: ' + u.error.message; return; }
+      f.innerHTML = '<h2 style="margin:0">Passordet er byttet</h2><div class="ok">Bruk det nye passordet neste gang du logger inn.</div><button type="button">Lukk</button>';
+      f.querySelector('button').onclick = lukk;
+    });
+  }
   async function start(client, user, skrive) {
     const store = await StatsV2.SupabaseStore({ client, deviceId, userId: user.id, mainSlug: demo ? 'main' : (cfg.mainSlug || 'main'), pollMs: demo ? 0 : 4000, ko: StatsV2.Ko(StatsV2.lagLagring('rv-v2-ko' + (cfg.queue ? '-' + cfg.queue : ''))) }).start();
     window.addEventListener('online', () => store.tøm());
-    window.__v2 = { store, client, cfg, demo };
+    window.__v2 = { store, client, cfg, demo, byttPassord };
     // Innstillinger for sidens eget lag (contexts.innstillinger), f.eks. nvbf_fyll = false for lag uten NVBF-utfylling
     if (!demo && window.PUBLIC_CTX) {
       try { const r = await client.schema('stats').from('contexts').select('innstillinger').eq('slug', cfg.mainSlug || 'main');
