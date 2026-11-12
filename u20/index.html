@@ -449,6 +449,11 @@ td.kort-n .nm-l { display: none; } td.kort-n .nm-k { display: inline; }
 .b-demo { background: var(--demo); color: var(--demo-bg); text-transform: uppercase; letter-spacing: .06em; padding: 4px 9px; }
 .match.demo, .match.ours.demo { background: var(--demo-bg); box-shadow: 0 0 0 1px var(--demo-kant); }
 .match.demo .d { color: var(--demo); }
+.b-forrunde { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.match.forrunde { opacity: .82; }
+.fr-h { margin-top: 28px; }
+.fr-note { margin: -4px 0 12px; font-size: 13px; color: var(--muted); }
+.match.forrunde .d { font-style: italic; }
 .round.demo > .label { color: var(--demo); }
 .b-win { background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: .04em; padding: 4px 9px; }
 .b-loss { background: transparent; color: var(--opp); box-shadow: inset 0 0 0 1.5px var(--opp); text-transform: uppercase; letter-spacing: .04em; padding: 4px 9px; }
@@ -4214,9 +4219,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   const pkort = (id) => { const p = player(id); return (p && p.nr ? '#' + p.nr + ' ' : '') + pname(id); };
   const pname = (id) => { const p = player(id); return p ? p.name.split(' ')[0] : NAMEHINT[id] ? NAMEHINT[id].split(' ')[0] : (EXTRA[id] || '?'); };
   // Kamptyper: serie fra terminlisten, eller egne kamper (cup, europacup, trening)
-  const TYPES = { serie: 'Seriekamp', cup: 'Cupkamp', europacup: 'Europacup', turnering: 'Turnering', trening: 'Treningskamp' };
+  const TYPES = { serie: 'Seriekamp', cup: 'Cupkamp', europacup: 'Europacup', turnering: 'Turnering', trening: 'Treningskamp', forrunde: 'Tidligere runde' };
+  // Kamper fra en tidligere runde (12.11.2026), f.eks. motstandernes 1. runde før EM-kvaliken: bare for speiding, aldri i tabell, topplister eller sesongstatistikk
+  const erForrunde = (m) => m.custom && m.type === 'forrunde';
   const TSHORT = { serie: 'Serie', cup: 'Cup', europacup: 'EC', turnering: 'T', trening: 'Tr' };
-  const roundLabel = (m) => m.custom ? (m.type === 'turnering' && m.round ? m.round : (TYPES[m.type] || 'Egen kamp') + (m.round ? ' · ' + m.round : '')) : (m.round ? 'Runde ' + m.round : 'Uten runde');
+  const roundLabel = (m) => m.custom && m.type === 'forrunde' ? (m.round || 'Tidligere runde') : m.custom ? (m.type === 'turnering' && m.round ? m.round : (TYPES[m.type] || 'Egen kamp') + (m.round ? ' · ' + m.round : '')) : (m.round ? 'Runde ' + m.round : 'Uten runde');
   const roundShort = (m) => m.custom ? (m.short || TSHORT[m.type] || 'Egen') : 'R' + (m.round || '?');
   // Motstanderens tropp lagres per lag og huskes til neste kamp mot samme lag
   const teamSlug = (s) => String(s || '').toLowerCase().replace(/æ/g, 'ae').replace(/ø/g, 'o').replace(/å/g, 'a').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'lag';
@@ -4786,7 +4793,11 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const rounds = {};
     const DEMO_R = 'Demo og test – teller ikke i statistikken';
     if (ms.some(isTest)) rounds[DEMO_R] = [];   // øverst i lista
-    ms.forEach((m) => { const r = isTest(m) ? DEMO_R : m.custom ? roundLabel(m) + '|' + m.id : roundLabel(m); (rounds[r] ||= []).push(m); });
+    const fr = {};   // kamper fra tidligere runder samles nederst, per sone/turnering, merket som speiding
+    ms.forEach((m) => {
+      if (!isTest(m) && erForrunde(m)) { const k = (m.round || 'Tidligere runde').split(' · ').slice(0, 2).join(' · '); (fr[k] ||= []).push(m); return; }
+      const r = isTest(m) ? DEMO_R : m.custom ? roundLabel(m) + '|' + m.id : roundLabel(m); (rounds[r] ||= []).push(m);
+    });
     let h = navHtml('kamper');
     if (S.showNewCtx) h += newCtxForm();
     if (S.showNew) h += newMatchForm();
@@ -4798,6 +4809,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     h += '<div class="list-controls"><h2 class="sec-h">Terminliste</h2><span class="spacer"></span><div class="tabs" role="group" aria-label="Filter">'
       + [['alle', 'Alle'], ['vare', OUR]].map(([k, l]) => '<button data-a="filter" data-v="' + k + '" aria-pressed="' + (S.filter === k) + '">' + esc(l) + '</button>').join('') + '</div></div>';
     h += '<div class="rounds">' + Object.entries(rounds).map(([r, list]) => '<section class="round' + (r === DEMO_R ? ' demo' : '') + '"><h2 class="label">' + esc(r.split('|')[0]) + '</h2>' + list.map(matchRow).join('') + '</section>').join('') + '</div>';
+    if (Object.keys(fr).length) h += '<h2 class="sec-h fr-h">Tidligere runder</h2><p class="fr-note">Motstandernes kamper før denne turneringen. Brukes bare til speiding og er ikke med i tabell, topplister eller statistikk.</p><div class="rounds">'
+      + Object.entries(fr).map(([k, list]) => '<section class="round forrunde"><h2 class="label">' + esc(k) + '</h2>' + list.sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(matchRow).join('') + '</section>').join('') + '</div>';
     return h;
   }
 
@@ -4830,7 +4843,8 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const oc = ours ? outcome(m) : null;
     const demo = isTest(m);
     const badge = demo ? '<span class="badge b-demo">Demo</span>' + (m.status === 'pågår' ? ' <span class="badge b-live">Live</span>' : '') : m.status === 'pågår' ? '<span class="badge b-live">Live</span>' : oc ? '<span class="badge ' + (oc === 'win' ? 'b-win">Seier' : 'b-loss">Tap') + '</span>' : ours ? '' : m.focus && !(m.nvbf && m.nvbf.src) ? '<span class="badge b-own">Egenført</span>' : (m.nvbf && m.nvbf.teams ? '<span class="badge b-nvbf">' + srcName(m.nvbf) + (m.nvbf.partial ? ' · delvis' : '-statistikk') + '</span>' : m.source === 'nvbf' ? '<span class="badge b-nvbf">NVBF</span>' : '');
-    return '<button class="match' + (ours ? ' ours' : '') + (demo ? ' demo' : '') + '" data-a="open" data-id="' + esc(m.id) + '"><span class="t"><span class="tn">' + (ours ? crest(m.home, 'sm') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'sm') : crest(m.home, 'xs') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'xs')) + '</span><span class="d">' + esc(fmtDate(m.date)) + (m.custom ? ' · ' + esc(TYPES[m.type] || 'Egen kamp') : '') + '</span></span><span class="res num">' + res + '</span>' + badge + '</button>';
+    const fr = erForrunde(m) ? '<span class="badge b-forrunde">' + esc((m.round || 'Tidligere runde').split(' · ')[0]) + '</span> ' : '';
+    return '<button class="match' + (ours ? ' ours' : '') + (demo ? ' demo' : '') + (fr ? ' forrunde' : '') + '" data-a="open" data-id="' + esc(m.id) + '"><span class="t"><span class="tn">' + (ours ? crest(m.home, 'sm') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'sm') : crest(m.home, 'xs') + '<span class="nmx">' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + '</span>' + crest(m.away, 'xs')) + '</span><span class="d">' + esc(fmtDate(m.date)) + (m.custom ? ' · ' + esc(TYPES[m.type] || 'Egen kamp') : '') + '</span></span><span class="res num">' + res + '</span>' + fr + badge + '</button>';
   }
 
   function newMatchForm() {
