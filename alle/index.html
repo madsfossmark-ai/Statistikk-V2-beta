@@ -341,8 +341,21 @@ html:not([data-theme="light"]) .ops-seg button[aria-pressed="true"] { background
   #stats .tbl th:first-child, .det-stats .tbl th:first-child { width: 28%; } #stats .tbl th:nth-child(2), .det-stats .tbl th:nth-child(2) { width: 7%; } #stats .tbl th:nth-child(3), .det-stats .tbl th:nth-child(3) { width: 12%; }
   #stats .tbl td:first-child, .det-stats .tbl td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-.det-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
-.det-kpis .kpi.mot { box-shadow: inset 3px 0 0 var(--opp); }
+/* Nøkkeltall etter kamp (variant B, 16.11.2026): én rad per tall, vårt lag (ellers hjemmelaget) til venstre, det andre laget til høyre */
+.det-kpis { background: var(--sunk); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
+.det-kpis .sml-topp, .det-kpis .sml-r { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, auto) minmax(0, 1fr); gap: 10px; align-items: center; }
+.det-kpis .sml-topp { padding-bottom: 6px; border-bottom: 1px solid var(--line); font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .04em; text-transform: uppercase; }
+.det-kpis .sml-topp .lag-v { color: var(--accent); } .det-kpis .sml-topp .lag-h { color: var(--opp); text-align: right; }
+.det-kpis .sml-topp small { font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.det-kpis .sml-r { padding: 7px 0; border-bottom: 1px solid var(--line); }
+.det-kpis .sml-r:last-child { border-bottom: 0; }
+.det-kpis .kpi { background: none; padding: 0; border-radius: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.det-kpis .kpi.v { align-items: flex-start; } .det-kpis .kpi.h { align-items: flex-end; }
+.det-kpis .kpi .display { font-size: 24px; font-variant-numeric: tabular-nums; }
+.det-kpis .kpi.svak .display { color: var(--muted); }
+.det-kpis .kpi .avgbar { width: 100%; }
+.det-kpis .kpi.h .avgbar { transform: scaleX(-1); }
+.det-kpis .sml-l { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.25; }
 .det-stats { display: flex; flex-direction: column; gap: 12px; }
 .nm-k { display: none; }
 td.kort-n .nm-l { display: none; } td.kort-n .nm-k { display: inline; }
@@ -989,6 +1002,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .pl-rad .nr.mot { background: var(--opp-nr); color: #FFE2B8; }
 .pl-rad .nv { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-rad .avgbar { width: 40px; flex: none; }
+.pl-rad .pl-k { flex: none; min-width: 34px; text-align: right; font-family: var(--font-display); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--soft); }
+.pl-rad .pl-k.null { color: var(--faint); }
+.pl-liste h3.pl-hk { display: flex; justify-content: space-between; gap: 8px; }
 .pl-kort { flex: 999 1 520px; min-width: 0; background: var(--surface); border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
 .pl-topp { display: flex; gap: 18px; background: var(--sunk); border-radius: 18px; padding: 14px; flex-wrap: wrap; }
 .pl-foto { position: relative; width: 190px; height: 240px; border-radius: 14px; background: var(--row); border: 1px solid var(--line); overflow: hidden; flex: none; display: flex; align-items: center; justify-content: center; }
@@ -5395,9 +5411,21 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
   function stdKpis(m, teams) {
     const vaar = teams.find((t) => lagNorm(t.name) === lagNorm(usName(m))) || teams.find((t) => erVaartLag(m, t.name));
-    return '<div class="kpis det-kpis">' + teams.map((t) => { const T = t.totals || {}, side = t === vaar ? '' : ' mot';
-      return [['Angrep uttelling', T.kp], ['Angrep snitt (0–2)', T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null, 'att'], ['Mottak snitt (0–2)', T.recAvg, 'rec'], ['Perfekt mottak', T.recPerf], ['Ess / servefeil', T.aces != null ? T.aces + ' / ' + T.srvErr : null], ['Blokkpoeng', T.blocks]]
-        .filter((x) => x[1] != null && x[1] !== '').map((x) => '<div class="kpi' + side + '"><div class="display num">' + esc(x[1]) + '</div>' + (x[2] ? avgBarOnly(x[1], 'wide', x[2]) : '') + '<div class="k">' + esc(shortName(t.name)) + ' · ' + esc(x[0]) + '</div></div>').join(''); }).join('') + '</div>';
+    const v = vaar || teams.find((t) => lagNorm(t.name) === lagNorm(m.home)) || teams[0], h = teams.find((t) => t !== v);
+    const tall = (T) => [T.kp, T.eff != null ? dec(1 + parseFloat(String(T.eff).replace('−', '-').replace(',', '.')) / 100) : null, T.recAvg, T.recPerf, T.aces != null ? T.aces + ' / ' + T.srvErr : null, T.blocks];
+    const NAVN = ['Angrep uttelling', 'Angrep snitt (0–2)', 'Mottak snitt (0–2)', 'Perfekt mottak', 'Ess / servefeil', 'Blokkpoeng'], SNITT = [null, 'att', 'rec', null, null, null];
+    const tv = tall(v.totals || {}), th = h ? tall(h.totals || {}) : [];
+    // Sammenligning: ess/servefeil som differanse, ellers tallet (prosent eller desimal)
+    const num = (x, i) => { if (x == null || x === '') return null; if (i === 4) { const [a, b] = String(x).split('/').map((y) => parseFloat(y)); return a - b; } const n = parseFloat(String(x).replace('−', '-').replace(',', '.')); return isNaN(n) ? null : n; };
+    const side = (x, i, kl, svak) => '<div class="kpi ' + kl + (svak ? ' svak' : '') + '"><div class="display num">' + (x == null || x === '' ? '–' : esc(x)) + '</div>' + (SNITT[i] && x != null ? avgBarOnly(x, 'wide', SNITT[i]) : '') + '</div>';
+    const hb = (t) => t && lagNorm(t.name) === lagNorm(m.home) ? 'hjemme' : t && lagNorm(t.name) === lagNorm(m.away) ? 'borte' : '';
+    return '<div class="det-kpis" aria-label="Nøkkeltall">'
+      + '<div class="sml-topp"><span class="lag-v">' + esc(shortName(v.name)) + (hb(v) ? ' <small>' + hb(v) + '</small>' : '') + '</span><span></span><span class="lag-h">' + (h ? (hb(h) ? '<small>' + hb(h) + '</small> ' : '') + esc(shortName(h.name)) : '') + '</span></div>'
+      + NAVN.map((l, i) => { const a = tv[i], b = th[i];
+        if ((a == null || a === '') && (b == null || b === '')) return '';
+        const na = num(a, i), nb = num(b, i);
+        return '<div class="sml-r">' + side(a, i, 'v', na != null && nb != null && nb > na) + '<div class="sml-l">' + l + '</div>' + side(b, i, 'h', na != null && nb != null && na > nb) + '</div>'; }).join('')
+      + '</div>';
   }
 
   function legacyBlock(L) {
@@ -6300,6 +6328,29 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       rec: snitt(sum(tell, 'rn'), sum(tell, 'rs')) ?? snitt(sum(egen, 'rn'), sum(egen, 'rs'))
     };
   }
+  // Kamper spilt (16.11.2026): en kamp teller når spilleren har minst én registrering i egen føring (mottak, angrep, serve, blokk)
+  // eller står med tall eller settdeltakelse i NVBF/CEV. Hver kamp teller én gang. Nevner = lagets kamper med tall.
+  const plSpilte = (q) => (q.setParticipation || []).some((x) => x && x !== '') || ['att', 'rec', 'srv', 'pts', 'blocks', 'aces', 'srvErr', 'kills'].some((k) => +q[k] > 0);
+  function plKamper(p) {
+    if (p.liga) return null;
+    if (p.ours) {
+      const id = String(p.id), nr = String(p.nr || ''), rader = plRader();
+      const k = rader.filter((m) => (SEASON.logs[m.id] || []).some((e) => String(e.p) === id && ['rec', 'att', 'srv', 'blk'].includes(e.type))
+        || (() => { const t = m.nvbf && (m.nvbf.teams || []).find((x) => erVaartLag(m, x.name)); const q = t && nr && (t.players || []).find((x) => String(x.nr) === nr); return !!(q && plSpilte(q)); })()).length;
+      return { k, n: rader.length };
+    }
+    const navn = p.team || ((S.opps || {})[PL.lag] || {}).name, nr = String(p.nr), nv = String(p.name || '').toLowerCase().replace(/ \(l\)$/, '');
+    let n = 0, k = 0;
+    S.matches.filter((m) => !isTest(m) && !erForrunde(m) && m.status === 'ferdig' && (lagNorm(m.home) === lagNorm(navn) || lagNorm(m.away) === lagNorm(navn))).forEach((m) => {
+      const t = m.nvbf && (m.nvbf.teams || []).find((x) => lagNorm(x.name) === lagNorm(navn)), logg = isOurs(m) ? (SEASON.logs[m.id] || []) : [];
+      if (!t && !logg.length) return;
+      n++;
+      const q = t && ((t.players || []).find((x) => String(x.nr) === nr) || (nv && (t.players || []).find((x) => String(x.name || '').toLowerCase().replace(/ \(l\)$/, '') === nv)));
+      if ((q && plSpilte(q)) || logg.some((e) => String(e.p) === nr && (e.type === 'opp' || e.type === 'dir'))) k++;
+    });
+    return { k, n };
+  }
+  const plKTekst = (x) => x ? x.k + '/' + x.n : null;
   function playersView() {
     plUtkast();
     const alle = plSpillere();
@@ -6326,8 +6377,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     h += '<div class="pl-lag" role="group" aria-label="Lag">' + lagene.map((l) => '<button type="button" class="' + (l.k === 'our' || l.vaar ? '' : 'mot') + '" data-a="pl-lag" data-v="' + esc(l.k) + '" aria-pressed="' + (PL.lag === l.k) + '">' + esc(l.navn) + '<span>' + l.n + '</span></button>').join('') + '</div>';
     if (!alle.length) return h + '<div class="panel"><div class="empty">Ingen spillere i troppen ennå. ' + (PL.lag === 'our' ? 'Legg dem inn under «Spillere» i en kamp, eller importer troppen fra Work.' : 'Motstanderens tropp kommer når den er importert eller ført i en kamp.') + '</div></div></div>';
 
-    h += '<div class="pl-main"><nav class="pl-liste" aria-label="Spillere">' + grupper.map((g) => '<div><h3>' + esc(g.pos || 'Uten posisjon') + '</h3>'
-      + g.sp.map((x) => { const v = listeSnitt(x); return '<button type="button" class="pl-rad" data-a="pl-pick" data-id="' + esc(x.key) + '" aria-current="' + (p && x.key === p.key) + '"><span class="nr' + (x.ours || x.vaar ? '' : ' mot') + '">' + esc(x.nr || '–') + '</span><span class="nv">' + esc(x.name || '#' + x.nr) + '</span>' + (v != null ? avgBarOnly(v, '', 'rec') : '<span class="avgbar" aria-hidden="true"></span>') + '</button>'; }).join('') + '</div>').join('') + '</nav>';
+    const visK = !PL.sesong;
+    h += '<div class="pl-main"><nav class="pl-liste" aria-label="Spillere">' + grupper.map((g, gi) => '<div><h3' + (visK && gi === 0 ? ' class="pl-hk"><span>' + esc(g.pos || 'Uten posisjon') + '</span><span>Kamper</span>' : '>' + esc(g.pos || 'Uten posisjon')) + '</h3>'
+      + g.sp.map((x) => { const v = listeSnitt(x), kp = plKamper(x); return '<button type="button" class="pl-rad" data-a="pl-pick" data-id="' + esc(x.key) + '" aria-current="' + (p && x.key === p.key) + '"><span class="nr' + (x.ours || x.vaar ? '' : ' mot') + '">' + esc(x.nr || '–') + '</span><span class="nv">' + esc(x.name || '#' + x.nr) + '</span>' + (v != null ? avgBarOnly(v, '', 'rec') : '<span class="avgbar" aria-hidden="true"></span>') + (kp ? '<span class="pl-k' + (kp.k ? '' : ' null') + '" title="' + kp.k + ' av ' + kp.n + ' kamper">' + plKTekst(kp) + '</span>' : '') + '</button>'; }).join('') + '</div>').join('') + '</nav>';
     h += '<section class="pl-kort" aria-label="Spillerkort">' + (p ? plKort(p, kildeNavn) : '<div class="pl-tom">Velg en spiller i listen</div>') + '</section></div></div>';
     return h;
   }
@@ -6350,7 +6402,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     if (!p.ours) {
       const s = plMotStat(p), kildeN = (s.off.kamper[0] || {}).kilde || kildeNavn;
       const brukOff = PL.motKilde !== 'egen' ? !!(s.off.kamper.length || !s.egen.kamper.length) : false;
-      h = h.replace(fakta('Kamper', null), fakta('Kamper', String(brukOff ? s.off.kamper.filter((k) => !k.delvis).length : s.egen.kamper.length)));
+      h = h.replace(fakta('Kamper', null), fakta('Kamper', plKTekst(plKamper(p))));
       h += '<div class="pl-src" role="group" aria-label="Kilde"><button type="button" data-a="pl-motkilde" data-v="off" aria-pressed="' + brukOff + '">' + esc(kildeN) + ' (alle kamper)</button><button type="button" data-a="pl-motkilde" data-v="egen" aria-pressed="' + !brukOff + '">Egen føring mot oss</button></div>';
       const kpi = (l, v, n, ord, kind) => '<div><span class="label">' + l + '</span><b>' + d2(v) + ' <small>' + n + ' ' + ord + '</small></b>' + (v != null ? avgBarOnly(v, 'wide', kind, p.pos) : '') + '</div>';
       const cell = (v, kind) => '<td>' + avgBar(v, d2(v), kind, p.pos) + '</td>';
@@ -6379,7 +6431,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     const egen = PL.omfang === 'gruppe' ? plFraHist(hist.rader, 'egen') : plStat(p, 'egen'), off = PL.omfang === 'gruppe' ? plFraHist(hist.rader, 'off') : plStat(p, 'off');
     if (!PL.kilde) PL.kilde = egen.kamper.length || !off.kamper.length ? 'egen' : 'off';
     const s = PL.kilde === 'off' ? off : egen;
-    h = h.replace(fakta('Kamper', null), fakta('Kamper', String(s.kamper.filter((k) => !k.delvis).length)));
+    h = h.replace(fakta('Kamper', null), fakta('Kamper', plKTekst(plKamper(p))));
     if (gruppe) h += '<div class="pl-src" role="group" aria-label="Omfang"><button type="button" data-a="pl-omfang" data-v="sesong" aria-pressed="' + (PL.omfang === 'sesong') + '">Denne sesongen</button><button type="button" data-a="pl-omfang" data-v="gruppe" aria-pressed="' + (PL.omfang === 'gruppe') + '">Alle landslagssesonger</button></div>'
       + (PL.omfang === 'gruppe' ? '<div class="status">' + esc([...new Set(hist.rader.map((r) => r.context_name))].join(' + ')) + '. Klubbstatistikk er aldri med.</div>' : '');
     h += '<div class="pl-src" role="group" aria-label="Kilde"><button type="button" data-a="pl-kilde" data-v="egen" aria-pressed="' + (PL.kilde === 'egen') + '">Egen føring</button><button type="button" data-a="pl-kilde" data-v="off" aria-pressed="' + (PL.kilde === 'off') + '">' + esc(kildeNavn) + '</button></div>';

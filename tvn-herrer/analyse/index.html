@@ -1813,7 +1813,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 .kp-seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
 .kp-status { font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); }
 .kp-status.ulagret { background: var(--warn-bg); color: var(--warn); } .kp-status.lagret { color: var(--ok); } .kp-status.feil { color: var(--bad); }
-.kp-ark { --p: #FFFFFF; --b: #16181D; --bs: #5A6070; --pl: #DAD7CF; background: var(--p); color: var(--b); border-radius: 6px; padding: 28px 30px; display: flex; flex-direction: column; gap: 18px; max-width: 840px; margin: 0 auto; width: 100%; box-shadow: 0 2px 18px rgba(0,0,0,.35); }
+.kp-ark { --p: #FFFFFF; --b: #16181D; --bs: #5A6070; --pl: #DAD7CF; box-sizing: border-box; background: var(--p); color: var(--b); border-radius: 6px; padding: 28px 30px; display: flex; flex-direction: column; gap: 18px; max-width: 840px; margin: 0 auto; width: 100%; box-shadow: 0 2px 18px rgba(0,0,0,.35); }
 .kp-ark h2 { margin: 0; font: 700 30px/1.05 var(--font-display); color: var(--b); text-transform: none; letter-spacing: 0; }
 .kp-ark h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--bs); border-bottom: 2px solid var(--b); padding-bottom: 4px; }
 .kp-ark .hode { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px 12px; flex-wrap: wrap; border-bottom: 4px solid var(--b); padding-bottom: 10px; }
@@ -1826,7 +1826,12 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
 .kp-ark th { text-align: left; font-size: 11px; font-weight: 600; color: var(--bs); padding: 3px 4px; border-bottom: 1px solid var(--pl); }
 .kp-ark td { padding: 4px; border-bottom: 1px solid var(--pl); vertical-align: middle; }
 .kp-ark td.r { font: 700 16px var(--font-display); }
-.kp-stolpe { display: flex; height: 14px; border-radius: 3px; overflow: hidden; font-size: 10px; color: #FFFFFF; font-weight: 600; min-width: 90px; }
+.kp-stolpe { display: flex; height: 14px; border-radius: 3px; overflow: hidden; font-size: 10px; color: #FFFFFF; font-weight: 600; min-width: 0; }
+/* Deres angrep (16.11.2026): faste kolonner, så retningsstolpen aldri går ut av arket på iPhone */
+.kp-angrep { table-layout: fixed; }
+.kp-angrep th:nth-child(2), .kp-angrep th:nth-child(3) { width: 3.6em; } .kp-angrep th:nth-child(4) { width: 34%; }
+.kp-angrep td:first-child { overflow-wrap: anywhere; }
+.kp-angrep .kilde { white-space: nowrap; }
 .kp-stolpe span { display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .kp-fokus { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: f; }
 .kp-fokus li { counter-increment: f; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; font-size: 15px; align-items: baseline; }
@@ -1907,7 +1912,7 @@ tr.klikk { cursor: pointer; } tr.klikk:hover td { background: var(--sunk); } tr.
         + '<section><h3>Fokus</h3>' + fokusListe() + '</section><div class="kp-to">';
       // Deres angrep
       h += '<section><h3>Deres angrep</h3>';
-      if (v.angrep.length) h += '<table><thead><tr><th>Spiller</th><th>Andel</th><th>Kill</th><th>Retning</th></tr></thead><tbody>' + v.angrep.map((a) => '<tr><td><b>#' + esc(a.nr) + '</b> ' + esc(a.navn) + '</td><td>' + (a.andel != null ? Math.round(a.andel) + ' %' : '–') + '</td><td>' + (a.killPct != null ? Math.round(a.killPct) + ' %' : '–') + '</td><td>'
+      if (v.angrep.length) h += '<table class="kp-angrep"><thead><tr><th>Spiller</th><th>Andel</th><th>Kill</th><th>Retning</th></tr></thead><tbody>' + v.angrep.map((a) => '<tr><td><b>#' + esc(a.nr) + '</b> ' + esc(a.navn) + '</td><td>' + (a.andel != null ? Math.round(a.andel) + ' %' : '–') + '</td><td>' + (a.killPct != null ? Math.round(a.killPct) + ' %' : '–') + '</td><td>'
         + (a.retning ? '<div class="kp-stolpe" title="' + a.retning.n + ' slag"><span style="width:' + a.retning.diagonal + '%;background:#1B4592">' + (a.retning.diagonal >= 15 ? 'D' : '') + '</span><span style="width:' + a.retning.linje + '%;background:#B3261E">' + (a.retning.linje >= 15 ? 'L' : '') + '</span><span style="width:' + a.retning.dip + '%;background:#8A6D1F">' + (a.retning.dip >= 15 ? 'dip' : '') + '</span></div>' : '<span class="kilde">ingen slag</span>') + '</td></tr>').join('') + '</tbody></table>';
       else h += '<p class="kp-tom">Ingen angrepstall for ' + esc(v.mot) + ' ennå.</p>';
       h += '<p class="kilde">Angrep fra scouting (NVBF/CEV og egen føring). Retning fra slagretninger' + (v.retning ? ', ' + v.retning.n + ' slag' : '') + '.' + (v.mottak ? ' Lagets mottak: ' + Math.round(v.mottak.feilPct) + ' % feil' + (v.mottak.posPct != null ? ', ' + Math.round(v.mottak.posPct) + ' % positivt' : '') + '.' : '') + '</p></section>';
