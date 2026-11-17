@@ -6530,6 +6530,9 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   // Lagres som vanlige registreringer med type 'dir' i samme logg: x1,y1 treffpunkt, x2,y2 landing, k = 'line' | 'dip', c = K/F/B/D
   const DCOL = ['#2F6FE0', '#2FAE52', '#D9473E', '#E8891C', '#8B4FD6', '#18A3B2', '#D64F9A', '#5C6270'];
   const DRES = { K: 'Kill', F: 'Feil', B: 'Blokk', D: 'Forsvart' };
+  // Filter på utfall i Slagretning (17.11.2026): samme rekkefølge og navn som knappene i registreringen
+  const DUTF = [['all', 'Alle utfall'], ['K', 'Kill'], ['B', 'Blokk'], ['F', 'Feil'], ['D', 'I spill']];
+  const dirUtfOk = (e) => DIR.utf === 'all' || e.c === DIR.utf;
   // ---------- Oppstilling (issue #20) ----------
   // Velgeren åpnes automatisk én gang per ubekreftet sett (start av sett 1 og hvert nye sett), ikke for et bekreftet sett.
   // Én bekreftelse lagrer oppstillingen (lineups) og oppdaterer onCourt og receivers i samme kampoppdatering.
@@ -6580,7 +6583,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     opsAapne(m);
   }
 
-  const DIR = { open: false, el: null, active: null, view: 'lines', who: 'all', set: 'all', kind: 'all', drawing: null, fs: false };
+  const DIR = { open: false, el: null, active: null, view: 'lines', who: 'all', set: 'all', kind: 'all', utf: 'all', drawing: null, fs: false };
   window.addEventListener('resize', () => { if (DIR.fs) requestAnimationFrame(dirFsOppsett); });
   const NS = 'http://www.w3.org/2000/svg';
   const svgEl = (t, attrs) => { const n = document.createElementNS(NS, t); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
@@ -6946,7 +6949,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<div class="bar-actions">'
       + (window.BaneFS ? '<button class="barbtn" data-d="stor" id="dir-storbtn">Fullskjerm</button>' : fsOk() ? '<button class="barbtn" data-d="fs" id="dir-fsbtn"></button>' : '') + '<button class="barbtn" data-d="print">Skriv ut</button><button class="barbtn" data-d="printall">Skriv ut alle</button>'
       + '<button class="barbtn primary-bar" data-d="close">' + (DIR.ro ? 'Lukk' : 'Ferdig') + '</button></div></header>'
-      + '<div class="dir-pick" id="dir-pick"><div class="dir-pl" id="dir-pick-pl"></div><div class="seg" id="dir-pview"></div><div class="seg" id="dir-pkind"></div><div class="seg" id="dir-psets"></div></div>'
+      + '<div class="dir-pick" id="dir-pick"><div class="dir-pl" id="dir-pick-pl"></div><div class="seg" id="dir-pview"></div><div class="seg" id="dir-pkind"></div><div class="seg" id="dir-putf"></div><div class="seg" id="dir-psets"></div></div>'
       + '<div class="dir-ptitle" id="dir-ptitle"></div>'
       + '<div class="dir-body"><div class="dir-court">' + COURT_SVG + '</div>'
       + '<div class="dir-side">'
@@ -6954,7 +6957,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + '<form class="addopp" id="dir-form"><label for="dir-nr" class="label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Draktnummer</label><input id="dir-nr" type="text" inputmode="numeric" placeholder="Nr" maxlength="3"><button type="submit">+ Nummer</button></form></section>'
       + '<section class="panel" id="dir-lastp"><div class="panel-head"><h2>Siste slag</h2></div><div class="status" id="dir-last"></div><div class="dir-res" id="dir-res">'
       + Object.entries(DRES).map(([k, l]) => '<button data-d="res" data-v="' + k + '" aria-pressed="false">' + l + '</button>').join('') + '</div></section>'
-      + '<section class="panel"><div class="panel-head"><h2>Visning</h2></div><div class="seg" id="dir-view"></div><div class="seg" id="dir-who"></div><div class="seg" id="dir-kind"></div><div class="seg" id="dir-sets"></div></section>'
+      + '<section class="panel"><div class="panel-head"><h2>Visning</h2></div><div class="seg" id="dir-view"></div><div class="seg" id="dir-who"></div><div class="seg" id="dir-kind"></div><div class="seg" id="dir-utf"></div><div class="seg" id="dir-sets"></div></section>'
       + '<section class="panel dir-sum"><div class="panel-head"><h2>Oppsummering</h2></div><div class="tbl-wrap"><table class="tbl" id="dir-stats"></table></div><div class="code-legend">Diagonal og linje regnes ut fra pilens vinkel. Soner er på vår banehalvdel: 4-3-2 foran, 5-6-1 bak. I Soner er slag en fylt sirkel og dip en hul ruter, og hver sone viser antall slag og dip. Velg «Bare slag» eller «Bare dip» for å se hvor spilleren foretrekker hvert av dem.</div></section>'
       + '</div></div>'
       + '<div class="dir-bunn"><button class="primary" type="button" data-d="close">' + (DIR.ro ? 'Lukk' : 'Ferdig') + '</button></div>'
@@ -7065,6 +7068,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
           : { key: 'spiller', navn: 'Spiller', verdi: DIR.who === 'all' ? '*' : DIR.active, standard: '*', valg: [['*', 'Hele laget']].concat(nums.map((n) => [n, '#' + n])) },
       { key: 'set', navn: 'Sett', verdi: String(DIR.set), standard: 'all', valg: sett },
       { key: 'kind', navn: 'Type', verdi: DIR.kind, standard: 'all', valg: [['all', 'Slag og dip'], ['hit', 'Bare slag'], ['dip', 'Bare dip']] },
+      { key: 'utf', navn: 'Utfall', verdi: DIR.utf, standard: 'all', valg: DUTF },
     ];
     const ekstra = '<span class="bfs-seg" role="group" aria-label="Visning"><button data-d="view" data-v="lines" aria-pressed="' + (DIR.view === 'lines') + '">Piler</button><button data-d="view" data-v="heat" aria-pressed="' + (DIR.view === 'heat') + '">Soner</button></span>'
       ;
@@ -7092,6 +7096,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     else if (a === 'view') { DIR.view = b.dataset.v; dirUpdate(); }
     else if (a === 'who') { DIR.who = b.dataset.v; dirUpdate(); }
     else if (a === 'kind') { DIR.kind = b.dataset.v; dirUpdate(); }
+    else if (a === 'utf') { DIR.utf = b.dataset.v; dirUpdate(); }
     else if (a === 'set') { DIR.set = b.dataset.v; dirUpdate(); }
     else if (a === 'pick') { if (b.dataset.v === '*') DIR.who = 'all'; else { DIR.who = 'active'; DIR.active = b.dataset.v; } dirUpdate(); }
     else if (a === 'pres') { DIR.pres = !DIR.pres; DIR.el.classList.toggle('pres', DIR.pres); dirUpdate(); }
@@ -7112,7 +7117,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       const nums = dirNums(m), who = [['*', 'Hele laget']].concat(nums.filter((n) => evs.some((e) => String(e.p) === n)).map((n) => [n, '#' + n]));
       box = document.createElement('div'); box.className = 'dir-print';
       who.forEach(([v, label], i) => {
-        const vis = evs.filter((e) => (v === '*' || String(e.p) === v) && (DIR.kind === 'all' || (DIR.kind === 'dip') === (e.k === 'dip')));
+        const vis = evs.filter((e) => (v === '*' || String(e.p) === v) && (DIR.kind === 'all' || (DIR.kind === 'dip') === (e.k === 'dip')) && dirUtfOk(e));
         const pg = document.createElement('section'); pg.className = 'dir-page';
         pg.innerHTML = '<div class="dir-ptitle">' + dirTitle(m, label) + '</div>' + COURT_SVG.replace(/ id="dir-/g, ' data-x="') + '<div class="tbl-wrap"><table class="tbl">' + dirTable(evs, nums, v === '*' ? null : v) + '</table></div>';
         const pick = (x) => pg.querySelector('[data-x="' + x + '"]');
@@ -7133,7 +7138,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
   }
   function dirTitle(m, label) {
     const oppName = m.home === usName(m) ? m.away : m.home;
-    const bits = [DIR.set === 'all' ? 'Hele kampen' : 'Sett ' + DIR.set, DIR.view === 'heat' ? 'Soner' : 'Piler', { all: 'Slag og dip', hit: 'Bare slag', dip: 'Bare dip' }[DIR.kind]];
+    const bits = [DIR.set === 'all' ? 'Hele kampen' : 'Sett ' + DIR.set, DIR.view === 'heat' ? 'Soner' : 'Piler', { all: 'Slag og dip', hit: 'Bare slag', dip: 'Bare dip' }[DIR.kind]].concat(DIR.utf === 'all' ? [] : [(DUTF.find((x) => x[0] === DIR.utf) || [])[1]]);
     return 'Slagretning ' + esc(shortName(oppName)) + ' · ' + esc(label) + '<small>' + esc(shortName(m.home)) + ' – ' + esc(shortName(m.away)) + (m.date ? ' · ' + esc(String(m.date).slice(0, 10)) : '') + ' · ' + bits.join(' · ') + '</small>';
   }
   // Snitt 0–2 for motstanderens angrep, som vårt: kill 2, i spill 1, feil og blokkert 0
@@ -7172,6 +7177,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     seg('#dir-view', 'view', [['lines', 'Piler'], ['heat', 'Soner']], DIR.view);
     seg('#dir-who', 'who', [['all', 'Alle spillere'], ['active', 'Valgt spiller']], DIR.who);
     seg('#dir-kind', 'kind', [['all', 'Slag og dip'], ['hit', 'Bare slag'], ['dip', 'Bare dip']], DIR.kind);
+    seg('#dir-utf', 'utf', DUTF, DIR.utf);
     const sets = [...new Set(all.map((e) => e.set).concat([cs]))].sort((a, b) => a - b);
     seg('#dir-sets', 'set', [['all', 'Kamp']].concat(sets.map((s) => [s, 'Sett ' + s])), DIR.set);
     // Siste eget slag
@@ -7182,7 +7188,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
     // Utvalg
     const isDip = (e) => e.k === 'dip';
     const visAll = all.filter((e) => (DIR.set === 'all' || String(e.set) === String(DIR.set)) && (DIR.who === 'all' || String(e.p) === String(DIR.active)));
-    const vis = visAll.filter((e) => DIR.kind === 'all' || (DIR.kind === 'dip') === isDip(e));
+    const vis = visAll.filter((e) => (DIR.kind === 'all' || (DIR.kind === 'dip') === isDip(e)) && dirUtfOk(e));
     const lastT = all.length ? all[all.length - 1].t : -1;
     if (DIR.endre && !all.includes(DIR.endre.ev)) {   // loggen er lest inn på nytt: finn samme slag igjen, ellers er det angret eller byttet ut
       const v = DIR.endre.ev, igjen = all.find((e) => e.t === v.t && String(e.p) === String(v.p) && String(e.set) === String(v.set) && e.c === v.c && e.x1 === v.x1 && e.y1 === v.y1);
@@ -7197,6 +7203,7 @@ table.rp-ka { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
       + withEv.map((n) => '<button data-d="pick" data-v="' + esc(n) + '" aria-pressed="' + (DIR.who !== 'all' && n === DIR.active) + '"><span class="dir-dot" style="background:' + dirColor(n) + '"></span>' + esc(n) + '</button>').join('');
     seg('#dir-pview', 'view', [['lines', 'Piler'], ['heat', 'Soner']], DIR.view);
     seg('#dir-pkind', 'kind', [['all', 'Slag og dip'], ['hit', 'Bare slag'], ['dip', 'Bare dip']], DIR.kind);
+    seg('#dir-putf', 'utf', DUTF, DIR.utf);
     seg('#dir-psets', 'set', [['all', 'Kamp']].concat(sets.map((s) => [s, 'Sett ' + s])), DIR.set);
     q('#dir-ptitle').innerHTML = dirTitle(m, DIR.who === 'all' ? 'Hele laget' : '#' + DIR.active);
     const pb = q('#dir-presbtn'); if (pb) pb.textContent = DIR.pres ? 'Registrer' : 'Visning';
